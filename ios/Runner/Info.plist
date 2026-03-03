@@ -6,6 +6,8 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Show your position on the route map so you can see your progress along the path.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Jippy Mobile</string>
 	<key>CFBundleExecutable</key>
