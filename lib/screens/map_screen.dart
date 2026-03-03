@@ -159,6 +159,8 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ],
           ),
+          _buildSearchBar(context),
+          _buildBottomDrawer(context),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
@@ -175,6 +177,130 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Polylines to draw (static routes + selected A* path). Empty until route data is wired.
   List<Polyline<Object>> get _routePolylines => [];
+
+  /// Floating pill-shaped search bar at top (design system: "Where do you want to go?").
+  /// Tapping will later expand to full-screen search; placeholder for now.
+  Widget _buildSearchBar(BuildContext context) {
+    final topPadding = MediaQuery.paddingOf(context).top + 8;
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Padding(
+        padding: EdgeInsets.only(top: topPadding, left: 16, right: 16),
+        child: Material(
+          elevation: 2,
+          shadowColor: Colors.black26,
+          borderRadius: BorderRadius.circular(24),
+          color: MapColors.background,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Icon(Icons.menu, color: MapColors.text, size: 24),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      // TODO: Expand to full-screen search view when implemented.
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: Text(
+                        'Where do you want to go?',
+                        style: TextStyle(
+                          color: MapColors.text.withValues(alpha: 0.6),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Icon(Icons.search, color: MapColors.text, size: 24),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Bottom drawer with grab handle and sections: Home, Route, Settings.
+  Widget _buildBottomDrawer(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.12,
+      minChildSize: 0.12,
+      maxChildSize: 0.6,
+      builder: (BuildContext context, ScrollController scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: MapColors.background,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: ListView(
+            controller: scrollController,
+            padding: EdgeInsets.zero,
+            children: [
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: MapColors.text.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _drawerSectionTile(
+                icon: Icons.home_outlined,
+                title: 'Home',
+                onTap: () {},
+              ),
+              _drawerSectionTile(
+                icon: Icons.route_outlined,
+                title: 'Route',
+                onTap: () {},
+              ),
+              _drawerSectionTile(
+                icon: Icons.settings_outlined,
+                title: 'Settings',
+                onTap: () {},
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _drawerSectionTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: MapColors.text, size: 24),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: MapColors.text,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
 
   Widget _buildLocationMessage(String message) {
     return Positioned(
