@@ -6,6 +6,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/theme/map_colors.dart';
+import '../data/map_data_loader.dart';
+import '../models/routes_and_stations_data.dart';
 
 /// Default center for the map: Iloilo City, Philippines.
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
@@ -39,10 +41,21 @@ class _MapScreenState extends State<MapScreen> {
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
 
+  /// Loaded routes and stations from dashboard API (sample asset for now).
+  RoutesAndStationsData? _mapData;
+  /// When true, tricycle stations are shown. Ready for future checkbox UI.
+  bool _showStations = true;
+
   @override
   void initState() {
     super.initState();
     _initLocation();
+    _loadMapData();
+  }
+
+  Future<void> _loadMapData() async {
+    final data = await loadSampleMapData();
+    if (mounted) setState(() => _mapData = data);
   }
 
   Future<void> _initLocation() async {
@@ -113,10 +126,10 @@ class _MapScreenState extends State<MapScreen> {
                 urlTemplate: _osmTileUrl,
                 userAgentPackageName: _userAgentPackageName,
               ),
-              // Polylines for static jeepney routes and A* path (empty until route data exists).
-              PolylineLayer<Object>(
-                polylines: _routePolylines,
-              ),
+              // Polylines for static jeepney routes and A* path.
+              PolylineLayer<Object>(polylines: _routePolylines),
+              if (_showStations && _mapData != null && _mapData!.stations.isNotEmpty)
+                MarkerLayer(markers: _stationMarkers),
               if (_userPosition != null)
                 MarkerLayer(
                   markers: [
@@ -132,10 +145,7 @@ class _MapScreenState extends State<MapScreen> {
                         decoration: BoxDecoration(
                           color: MapColors.userLocationColor,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2,
-                          ),
+                          border: Border.all(color: Colors.white, width: 2),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black26,
@@ -152,9 +162,7 @@ class _MapScreenState extends State<MapScreen> {
                 animationConfig: const ScaleRAWA(),
                 showFlutterMapAttribution: false,
                 attributions: [
-                  const TextSourceAttribution(
-                    'OpenStreetMap contributors',
-                  ),
+                  const TextSourceAttribution('OpenStreetMap contributors'),
                 ],
               ),
             ],
@@ -175,8 +183,62 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  /// Polylines to draw (static routes + selected A* path). Empty until route data is wired.
-  List<Polyline<Object>> get _routePolylines => [];
+  /// Polylines to draw (static jeepney routes from API; A* path can be appended later).
+  List<Polyline<Object>> get _routePolylines {
+    final routes = _mapData?.routes ?? [];
+    final polylines = <Polyline<Object>>[];
+    for (final route in routes) {
+      final sorted = List.of(route.points)..sort((a, b) => a.sequence.compareTo(b.sequence));
+      final points = sorted.map((p) => LatLng(p.lat, p.lon)).toList();
+      if (points.length < 2) continue;
+      final color = _parseRouteColor(route.routeColor);
+      polylines.add(Polyline<Object>(
+        points: points,
+        color: color,
+        strokeWidth: MapColors.jeepneyRouteStrokeWidth,
+      ));
+    }
+    return polylines;
+  }
+
+  /// Tricycle station markers (accent color, distinct from user dot).
+  List<Marker> get _stationMarkers {
+    final stations = _mapData?.stations ?? [];
+    return stations
+        .map((s) => Marker(
+              point: LatLng(s.lat, s.lon),
+              width: 20,
+              height: 20,
+              alignment: Alignment.center,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: MapColors.accentColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 2,
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+              ),
+            ))
+        .toList();
+  }
+
+  /// Parses hex route color (e.g. "#009e49"); returns [MapColors.jeepneyRouteColor] on failure.
+  Color _parseRouteColor(String hex) {
+    try {
+      String s = hex.trim();
+      if (s.startsWith('#')) s = s.substring(1);
+      if (s.length == 6) s = 'FF$s';
+      return Color(int.parse(s, radix: 16));
+    } catch (_) {
+      return MapColors.jeepneyRouteColor;
+    }
+  }
 
   /// Floating pill-shaped search bar at top (design system: "Where do you want to go?").
   /// Tapping will later expand to full-screen search; placeholder for now.
@@ -315,15 +377,15 @@ class _MapScreenState extends State<MapScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              Icon(Icons.location_off, color: MapColors.text.withValues(alpha: 0.7)),
+              Icon(
+                Icons.location_off,
+                color: MapColors.text.withValues(alpha: 0.7),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   message,
-                  style: TextStyle(
-                    color: MapColors.text,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: MapColors.text, fontSize: 13),
                 ),
               ),
             ],
