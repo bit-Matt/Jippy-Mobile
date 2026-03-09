@@ -1,0 +1,281 @@
+{
+  "ok": true,
+  "data": {
+    "routes": [
+      {
+        "id": "019c7a33-db0d-71df-8905-244b696ccc74",
+        "routeNumber": "01",
+        "routeName": "Savannnah 2",
+        "routeColor": "#009e49",
+        "points": [
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-5a80082708cc",
+            "sequence": 0,
+            "address": "Iloilo R-2 Road, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7454397285424, 122.513281702995]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-5c8a13d8c824",
+            "sequence": 1,
+            "address": "F. Gorriceta Avenue, Pandac, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7431063374748, 122.515062689781]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-600957f5df5b",
+            "sequence": 2,
+            "address": "F. Gorriceta Avenue, Pandac, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7462772166498, 122.51743376255]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-640e403a5608",
+            "sequence": 3,
+            "address": "F. Gorriceta Avenue, Pandac, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7490568454995, 122.519536614418]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-6a7a4b2ffd13",
+            "sequence": 4,
+            "address": "F. Gorriceta Avenue, Pandac, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7524067438419, 122.52200961113]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-6e896780b13f",
+            "sequence": 5,
+            "address": "F. Gorriceta Avenue, Pandac, Balabag, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7558497647426, 122.524525523186]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-7029449b847b",
+            "sequence": 6,
+            "address": "F. Gorriceta Avenue, Saint Joseph, Pandac, Poblacion, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7597758113378, 122.527288198471]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-771fe24f9c8e",
+            "sequence": 7,
+            "address": "F. Gorriceta Avenue, CPU Centennial Village, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7635974188975, 122.530077695847]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-7a8198802940",
+            "sequence": 8,
+            "address": "F. Gorriceta Avenue, CPU Centennial Village, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7663955454878, 122.533113956451]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-7f152fb77975",
+            "sequence": 9,
+            "address": "F. Gorriceta Avenue, CPU Centennial Village, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7687883012587, 122.535753250122]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-83ab5fbfe6d9",
+            "sequence": 10,
+            "address": "Benigno S. Aquino Jr. Avenue, CPU Centennial Village, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7693571173174, 122.536418437958]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-85f1729ce4b0",
+            "sequence": 11,
+            "address": "Benigno S. Aquino Jr. Avenue, Aganan, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7661909536605, 122.536836862564]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-88448a6e94b1",
+            "sequence": 12,
+            "address": "Benigno S. Aquino Jr. Avenue, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7631558889416, 122.537341117859]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-8f5e79353bc3",
+            "sequence": 13,
+            "address": "Benigno S. Aquino Jr. Avenue, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7607943494795, 122.537716627121]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-91a1986c1dbd",
+            "sequence": 14,
+            "address": "Benigno S. Aquino Jr. Avenue, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7595194673674, 122.537925839424]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-974e8e346d9d",
+            "sequence": 15,
+            "address": "Benigno S. Aquino Jr. Avenue, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7578641799152, 122.538188695908]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-992a528184c6",
+            "sequence": 16,
+            "address": "Benigno S. Aquino Jr. Avenue, Ungka II, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7554044756418, 122.538408637047]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-9e70fd756228",
+            "sequence": 17,
+            "address": "Benigno S. Aquino Jr. Avenue, Ungka II, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7547541733357, 122.538446187973]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-a16a90569e27",
+            "sequence": 18,
+            "address": "Ungka Flyover, Ungka II Flyover, Ungka Ⅱ, Ungka II, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7528667573664, 122.538532018662]
+          },
+          {
+            "id": "019cb3fa-3bf8-74f2-aa46-a75a62564eb8",
+            "sequence": 19,
+            "address": "Benigno S. Aquino Jr. Avenue, Ungka Ⅱ, Ungka II, Pavia, Iloilo, Western Visayas, 5001, Philippines",
+            "point": [10.7497731196925, 122.538714408875]
+          }
+        ]
+      },
+      {
+        "id": "019cafd8-cf52-724a-9d4b-e85693d6b9f7",
+        "routeNumber": "02",
+        "routeName": "Highway test",
+        "routeColor": "#e81123",
+        "points": [
+          {
+            "id": "019cafd8-e8ac-77da-a886-5f2972824735",
+            "sequence": 0,
+            "address": "Benigno S. Aquino Jr. Avenue, Dungon A, Desamparados, Jaro, Calubihan, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.7248858388693, 122.549561262131]
+          },
+          {
+            "id": "019cafd8-e8ad-779e-8d33-5b57feffeb91",
+            "sequence": 1,
+            "address": "Benigno S. Aquino Jr. Avenue, Buhang Taft-North, Bakhaw, Mandurriao, Calubihan, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.7204478662225, 122.551653385162]
+          },
+          {
+            "id": "019cafd8-e8ad-779e-8d33-5cb67ab28373",
+            "sequence": 2,
+            "address": "Benigno S. Aquino Jr. Avenue, Buhang Taft-North, Bakhaw, Mandurriao, Calubihan, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.7158938693922, 122.552726268768]
+          },
+          {
+            "id": "019cafd8-e8ad-779e-8d33-61ec1d349cfb",
+            "sequence": 3,
+            "address": "Monkey Grounds Coffee, PH52+FJ9, Benigno S. Aquino Jr. Avenue, San Rafael, Mandurriao, Calubihan, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.7092419592664, 122.551599740982]
+          },
+          {
+            "id": "019cafd8-e8ad-779e-8d33-64e75a648be2",
+            "sequence": 4,
+            "address": "Benigno S. Aquino Jr. Avenue, San Rafael, Mandurriao, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.7029694221045, 122.553230524063]
+          },
+          {
+            "id": "019cafd8-e8ad-779e-8d33-6a5b4598859d",
+            "sequence": 5,
+            "address": "Infante Avenue, Cochero, Molo, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.6973714684117, 122.554678916931]
+          }
+        ]
+      }
+    ],
+    "regions": [
+      {
+        "id": "019cb3f9-c070-7453-8db5-5bddd964bc1d",
+        "regionName": "Station 2",
+        "regionColor": "#ec008c",
+        "regionShape": "Polygon",
+        "points": [
+          {
+            "id": "019cb3f9-c071-76be-ba2a-cb8f9183cf77",
+            "sequence": 0,
+            "point": [10.7461787682929, 122.556931972504]
+          },
+          {
+            "id": "019cb3f9-c071-76be-ba2a-cc4e0ce6e7fc",
+            "sequence": 1,
+            "point": [10.7418148941217, 122.56246805191]
+          },
+          {
+            "id": "019cb3f9-c071-76be-ba2a-d1f9f0b9ff84",
+            "sequence": 2,
+            "point": [10.7439441352917, 122.563916444778]
+          },
+          {
+            "id": "019cb3f9-c071-76be-ba2a-d47d46de0a0a",
+            "sequence": 3,
+            "point": [10.743121954837, 122.564688920975]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-a552a578a5de",
+            "sequence": 4,
+            "point": [10.7429954653376, 122.564967870712]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-ab729a1a4b67",
+            "sequence": 5,
+            "point": [10.7462420123825, 122.567092180252]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-af1a035a7d46",
+            "sequence": 6,
+            "point": [10.74696931846, 122.567542791367]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-b1827542cf06",
+            "sequence": 7,
+            "point": [10.7489825768688, 122.566384077072]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-b499b30bc121",
+            "sequence": 8,
+            "point": [10.7507428493949, 122.564989328384]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-b9beece1da9c",
+            "sequence": 9,
+            "point": [10.7521974381054, 122.560697793961]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-bfaed2a58588",
+            "sequence": 10,
+            "point": [10.7501314984238, 122.558391094208]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-c0030f88e816",
+            "sequence": 11,
+            "point": [10.7486979809453, 122.557414770126]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-c4ea1a481dc6",
+            "sequence": 12,
+            "point": [10.7496677141024, 122.555311918259]
+          },
+          {
+            "id": "019cb3f9-c072-740d-ad34-cb32670520e6",
+            "sequence": 13,
+            "point": [10.748086625832, 122.554271221161]
+          }
+        ],
+        "stations": [
+          {
+            "id": "019cb3f9-c07e-7464-9b3b-f83757fefa56",
+            "address": "Carmen J Ledesma Village, M. V. Hechanova, Jaro, Quintin Salas, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.7457993034774, 122.557801008225]
+          },
+          {
+            "id": "019cb3f9-c07e-7464-9b3b-f53485375fce",
+            "address": "Cypress Avenue, Gran Plains, M. V. Hechanova, Jaro, Quintin Salas, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.7447136098431, 122.55917429924]
+          },
+          {
+            "id": "019cb3f9-c07e-7464-9b3b-f090d81f0e7a",
+            "address": "Yellow Bell Street, Gran Plains, M. V. Hechanova, Jaro, Quintin Salas, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.7456411929968, 122.56641626358]
+          },
+          {
+            "id": "019cb3f9-c07e-7464-9b3b-ee7a46b9409d",
+            "address": "Toyota Iloilo, MacArthur Drive, M. V. Hechanova, Jaro, Quintin Salas, Iloilo City, Western Visayas, 5000, Philippines",
+            "point": [10.743543586119, 122.565171718597]
+          }
+        ]
+      }
+    ]
+  }
+}
