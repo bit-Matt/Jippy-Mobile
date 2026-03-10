@@ -43,8 +43,9 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Loaded routes and stations from dashboard API (sample asset for now).
   RoutesAndStationsData? _mapData;
+
   /// When true, tricycle stations are shown. Ready for future checkbox UI.
-  bool _showStations = true;
+  final bool _showStations = true;
 
   @override
   void initState() {
@@ -128,7 +129,9 @@ class _MapScreenState extends State<MapScreen> {
               ),
               // Polylines for static jeepney routes and A* path.
               PolylineLayer<Object>(polylines: _routePolylines),
-              if (_showStations && _mapData != null && _mapData!.stations.isNotEmpty)
+              if (_showStations &&
+                  _mapData != null &&
+                  _mapData!.stations.isNotEmpty)
                 MarkerLayer(markers: _stationMarkers),
               if (_userPosition != null)
                 MarkerLayer(
@@ -188,15 +191,18 @@ class _MapScreenState extends State<MapScreen> {
     final routes = _mapData?.routes ?? [];
     final polylines = <Polyline<Object>>[];
     for (final route in routes) {
-      final sorted = List.of(route.points)..sort((a, b) => a.sequence.compareTo(b.sequence));
+      final sorted = List.of(route.points)
+        ..sort((a, b) => a.sequence.compareTo(b.sequence));
       final points = sorted.map((p) => LatLng(p.lat, p.lon)).toList();
       if (points.length < 2) continue;
       final color = _parseRouteColor(route.routeColor);
-      polylines.add(Polyline<Object>(
-        points: points,
-        color: color,
-        strokeWidth: MapColors.jeepneyRouteStrokeWidth,
-      ));
+      polylines.add(
+        Polyline<Object>(
+          points: points,
+          color: color,
+          strokeWidth: MapColors.jeepneyRouteStrokeWidth,
+        ),
+      );
     }
     return polylines;
   }
@@ -205,26 +211,28 @@ class _MapScreenState extends State<MapScreen> {
   List<Marker> get _stationMarkers {
     final stations = _mapData?.stations ?? [];
     return stations
-        .map((s) => Marker(
-              point: LatLng(s.lat, s.lon),
-              width: 20,
-              height: 20,
-              alignment: Alignment.center,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: MapColors.accentColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 2,
-                      spreadRadius: 0,
-                    ),
-                  ],
-                ),
+        .map(
+          (s) => Marker(
+            point: LatLng(s.lat, s.lon),
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            child: Container(
+              decoration: BoxDecoration(
+                color: MapColors.accentColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 2,
+                    spreadRadius: 0,
+                  ),
+                ],
               ),
-            ))
+            ),
+          ),
+        )
         .toList();
   }
 
