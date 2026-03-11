@@ -75,15 +75,19 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       } catch (_) {
         data = await loadSampleMapData();
       }
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _mapData = data;
         _isLoadingMapData = false;
       });
+      }
     } catch (_) {
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _mapData = const RoutesAndStationsData(routes: [], stations: []);
         _isLoadingMapData = false;
       });
+      }
     }
   }
 
