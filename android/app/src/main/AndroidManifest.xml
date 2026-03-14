@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Location for user position on map (visual aid only; no vehicle tracking). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <application
         android:label="jippy_mobile"
         android:name="${applicationName}"
