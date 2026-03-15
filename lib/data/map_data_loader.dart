@@ -5,9 +5,12 @@ import 'package:http/http.dart' as http;
 
 import '../models/routes_and_stations_data.dart';
 
+/// Dashboard API base URL (no trailing slash). Used for routes and Valhalla proxy.
+const String apiBaseUrl = 'https://jippy.shinosawa-laboratories.dev'; // Production
+// const String apiBaseUrl = 'http://localhost:3000'; // Local Development
+
 /// Public API URL for all routes and regions (dashboard API shape).
-const String routesApiUrl = 'https://jippy.shinosawa-laboratories.dev/api/public/all'; // Production
-// const String routesApiUrl = 'http://localhost:3000/api/public/all'; // Local Development
+const String routesApiUrl = '$apiBaseUrl/api/public/all';
 
 /// Timeout for the routes API request.
 const Duration _routesApiTimeout = Duration(seconds: 15);
