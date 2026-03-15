@@ -1,13 +1,14 @@
 import 'route_point.dart';
 
-/// A jeepney route from the dashboard API (id, number, name, color, ordered points).
+/// A jeepney route from the dashboard API (id, number, name, color, points by direction).
 class JeepneyRoute {
   const JeepneyRoute({
     required this.id,
     required this.routeNumber,
     required this.routeName,
     required this.routeColor,
-    required this.points,
+    required this.goingTo,
+    required this.goingBack,
   });
 
   final String id;
@@ -15,20 +16,27 @@ class JeepneyRoute {
   final String routeName;
   /// Hex color string (e.g. "#009e49"). Use for polyline color; fallback if invalid.
   final String routeColor;
-  final List<RoutePoint> points;
+  /// Outbound direction points (e.g. terminal A → terminal B).
+  final List<RoutePoint> goingTo;
+  /// Return direction points (e.g. terminal B → terminal A).
+  final List<RoutePoint> goingBack;
 
-  /// Parses from API shape: { "id", "routeNumber", "routeName", "routeColor", "points": [] }.
+  /// Parses from API shape: { "id", "routeNumber", "routeName", "routeColor", "points": { "goingTo": [], "goingBack": [] } }
+  /// or legacy { "points": [] } (single list used as goingTo, goingBack empty).
   static JeepneyRoute? fromJson(Map<String, dynamic> json) {
     final pointsJson = json['points'];
-    if (pointsJson is! List) return null;
-    final points = <RoutePoint>[];
-    for (final e in pointsJson) {
-      if (e is Map<String, dynamic>) {
-        final p = RoutePoint.fromJson(e);
-        if (p != null) points.add(p);
-      }
+    List<RoutePoint> goingTo;
+    List<RoutePoint> goingBack;
+    if (pointsJson is Map<String, dynamic>) {
+      goingTo = _parsePointList(pointsJson['goingTo']);
+      goingBack = _parsePointList(pointsJson['goingBack']);
+    } else if (pointsJson is List) {
+      goingTo = _parsePointList(pointsJson);
+      goingBack = [];
+    } else {
+      return null;
     }
-    if (points.isEmpty) return null;
+    if (goingTo.isEmpty && goingBack.isEmpty) return null;
 
     final id = json['id']?.toString() ?? '';
     final routeNumber = json['routeNumber']?.toString() ?? '';
@@ -39,7 +47,20 @@ class JeepneyRoute {
       routeNumber: routeNumber,
       routeName: routeName,
       routeColor: routeColor,
-      points: points,
+      goingTo: goingTo,
+      goingBack: goingBack,
     );
+  }
+
+  static List<RoutePoint> _parsePointList(dynamic value) {
+    if (value is! List) return [];
+    final list = <RoutePoint>[];
+    for (final e in value) {
+      if (e is Map<String, dynamic>) {
+        final p = RoutePoint.fromJson(e);
+        if (p != null) list.add(p);
+      }
+    }
+    return list;
   }
 }

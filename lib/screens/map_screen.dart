@@ -13,6 +13,8 @@ import '../models/routes_and_stations_data.dart';
 /// Default center for the map: Iloilo City, Philippines.
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
 
+enum _RouteDirection { goingTo, goingBack }
+
 /// Initial zoom level so the city and jeepney routes are visible.
 const double _initialZoom = 14.0;
 
@@ -47,8 +49,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   RoutesAndStationsData? _mapData;
   /// True while fetching routes from API or loading fallback.
   bool _isLoadingMapData = false;
-  /// Road-aligned polyline points from Valhalla per route id. Empty or missing = use straight segments.
-  Map<String, List<LatLng>> _roadAlignedPointsByRouteId = {};
+  /// Road-aligned polyline points from Valhalla. Keys: 'routeId_goingTo' / 'routeId_goingBack'. Missing = use straight segments.
+  Map<String, List<LatLng>> _roadAlignedPointsByKey = {};
   /// When true, tricycle stations are shown. Ready for future checkbox UI.
   final bool _showStations = true;
 
@@ -82,7 +84,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         setState(() {
           _mapData = data;
           _isLoadingMapData = false;
-          _roadAlignedPointsByRouteId = {};
+          _roadAlignedPointsByKey = {};
         });
         _fetchValhallaRoutesForMapData(data);
       }
@@ -91,29 +93,38 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         setState(() {
           _mapData = const RoutesAndStationsData(routes: [], stations: []);
           _isLoadingMapData = false;
-          _roadAlignedPointsByRouteId = {};
+          _roadAlignedPointsByKey = {};
         });
       }
     }
   }
 
-  /// Fetches road-aligned geometry from Valhalla for each route; updates state per route on success.
+  /// Fetches road-aligned geometry from Valhalla for each route direction; updates state on success.
   /// If the Valhalla status check fails, skips requests so routes stay as straight segments.
   Future<void> _fetchValhallaRoutesForMapData(RoutesAndStationsData data) async {
     final available = await checkValhallaStatus().catchError((_) => false);
     if (!available || !mounted) return;
     for (final route in data.routes) {
-      if (route.points.length < 2) continue;
-      fetchRoadAlignedRoute(route.points).then((points) {
-        if (mounted) {
-          setState(() {
-            _roadAlignedPointsByRouteId = Map.of(_roadAlignedPointsByRouteId)
-              ..[route.id] = points;
-          });
-        }
-      }).catchError((_) {
-        // Fallback: do not set; _routePolylines will use straight segments.
-      });
+      if (route.goingTo.length >= 2) {
+        final key = '${route.id}_goingTo';
+        fetchRoadAlignedRoute(route.goingTo).then((points) {
+          if (mounted) {
+            setState(() {
+              _roadAlignedPointsByKey = Map.of(_roadAlignedPointsByKey)..[key] = points;
+            });
+          }
+        }).catchError((_) {});
+      }
+      if (route.goingBack.length >= 2) {
+        final key = '${route.id}_goingBack';
+        fetchRoadAlignedRoute(route.goingBack).then((points) {
+          if (mounted) {
+            setState(() {
+              _roadAlignedPointsByKey = Map.of(_roadAlignedPointsByKey)..[key] = points;
+            });
+          }
+        }).catchError((_) {});
+      }
     }
   }
 
@@ -247,29 +258,33 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Polylines to draw (jeepney routes: road-aligned from Valhalla when available, else straight segments).
+  /// Polylines to draw (jeepney routes: goingTo and goingBack, road-aligned from Valhalla when available, else straight segments).
   List<Polyline<Object>> get _routePolylines {
     final routes = _mapData?.routes ?? [];
     final polylines = <Polyline<Object>>[];
     for (final route in routes) {
-      List<LatLng> points;
-      final roadAligned = _roadAlignedPointsByRouteId[route.id];
-      if (roadAligned != null && roadAligned.length >= 2) {
-        points = roadAligned;
-      } else {
-        final sorted = List.of(route.points)
-          ..sort((a, b) => a.sequence.compareTo(b.sequence));
-        points = sorted.map((p) => LatLng(p.lat, p.lon)).toList();
+      final routeColor = _parseRouteColor(route.routeColor);
+      for (final direction in _RouteDirection.values) {
+        final list = direction == _RouteDirection.goingTo ? route.goingTo : route.goingBack;
+        if (list.length < 2) continue;
+        final key = '${route.id}_${direction.name}';
+        List<LatLng> points;
+        final roadAligned = _roadAlignedPointsByKey[key];
+        if (roadAligned != null && roadAligned.length >= 2) {
+          points = roadAligned;
+        } else {
+          final sorted = List.of(list)..sort((a, b) => a.sequence.compareTo(b.sequence));
+          points = sorted.map((p) => LatLng(p.lat, p.lon)).toList();
+        }
+        if (points.length < 2) continue;
+        polylines.add(
+          Polyline<Object>(
+            points: points,
+            color: routeColor,
+            strokeWidth: MapColors.jeepneyRouteStrokeWidth,
+          ),
+        );
       }
-      if (points.length < 2) continue;
-      final color = _parseRouteColor(route.routeColor);
-      polylines.add(
-        Polyline<Object>(
-          points: points,
-          color: color,
-          strokeWidth: MapColors.jeepneyRouteStrokeWidth,
-        ),
-      );
     }
     return polylines;
   }
