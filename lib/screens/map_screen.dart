@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../core/theme/map_colors.dart';
 import '../data/map_data_loader.dart';
 import '../data/valhalla_route_client.dart';
+import '../models/jeepney_route.dart';
 import '../models/routes_and_stations_data.dart';
 
 /// Default center for the map: Iloilo City, Philippines.
@@ -51,8 +52,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   bool _isLoadingMapData = false;
   /// Road-aligned polyline points from Valhalla. Keys: 'routeId_goingTo' / 'routeId_goingBack'. Missing = use straight segments.
   Map<String, List<LatLng>> _roadAlignedPointsByKey = {};
+  /// Selected route IDs currently visible on the map.
+  Set<String>? _selectedRouteIds;
   /// When true, tricycle stations are shown. Ready for future checkbox UI.
   final bool _showStations = true;
+
+  Set<String> get _selectedRouteIdsSafe => _selectedRouteIds ??= <String>{};
 
   @override
   void initState() {
@@ -81,10 +86,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         data = await loadSampleMapData();
       }
       if (mounted) {
+        final incomingRouteIds = data.routes.map((r) => r.id).toSet();
         setState(() {
           _mapData = data;
           _isLoadingMapData = false;
           _roadAlignedPointsByKey = {};
+          _selectedRouteIdsSafe.removeWhere((id) => !incomingRouteIds.contains(id));
         });
         _fetchValhallaRoutesForMapData(data);
       }
@@ -94,6 +101,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           _mapData = const RoutesAndStationsData(routes: [], stations: []);
           _isLoadingMapData = false;
           _roadAlignedPointsByKey = {};
+          _selectedRouteIdsSafe.clear();
         });
       }
     }
@@ -260,7 +268,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Polylines to draw (jeepney routes: goingTo and goingBack, road-aligned from Valhalla when available, else straight segments).
   List<Polyline<Object>> get _routePolylines {
-    final routes = _mapData?.routes ?? [];
+    final routes = _visibleRoutes;
     final polylines = <Polyline<Object>>[];
     for (final route in routes) {
       final routeColor = _parseRouteColor(route.routeColor);
@@ -287,6 +295,73 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       }
     }
     return polylines;
+  }
+
+  List<JeepneyRoute> get _visibleRoutes {
+    final routes = _mapData?.routes ?? const <JeepneyRoute>[];
+    if (_selectedRouteIdsSafe.isEmpty) return routes;
+    return routes.where((r) => _selectedRouteIdsSafe.contains(r.id)).toList();
+  }
+
+  void _onRouteTap(JeepneyRoute route) {
+    late List<JeepneyRoute> routesToFit;
+    setState(() {
+      // Focus mode: first selection isolates the tapped route.
+      if (_selectedRouteIdsSafe.isEmpty) {
+        _selectedRouteIdsSafe.add(route.id);
+      } else if (_selectedRouteIdsSafe.contains(route.id)) {
+        _selectedRouteIdsSafe.remove(route.id);
+      } else {
+        _selectedRouteIdsSafe.add(route.id);
+      }
+      routesToFit = _selectedRouteIdsSafe.isEmpty
+          ? (_mapData?.routes ?? const <JeepneyRoute>[])
+          : _visibleRoutes;
+    });
+
+    if (routesToFit.isEmpty) {
+      _mapController.move(_iloiloCenter, _initialZoom);
+      return;
+    }
+    _fitRoutesBounds(routesToFit);
+  }
+
+  void _showAllRoutes() {
+    final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
+    setState(() {
+      _selectedRouteIdsSafe.clear();
+    });
+    _fitRoutesBounds(allRoutes);
+  }
+
+  /// Fits map camera to route points; falls back to city center if no points.
+  void _fitRoutesBounds(List<JeepneyRoute> routes) {
+    final points = <LatLng>[];
+    for (final route in routes) {
+      for (final p in route.goingTo) {
+        points.add(LatLng(p.lat, p.lon));
+      }
+      for (final p in route.goingBack) {
+        points.add(LatLng(p.lat, p.lon));
+      }
+    }
+
+    if (points.isEmpty) {
+      _mapController.move(_iloiloCenter, _initialZoom);
+      return;
+    }
+
+    final bounds = LatLngBounds.fromPoints(points);
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.fromLTRB(32, 110, 32, 300),
+        ),
+      );
+    } catch (_) {
+      _mapController.move(bounds.center, _mapController.camera.zoom);
+    }
   }
 
   /// Tricycle station markers (accent color, distinct from user dot).
@@ -471,44 +546,39 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             color: MapColors.background,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: RefreshIndicator(
-            onRefresh: _loadMapData,
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                Center(
-                  child: Container(
-                    width: 78,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: MapColors.text.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  width: 78,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: MapColors.text.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      _buildRoutesHeader(),
-                      const SizedBox(height: 12),
-                      _buildRouteChipsRow(),
-                      const SizedBox(height: 16),
-                      _buildCurrentlyViewingCard(),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    _buildRoutesHeader(),
+                    const SizedBox(height: 16),
+                    _buildRoutesList(),
+                    const SizedBox(height: 16),
+                  ],
                 ),
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: MapColors.text.withValues(alpha: 0.08),
-                ),
-                _buildBottomNavBar(context),
-              ],
-            ),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: MapColors.text.withValues(alpha: 0.08),
+              ),
+              _buildBottomNavBar(context),
+            ],
           ),
         );
       },
@@ -529,9 +599,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ),
         const Spacer(),
         TextButton(
-          onPressed: () {
-            // TODO: Push routes list screen.
-          },
+          onPressed: _showAllRoutes,
           style: TextButton.styleFrom(
             foregroundColor: MapColors.primary,
             padding: EdgeInsets.zero,
@@ -539,7 +607,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           child: const Text(
-            'See all',
+            'Show all routes',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
@@ -547,142 +615,96 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildRouteChipsRow() {
-    final chips = _routeChips;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (int i = 0; i < chips.length; i++) ...[
-            _buildRouteChip(chips[i]),
-            if (i != chips.length - 1) const SizedBox(width: 10),
+  Widget _buildRoutesList() {
+    final routes = _mapData?.routes ?? const <JeepneyRoute>[];
+    if (routes.isEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
+          color: MapColors.background,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+        child: const Text(
+          'No routes available right now.',
+          style: TextStyle(
+            color: MapColors.text,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        for (int index = 0; index < routes.length; index++) ...[
+          _buildRouteListItem(
+            routes[index],
+            isSelected: _selectedRouteIdsSafe.contains(routes[index].id),
+          ),
+          if (index < routes.length - 1) const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildRouteListItem(JeepneyRoute route, {required bool isSelected}) {
+    final color = _parseRouteColor(route.routeColor);
+    final routeNumber = route.routeNumber.trim().isEmpty ? '--' : route.routeNumber.trim();
+
+    return InkWell(
+      onTap: () => _onRouteTap(route),
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? color : color.withValues(alpha: 0.18),
+            width: isSelected ? 2 : 1,
+          ),
+          color: MapColors.background,
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              constraints: const BoxConstraints(minWidth: 52, minHeight: 52),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                routeNumber,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                route.routeName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MapColors.text,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                ),
+              ),
+            ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRouteChip(_RouteChipViewData chip) {
-    final bool isActive = chip.isActive;
-    return SizedBox(
-      width: 58,
-      child: Column(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: chip.background,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: isActive
-                  ? [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.07),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              chip.code,
-              style: TextStyle(
-                color: isActive ? Colors.white : MapColors.text,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            isActive ? 'ACTIVE' : 'OFF',
-            style: TextStyle(
-              color: isActive ? chip.background : MapColors.text.withValues(alpha: 0.35),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCurrentlyViewingCard() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
-        color: MapColors.background,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'CURRENTLY VIEWING',
-                  style: TextStyle(
-                    color: MapColors.primary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _currentRouteLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MapColors.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _buildOverlappingRouteBadges(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOverlappingRouteBadges() {
-    final active = _activeRouteCodes;
-    if (active.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      width: active.length > 1 ? 56 : 26,
-      height: 26,
-      child: Stack(
-        children: [
-          for (int i = 0; i < active.length && i < 2; i++)
-            Positioned(
-              left: i * 22,
-              child: Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: i == 0 ? MapColors.primary : MapColors.accent,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: MapColors.background, width: 1.4),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  active[i],
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -696,8 +718,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         children: [
           _buildBottomNavItem(index: 0, icon: Icons.map_outlined, label: 'Map'),
           _buildBottomNavItem(index: 1, icon: Icons.alt_route, label: 'Routes'),
-          _buildBottomNavItem(index: 2, icon: Icons.bookmark_border, label: 'Saved'),
-          _buildBottomNavItem(index: 3, icon: Icons.person_outline, label: 'Profile'),
+          _buildBottomNavItem(index: 3, icon: Icons.person_outline, label: 'Setting'),
         ],
       ),
     );
@@ -734,47 +755,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  List<_RouteChipViewData> get _routeChips {
-    final routes = _mapData?.routes ?? const [];
-    if (routes.isEmpty) {
-      return const [
-        _RouteChipViewData(code: '01A', isActive: true, background: MapColors.primary),
-        _RouteChipViewData(code: '03B', isActive: true, background: MapColors.accent),
-        _RouteChipViewData(code: '08A', isActive: false, background: Color(0xFFE8E5E1)),
-        _RouteChipViewData(code: '12C', isActive: false, background: Color(0xFFE8E5E1)),
-        _RouteChipViewData(code: '07D', isActive: false, background: Color(0xFFE8E5E1)),
-      ];
-    }
-
-    final list = <_RouteChipViewData>[];
-    final count = routes.length < 5 ? routes.length : 5;
-    for (int i = 0; i < count; i++) {
-      final isActive = i < 2;
-      list.add(
-        _RouteChipViewData(
-          code: routes[i].routeNumber,
-          isActive: isActive,
-          background: isActive
-              ? (i == 0 ? MapColors.primary : MapColors.accent)
-              : const Color(0xFFE8E5E1),
-        ),
-      );
-    }
-    return list;
-  }
-
-  List<String> get _activeRouteCodes {
-    return _routeChips.where((chip) => chip.isActive).take(2).map((chip) => chip.code).toList();
-  }
-
-  String get _currentRouteLabel {
-    final routes = _mapData?.routes;
-    if (routes == null || routes.isEmpty) {
-      return 'Jaro CPU-City Proper Loop';
-    }
-    return routes.first.routeName;
-  }
-
   Widget _buildLocationMessage(String message) {
     return Positioned(
       bottom: 24,
@@ -805,16 +785,4 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       ),
     );
   }
-}
-
-class _RouteChipViewData {
-  const _RouteChipViewData({
-    required this.code,
-    required this.isActive,
-    required this.background,
-  });
-
-  final String code;
-  final bool isActive;
-  final Color background;
 }
