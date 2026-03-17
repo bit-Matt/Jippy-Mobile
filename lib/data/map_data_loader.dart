@@ -6,8 +6,8 @@ import 'package:http/http.dart' as http;
 import '../models/routes_and_stations_data.dart';
 
 /// Public API URL for all routes and regions (dashboard API shape).
-const String routesApiUrl = 'https://jippy.shinosawa-laboratories.dev/api/public/all'; // Production
-// const String routesApiUrl = 'http://localhost:3000/api/public/all'; // Local Development
+// const String routesApiUrl = 'http://localhost:3000/api/public/all'; // Production
+const String routesApiUrl = 'http://172.25.176.1:3000/api/public/all'; // Local Development
 
 /// Timeout for the routes API request.
 const Duration _routesApiTimeout = Duration(seconds: 15);

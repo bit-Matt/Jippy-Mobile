@@ -7,6 +7,7 @@ class JeepneyRoute {
     required this.routeNumber,
     required this.routeName,
     required this.routeColor,
+    required this.routeDetail,
     required this.points,
   });
 
@@ -15,9 +16,11 @@ class JeepneyRoute {
   final String routeName;
   /// Hex color string (e.g. "#009e49"). Use for polyline color; fallback if invalid.
   final String routeColor;
+  /// Route details text from backend. Used by the panel details view.
+  final String routeDetail;
   final List<RoutePoint> points;
 
-  /// Parses from API shape: { "id", "routeNumber", "routeName", "routeColor", "points": [] }.
+  /// Parses from API shape: { "id", "routeNumber", "routeName", "routeColor", "routeDetail", "points": [] }.
   static JeepneyRoute? fromJson(Map<String, dynamic> json) {
     final pointsJson = json['points'];
     if (pointsJson is! List) return null;
@@ -34,11 +37,13 @@ class JeepneyRoute {
     final routeNumber = json['routeNumber']?.toString() ?? '';
     final routeName = json['routeName']?.toString() ?? '';
     final routeColor = json['routeColor']?.toString() ?? '#e68c1e';
+    final routeDetail = json['routeDetail']?.toString() ?? '';
     return JeepneyRoute(
       id: id,
       routeNumber: routeNumber,
       routeName: routeName,
       routeColor: routeColor,
+      routeDetail: routeDetail,
       points: points,
     );
   }
