@@ -743,9 +743,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   Widget _buildRouteDetailsView(ScrollController scrollController) {
     final route = _selectedRouteForDetails;
-    final hasDetail = route != null && route.routeDetail.trim().isNotEmpty;
-    final detailText = hasDetail
-        ? route!.routeDetail.trim()
+    final hasDetails = route != null && route.routeDetails.trim().isNotEmpty;
+    final detailText = hasDetails
+        ? route!.routeDetails.trim()
         : 'No route details available for this route yet.';
 
     return ListView(

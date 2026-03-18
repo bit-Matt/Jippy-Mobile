@@ -7,7 +7,7 @@ class JeepneyRoute {
     required this.routeNumber,
     required this.routeName,
     required this.routeColor,
-    required this.routeDetail,
+    required this.routeDetails,
     required this.goingTo,
     required this.goingBack,
   });
@@ -18,11 +18,14 @@ class JeepneyRoute {
   /// Hex color string (e.g. "#009e49"). Use for polyline color; fallback if invalid.
   final String routeColor;
   /// Route details text from backend. Used by the panel details view.
-  final String routeDetail;
+  final String routeDetails;
   /// Outbound direction points (e.g. terminal A → terminal B).
   final List<RoutePoint> goingTo;
   /// Return direction points (e.g. terminal B → terminal A).
   final List<RoutePoint> goingBack;
+
+  /// Backward-compatible alias for older call sites.
+  String get routeDetail => routeDetails;
 
   /// Combined points view for legacy consumers.
   List<RoutePoint> get points => [...goingTo, ...goingBack];
@@ -48,13 +51,14 @@ class JeepneyRoute {
     final routeNumber = json['routeNumber']?.toString() ?? '';
     final routeName = json['routeName']?.toString() ?? '';
     final routeColor = json['routeColor']?.toString() ?? '#e68c1e';
-    final routeDetail = json['routeDetail']?.toString() ?? '';
+    final routeDetails =
+        json['routeDetails']?.toString() ?? json['routeDetail']?.toString() ?? '';
     return JeepneyRoute(
       id: id,
       routeNumber: routeNumber,
       routeName: routeName,
       routeColor: routeColor,
-      routeDetail: routeDetail,
+      routeDetails: routeDetails,
       goingTo: goingTo,
       goingBack: goingBack,
     );
