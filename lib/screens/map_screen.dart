@@ -219,21 +219,26 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                         _userPosition!.latitude,
                         _userPosition!.longitude,
                       ),
-                      width: 24,
-                      height: 24,
+                      width: 40,
+                      height: 40,
                       alignment: Alignment.center,
                       child: Container(
                         decoration: BoxDecoration(
                           color: MapColors.userLocationColor,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: Colors.white, width: 2.5),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black26,
-                              blurRadius: 4,
+                              blurRadius: 6,
                               spreadRadius: 1,
                             ),
                           ],
+                        ),
+                        child: const Icon(
+                          Icons.my_location,
+                          color: Colors.white,
+                          size: 22,
                         ),
                       ),
                     ),
@@ -364,28 +369,38 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Tricycle station markers (accent color, distinct from user dot).
+  /// Tricycle station markers (white circle, purple border, tricycle icon).
   List<Marker> get _stationMarkers {
     final stations = _mapData?.stations ?? [];
     return stations
         .map(
           (s) => Marker(
             point: LatLng(s.lat, s.lon),
-            width: 20,
-            height: 20,
+            width: 36,
+            height: 36,
             alignment: Alignment.center,
             child: Container(
               decoration: BoxDecoration(
-                color: MapColors.accentColor,
+                color: Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.5),
+                border: Border.all(
+                  color: MapColors.accentColor,
+                  width: 2,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black26,
-                    blurRadius: 2,
+                    blurRadius: 4,
                     spreadRadius: 0,
                   ),
                 ],
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Image.asset(
+                'assets/icons/tricycle.png',
+                width: 24,
+                height: 24,
+                fit: BoxFit.contain,
               ),
             ),
           ),
