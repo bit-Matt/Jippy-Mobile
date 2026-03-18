@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../core/theme/map_colors.dart';
 import '../data/map_data_loader.dart';
+import '../data/valhalla_route_client.dart';
 import '../models/jeepney_route.dart';
 import '../models/routes_and_stations_data.dart';
 import '../utils/polyline_1e6.dart';
@@ -55,12 +56,26 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Loaded routes and stations from API (or asset fallback).
   RoutesAndStationsData? _mapData;
+
+  /// True while routes are being fetched and during the first render pass.
+  bool _loadingRoutes = true;
+
   /// True while fetching routes from API or loading fallback.
   bool _isLoadingMapData = false;
+
   /// Selected route IDs currently visible on the map.
   Set<String>? _selectedRouteIds;
+
+  /// Selected route for details panel mode.
+  JeepneyRoute? _selectedRouteForDetails;
+  bool _showingRouteDetails = false;
+
   /// When true, tricycle stations are shown.
   bool _showStations = true;
+
+  /// Road-aligned route points fetched from Valhalla (when API polylines missing).
+  /// Key format: `${route.id}_goingTo` / `${route.id}_goingBack`.
+  Map<String, List<LatLng>> _roadAlignedPointsByKey = <String, List<LatLng>>{};
 
   Set<String> get _selectedRouteIdsSafe => _selectedRouteIds ??= <String>{};
 
@@ -95,10 +110,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Loads routes from API; on failure falls back to asset data.
   Future<void> _loadMapData() async {
     if (!mounted) return;
-    setState(() => _isLoadingMapData = true);
+    setState(() {
+      _loadingRoutes = true;
+      _isLoadingMapData = true;
+    });
     try {
       final previousAllIds = _allRouteIds;
-      final bool wasAllSelected = previousAllIds.isNotEmpty &&
+      final bool wasAllSelected =
+          previousAllIds.isNotEmpty &&
           _selectedRouteIdsSafe.length == previousAllIds.length &&
           _selectedRouteIdsSafe.containsAll(previousAllIds);
 
@@ -128,9 +147,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ..clear()
               ..addAll(incomingRouteIds);
           } else {
-            _selectedRouteIdsSafe.removeWhere((id) => !incomingRouteIds.contains(id));
+            _selectedRouteIdsSafe.removeWhere(
+              (id) => !incomingRouteIds.contains(id),
+            );
           }
         });
+        _completeRouteLoadingAfterRender();
+        _fetchValhallaRoutesForMapData(data);
       }
     } catch (_) {
       if (mounted) {
@@ -139,6 +162,51 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           _isLoadingMapData = false;
           _selectedRouteIdsSafe.clear();
         });
+        _completeRouteLoadingAfterRender();
+      }
+    }
+  }
+
+  void _completeRouteLoadingAfterRender() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _loadingRoutes = false);
+    });
+  }
+
+  /// Fetches road-aligned geometry from Valhalla for each route direction; updates state on success.
+  /// If the Valhalla status check fails, skips requests so routes stay as straight segments.
+  Future<void> _fetchValhallaRoutesForMapData(
+    RoutesAndStationsData data,
+  ) async {
+    final available = await checkValhallaStatus().catchError((_) => false);
+    if (!available || !mounted) return;
+    for (final route in data.routes) {
+      if (route.goingTo.length >= 2) {
+        final key = '${route.id}_goingTo';
+        fetchRoadAlignedRoute(route.goingTo)
+            .then((points) {
+              if (mounted) {
+                setState(() {
+                  _roadAlignedPointsByKey = Map.of(_roadAlignedPointsByKey)
+                    ..[key] = points;
+                });
+              }
+            })
+            .catchError((_) {});
+      }
+      if (route.goingBack.length >= 2) {
+        final key = '${route.id}_goingBack';
+        fetchRoadAlignedRoute(route.goingBack)
+            .then((points) {
+              if (mounted) {
+                setState(() {
+                  _roadAlignedPointsByKey = Map.of(_roadAlignedPointsByKey)
+                    ..[key] = points;
+                });
+              }
+            })
+            .catchError((_) {});
       }
     }
   }
@@ -219,59 +287,59 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     },
                   ),
                 ),
-              // Polylines for static jeepney routes and A* path.
-              PolylineLayer<Object>(polylines: _routePolylines),
-              if (_showStations &&
-                  _mapData != null &&
-                  _mapData!.stations.isNotEmpty)
-                MarkerLayer(markers: _stationMarkers),
-              if (_userPosition != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: LatLng(
-                        _userPosition!.latitude,
-                        _userPosition!.longitude,
-                      ),
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: MapColors.userLocationColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 6,
-                              spreadRadius: 1,
-                            ),
-                          ],
+                // Polylines for static jeepney routes and A* path.
+                PolylineLayer<Object>(polylines: _routePolylines),
+                if (_showStations &&
+                    _mapData != null &&
+                    _mapData!.stations.isNotEmpty)
+                  MarkerLayer(markers: _stationMarkers),
+                if (_userPosition != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: LatLng(
+                          _userPosition!.latitude,
+                          _userPosition!.longitude,
                         ),
-                        child: const Icon(
-                          Icons.my_location,
-                          color: Colors.white,
-                          size: 22,
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: MapColors.userLocationColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 6,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.my_location,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
+                  ),
+                RichAttributionWidget(
+                  animationConfig: const ScaleRAWA(),
+                  showFlutterMapAttribution: false,
+                  attributions: [
+                    const TextSourceAttribution('OpenStreetMap contributors'),
                   ],
                 ),
-              RichAttributionWidget(
-                animationConfig: const ScaleRAWA(),
-                showFlutterMapAttribution: false,
-                attributions: [
-                  const TextSourceAttribution('OpenStreetMap contributors'),
-                ],
-              ),
-            ],
-          ),
+              ],
+            ),
           ),
           if (_showSearchBar) _buildSearchBar(context),
           _buildMapActionButtons(context),
           _buildBottomDrawer(context),
-          if (_isLoadingMapData) _buildLoadingOverlay(),
+          if (_loadingRoutes) _buildLoadingOverlay(),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
@@ -303,6 +371,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
         List<LatLng> points = const <LatLng>[];
         bool usedDecoded = false;
+        bool usedValhalla = false;
         if (encoded != null && encoded.trim().isNotEmpty) {
           final decoded = decodeApiRoutePolyline(encoded);
           if (decoded != null) {
@@ -312,30 +381,44 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         }
 
         if (points.length < 2) {
-          final list =
-              direction == _RouteDirection.goingTo ? route.goingTo : route.goingBack;
-          if (list.length < 2) continue;
-          final sorted = List.of(list)
-            ..sort((a, b) => a.sequence.compareTo(b.sequence));
-          points = sorted.map((p) => LatLng(p.lat, p.lon)).toList();
+          final key = direction == _RouteDirection.goingTo
+              ? '${route.id}_goingTo'
+              : '${route.id}_goingBack';
+          final valhallaPoints = _roadAlignedPointsByKey[key];
+          if (valhallaPoints != null && valhallaPoints.length >= 2) {
+            points = valhallaPoints;
+            usedValhalla = true;
+          } else {
+            final list = direction == _RouteDirection.goingTo
+                ? route.goingTo
+                : route.goingBack;
+            if (list.length < 2) continue;
+            final sorted = List.of(list)
+              ..sort((a, b) => a.sequence.compareTo(b.sequence));
+            points = sorted.map((p) => LatLng(p.lat, p.lon)).toList();
+          }
         }
 
         if (points.length < 2) continue;
         if (_debugPolylineDiagnostics) {
           final dirLabel = direction == _RouteDirection.goingTo ? 'to' : 'back';
           diagParts.add(
-            '${route.id}:$dirLabel:${usedDecoded ? 'decoded' : 'fallback'}:${points.length}',
+            '${route.id}:$dirLabel:${usedDecoded ? 'decoded' : (usedValhalla ? 'valhalla' : 'fallback')}:${points.length}',
           );
         }
         polylines.add(
           Polyline<Object>(
             points: points,
-            color: usedDecoded
+            color: usedDecoded || usedValhalla
                 ? routeColor
-                : routeColor.withValues(alpha: 0.35), // visually obvious fallback
-            strokeWidth: usedDecoded
+                : routeColor.withValues(
+                    alpha: 0.35,
+                  ), // visually obvious fallback
+            strokeWidth: usedDecoded || usedValhalla
                 ? MapColors.jeepneyRouteStrokeWidth
-                : (MapColors.jeepneyRouteStrokeWidth - 1).clamp(1, 999).toDouble(),
+                : (MapColors.jeepneyRouteStrokeWidth - 1)
+                      .clamp(1, 999)
+                      .toDouble(),
           ),
         );
       }
@@ -378,6 +461,30 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       return;
     }
     _fitRoutesBounds(routesToFit);
+  }
+
+  void _showAllRoutes() {
+    final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
+    final allIds = allRoutes.map((r) => r.id).toSet();
+    setState(() {
+      _selectedRouteIdsSafe
+        ..clear()
+        ..addAll(allIds);
+    });
+    _fitRoutesBounds(allRoutes);
+  }
+
+  void _openRouteDetails(JeepneyRoute route) {
+    setState(() {
+      _selectedRouteForDetails = route;
+      _showingRouteDetails = true;
+    });
+  }
+
+  void _closeRouteDetails() {
+    setState(() {
+      _showingRouteDetails = false;
+    });
   }
 
   /// Fits map camera to route points; falls back to city center if no points.
@@ -424,10 +531,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: MapColors.accentColor,
-                  width: 2,
-                ),
+                border: Border.all(color: MapColors.accentColor, width: 2),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black26,
@@ -617,15 +721,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 10),
               Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    _buildRoutesHeader(),
-                    const SizedBox(height: 16),
-                    _buildRoutesList(),
-                    const SizedBox(height: 16),
-                  ],
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: _showingRouteDetails
+                      ? _buildRouteDetailsView(scrollController)
+                      : _buildRoutesListView(scrollController),
                 ),
               ),
               Divider(
@@ -718,6 +820,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildRoutesList() {
+    if (_loadingRoutes) {
+      return _buildRoutesLoadingState();
+    }
+
     final routes = _mapData?.routes ?? const <JeepneyRoute>[];
     if (routes.isEmpty) {
       return Container(
@@ -751,9 +857,129 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildRoutesLoadingState() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
+        color: MapColors.background,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+      child: Row(
+        children: const [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Loading routes...',
+              style: TextStyle(
+                color: MapColors.text,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoutesListView(ScrollController scrollController) {
+    return ListView(
+      key: const ValueKey<String>('routes-list-view'),
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        _buildRoutesHeader(),
+        const SizedBox(height: 16),
+        _buildRoutesList(),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildRouteDetailsView(ScrollController scrollController) {
+    final route = _selectedRouteForDetails;
+    final hasDetails = route != null && route.routeDetails.trim().isNotEmpty;
+    final detailText = hasDetails
+        ? route!.routeDetails.trim()
+        : 'No route details available for this route yet.';
+
+    return ListView(
+      key: const ValueKey<String>('route-details-view'),
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  route?.routeName ?? 'Route details',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MapColors.text,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            TextButton.icon(
+              onPressed: _closeRouteDetails,
+              style: TextButton.styleFrom(
+                foregroundColor: MapColors.primary,
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(72, 40),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                alignment: Alignment.centerRight,
+              ),
+              label: const Text(
+                'Back',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              icon: const Icon(Icons.arrow_forward, size: 20),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: MapColors.primary.withValues(alpha: 0.18),
+            ),
+            color: MapColors.background,
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Text(
+            detailText,
+            style: const TextStyle(
+              color: MapColors.text,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
   Widget _buildRouteListItem(JeepneyRoute route, {required bool isSelected}) {
     final color = _parseRouteColor(route.routeColor);
-    final routeNumber = route.routeNumber.trim().isEmpty ? '--' : route.routeNumber.trim();
+    final routeNumber = route.routeNumber.trim().isEmpty
+        ? '--'
+        : route.routeNumber.trim();
 
     return InkWell(
       onTap: () => _onRouteTap(route),
@@ -805,6 +1031,37 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 ),
               ),
             ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () => _openRouteDetails(route),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: color.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Details',
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.chevron_right, color: color, size: 18),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -814,13 +1071,22 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   Widget _buildBottomNavBar(BuildContext context) {
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(8, 8, 8, bottomPadding > 0 ? bottomPadding : 8),
+      padding: EdgeInsets.fromLTRB(
+        8,
+        8,
+        8,
+        bottomPadding > 0 ? bottomPadding : 8,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildBottomNavItem(index: 0, icon: Icons.map_outlined, label: 'Map'),
           _buildBottomNavItem(index: 1, icon: Icons.alt_route, label: 'Routes'),
-          _buildBottomNavItem(index: 3, icon: Icons.person_outline, label: 'Setting'),
+          _buildBottomNavItem(
+            index: 3,
+            icon: Icons.person_outline,
+            label: 'Setting',
+          ),
         ],
       ),
     );
@@ -832,7 +1098,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     required String label,
   }) {
     final selected = _selectedNavIndex == index;
-    final color = selected ? MapColors.primary : MapColors.text.withValues(alpha: 0.35);
+    final color = selected
+        ? MapColors.primary
+        : MapColors.text.withValues(alpha: 0.35);
     return InkWell(
       onTap: () => setState(() => _selectedNavIndex = index),
       borderRadius: BorderRadius.circular(12),

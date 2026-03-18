@@ -7,6 +7,7 @@ class JeepneyRoute {
     required this.routeNumber,
     required this.routeName,
     required this.routeColor,
+    required this.routeDetails,
     required this.goingTo,
     required this.goingBack,
     required this.polylineGoingTo,
@@ -18,6 +19,8 @@ class JeepneyRoute {
   final String routeName;
   /// Hex color string (e.g. "#009e49"). Use for polyline color; fallback if invalid.
   final String routeColor;
+  /// Route details text from backend. Used by the panel details view.
+  final String routeDetails;
   /// Outbound direction points (e.g. terminal A → terminal B).
   final List<RoutePoint> goingTo;
   /// Return direction points (e.g. terminal B → terminal A).
@@ -28,6 +31,12 @@ class JeepneyRoute {
   /// Encoded polyline for return direction (Valhalla-style, precision 1e6).
   /// Prefer this for rendering when present to avoid recomputing geometry.
   final String? polylineGoingBack;
+
+  /// Backward-compatible alias for older call sites.
+  String get routeDetail => routeDetails;
+
+  /// Combined points view for legacy consumers.
+  List<RoutePoint> get points => [...goingTo, ...goingBack];
 
   /// Parses from API shape: { "id", "routeNumber", "routeName", "routeColor", "points": { "goingTo": [], "goingBack": [] } }
   /// or legacy { "points": [] } (single list used as goingTo, goingBack empty).
@@ -56,11 +65,14 @@ class JeepneyRoute {
     final routeNumber = json['routeNumber']?.toString() ?? '';
     final routeName = json['routeName']?.toString() ?? '';
     final routeColor = json['routeColor']?.toString() ?? '#e68c1e';
+    final routeDetails =
+        json['routeDetails']?.toString() ?? json['routeDetail']?.toString() ?? '';
     return JeepneyRoute(
       id: id,
       routeNumber: routeNumber,
       routeName: routeName,
       routeColor: routeColor,
+      routeDetails: routeDetails,
       goingTo: goingTo,
       goingBack: goingBack,
       polylineGoingTo: polylineGoingTo,

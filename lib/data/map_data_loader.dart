@@ -10,6 +10,7 @@ const String apiBaseUrl = 'https://jippy.shinosawa-laboratories.dev'; // Product
 // const String apiBaseUrl = 'http://192.168.1.21:6769'; // Local Development
 
 /// Public API URL for all routes and regions (dashboard API shape).
+// const String routesApiUrl = 'http://localhost:3000/api/public/all'; // Production
 const String routesApiUrl = '$apiBaseUrl/api/public/all';
 
 /// Timeout for the routes API request.
