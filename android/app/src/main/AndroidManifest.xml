@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Location for user position on map (visual aid only; no vehicle tracking). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Required for OSM map tiles and dashboard/Valhalla API in all build types (including release APK). -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="jippy_mobile"
         android:name="${applicationName}"
