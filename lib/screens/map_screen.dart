@@ -48,12 +48,17 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Loaded routes and stations from API (or asset fallback).
   RoutesAndStationsData? _mapData;
+  /// True while routes are being fetched and during the first render pass.
+  bool _loadingRoutes = true;
   /// True while fetching routes from API or loading fallback.
   bool _isLoadingMapData = false;
   /// Road-aligned polyline points from Valhalla. Keys: 'routeId_goingTo' / 'routeId_goingBack'. Missing = use straight segments.
   Map<String, List<LatLng>> _roadAlignedPointsByKey = {};
   /// Selected route IDs currently visible on the map.
   Set<String>? _selectedRouteIds;
+  /// Selected route for details panel mode.
+  JeepneyRoute? _selectedRouteForDetails;
+  bool _showingRouteDetails = false;
   /// When true, tricycle stations are shown. Ready for future checkbox UI.
   final bool _showStations = true;
 
@@ -77,7 +82,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Loads routes from API; on failure falls back to asset data.
   Future<void> _loadMapData() async {
     if (!mounted) return;
-    setState(() => _isLoadingMapData = true);
+    setState(() {
+      _loadingRoutes = true;
+      _isLoadingMapData = true;
+    });
     try {
       RoutesAndStationsData data;
       try {
@@ -93,6 +101,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           _roadAlignedPointsByKey = {};
           _selectedRouteIdsSafe.removeWhere((id) => !incomingRouteIds.contains(id));
         });
+        _completeRouteLoadingAfterRender();
         _fetchValhallaRoutesForMapData(data);
       }
     } catch (_) {
@@ -103,8 +112,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           _roadAlignedPointsByKey = {};
           _selectedRouteIdsSafe.clear();
         });
+        _completeRouteLoadingAfterRender();
       }
     }
+  }
+
+  void _completeRouteLoadingAfterRender() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _loadingRoutes = false);
+    });
   }
 
   /// Fetches road-aligned geometry from Valhalla for each route direction; updates state on success.
@@ -256,7 +273,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           _buildSearchBar(context),
           _buildMapActionButtons(context),
           _buildBottomDrawer(context),
-          if (_isLoadingMapData) _buildLoadingOverlay(),
+          if (_loadingRoutes) _buildLoadingOverlay(),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
@@ -337,6 +354,19 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _selectedRouteIdsSafe.clear();
     });
     _fitRoutesBounds(allRoutes);
+  }
+
+  void _openRouteDetails(JeepneyRoute route) {
+    setState(() {
+      _selectedRouteForDetails = route;
+      _showingRouteDetails = true;
+    });
+  }
+
+  void _closeRouteDetails() {
+    setState(() {
+      _showingRouteDetails = false;
+    });
   }
 
   /// Fits map camera to route points; falls back to city center if no points.
@@ -576,15 +606,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 10),
               Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    _buildRoutesHeader(),
-                    const SizedBox(height: 16),
-                    _buildRoutesList(),
-                    const SizedBox(height: 16),
-                  ],
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: _showingRouteDetails
+                      ? _buildRouteDetailsView(scrollController)
+                      : _buildRoutesListView(scrollController),
                 ),
               ),
               Divider(
@@ -631,6 +659,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildRoutesList() {
+    if (_loadingRoutes) {
+      return _buildRoutesLoadingState();
+    }
+
     final routes = _mapData?.routes ?? const <JeepneyRoute>[];
     if (routes.isEmpty) {
       return Container(
@@ -660,6 +692,122 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
           if (index < routes.length - 1) const SizedBox(height: 12),
         ],
+      ],
+    );
+  }
+
+  Widget _buildRoutesLoadingState() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
+        color: MapColors.background,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+      child: Row(
+        children: const [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Loading routes...',
+              style: TextStyle(
+                color: MapColors.text,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoutesListView(ScrollController scrollController) {
+    return ListView(
+      key: const ValueKey<String>('routes-list-view'),
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        _buildRoutesHeader(),
+        const SizedBox(height: 16),
+        _buildRoutesList(),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildRouteDetailsView(ScrollController scrollController) {
+    final route = _selectedRouteForDetails;
+    final hasDetails = route != null && route.routeDetails.trim().isNotEmpty;
+    final detailText = hasDetails
+        ? route!.routeDetails.trim()
+        : 'No route details available for this route yet.';
+
+    return ListView(
+      key: const ValueKey<String>('route-details-view'),
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  route?.routeName ?? 'Route details',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MapColors.text,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            TextButton.icon(
+              onPressed: _closeRouteDetails,
+              style: TextButton.styleFrom(
+                foregroundColor: MapColors.primary,
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(72, 40),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                alignment: Alignment.centerRight,
+              ),
+              label: const Text(
+                'Back',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              icon: const Icon(Icons.arrow_forward, size: 20),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
+            color: MapColors.background,
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Text(
+            detailText,
+            style: const TextStyle(
+              color: MapColors.text,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -715,6 +863,34 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   height: 1.2,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () => _openRouteDetails(route),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: color.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Details',
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.chevron_right, color: color, size: 18),
+                  ],
                 ),
               ),
             ),
