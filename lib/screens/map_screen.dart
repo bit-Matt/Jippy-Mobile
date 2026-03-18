@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -7,9 +8,9 @@ import 'package:latlong2/latlong.dart';
 
 import '../core/theme/map_colors.dart';
 import '../data/map_data_loader.dart';
-import '../data/valhalla_route_client.dart';
 import '../models/jeepney_route.dart';
 import '../models/routes_and_stations_data.dart';
+import '../utils/polyline_1e6.dart';
 
 /// Default center for the map: Iloilo City, Philippines.
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
@@ -28,6 +29,9 @@ const String _userAgentPackageName = 'com.example.jippy_mobile';
 
 /// Distance filter (meters) for position updates so the dot does not jump every second.
 const int _positionStreamDistanceFilterMeters = 8;
+
+/// Debug-only diagnostics for route polylines (decoded vs fallback).
+const bool _debugPolylineDiagnostics = kDebugMode;
 
 /// Full-screen map with OpenStreetMap tiles, user location dot, and structure for
 /// static route polylines and A* path segments.
@@ -50,14 +54,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   RoutesAndStationsData? _mapData;
   /// True while fetching routes from API or loading fallback.
   bool _isLoadingMapData = false;
-  /// Road-aligned polyline points from Valhalla. Keys: 'routeId_goingTo' / 'routeId_goingBack'. Missing = use straight segments.
-  Map<String, List<LatLng>> _roadAlignedPointsByKey = {};
   /// Selected route IDs currently visible on the map.
   Set<String>? _selectedRouteIds;
   /// When true, tricycle stations are shown. Ready for future checkbox UI.
   final bool _showStations = true;
 
   Set<String> get _selectedRouteIdsSafe => _selectedRouteIds ??= <String>{};
+
+  /// Prevents log spam by only printing when the signature changes.
+  String? _lastPolylineDiagnosticsSignature;
 
   @override
   void initState() {
@@ -90,48 +95,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         setState(() {
           _mapData = data;
           _isLoadingMapData = false;
-          _roadAlignedPointsByKey = {};
           _selectedRouteIdsSafe.removeWhere((id) => !incomingRouteIds.contains(id));
         });
-        _fetchValhallaRoutesForMapData(data);
       }
     } catch (_) {
       if (mounted) {
         setState(() {
           _mapData = const RoutesAndStationsData(routes: [], stations: []);
           _isLoadingMapData = false;
-          _roadAlignedPointsByKey = {};
           _selectedRouteIdsSafe.clear();
         });
-      }
-    }
-  }
-
-  /// Fetches road-aligned geometry from Valhalla for each route direction; updates state on success.
-  /// If the Valhalla status check fails, skips requests so routes stay as straight segments.
-  Future<void> _fetchValhallaRoutesForMapData(RoutesAndStationsData data) async {
-    final available = await checkValhallaStatus().catchError((_) => false);
-    if (!available || !mounted) return;
-    for (final route in data.routes) {
-      if (route.goingTo.length >= 2) {
-        final key = '${route.id}_goingTo';
-        fetchRoadAlignedRoute(route.goingTo).then((points) {
-          if (mounted) {
-            setState(() {
-              _roadAlignedPointsByKey = Map.of(_roadAlignedPointsByKey)..[key] = points;
-            });
-          }
-        }).catchError((_) {});
-      }
-      if (route.goingBack.length >= 2) {
-        final key = '${route.id}_goingBack';
-        fetchRoadAlignedRoute(route.goingBack).then((points) {
-          if (mounted) {
-            setState(() {
-              _roadAlignedPointsByKey = Map.of(_roadAlignedPointsByKey)..[key] = points;
-            });
-          }
-        }).catchError((_) {});
       }
     }
   }
@@ -193,18 +166,25 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return Scaffold(
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _iloiloCenter,
-              initialZoom: _initialZoom,
-              backgroundColor: MapColors.background,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: _osmTileUrl,
-                userAgentPackageName: _userAgentPackageName,
+          Positioned.fill(
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _iloiloCenter,
+                initialZoom: _initialZoom,
+                backgroundColor: MapColors.background,
               ),
+              children: [
+                TileLayer(
+                  urlTemplate: _osmTileUrl,
+                  userAgentPackageName: _userAgentPackageName,
+                  tileProvider: NetworkTileProvider(
+                    headers: {
+                      'User-Agent':
+                          'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
+                    },
+                  ),
+                ),
               // Polylines for static jeepney routes and A* path.
               PolylineLayer<Object>(polylines: _routePolylines),
               if (_showStations &&
@@ -253,6 +233,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ],
           ),
+          ),
           _buildSearchBar(context),
           _buildMapActionButtons(context),
           _buildBottomDrawer(context),
@@ -271,32 +252,66 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Polylines to draw (jeepney routes: goingTo and goingBack, road-aligned from Valhalla when available, else straight segments).
+  /// Polylines to draw (jeepney routes: goingTo and goingBack).
+  ///
+  /// Prefers encoded polylines from the API (`polylineGoingTo` / `polylineGoingBack`).
+  /// Falls back to straight segments between the stored waypoints.
   List<Polyline<Object>> get _routePolylines {
     final routes = _visibleRoutes;
     final polylines = <Polyline<Object>>[];
+    final diagParts = <String>[];
     for (final route in routes) {
       final routeColor = _parseRouteColor(route.routeColor);
       for (final direction in _RouteDirection.values) {
-        final list = direction == _RouteDirection.goingTo ? route.goingTo : route.goingBack;
-        if (list.length < 2) continue;
-        final key = '${route.id}_${direction.name}';
-        List<LatLng> points;
-        final roadAligned = _roadAlignedPointsByKey[key];
-        if (roadAligned != null && roadAligned.length >= 2) {
-          points = roadAligned;
-        } else {
-          final sorted = List.of(list)..sort((a, b) => a.sequence.compareTo(b.sequence));
+        final encoded = direction == _RouteDirection.goingTo
+            ? route.polylineGoingTo
+            : route.polylineGoingBack;
+
+        List<LatLng> points = const <LatLng>[];
+        bool usedDecoded = false;
+        if (encoded != null && encoded.trim().isNotEmpty) {
+          final decoded = decodeApiRoutePolyline(encoded);
+          if (decoded != null) {
+            points = decoded;
+            usedDecoded = true;
+          }
+        }
+
+        if (points.length < 2) {
+          final list =
+              direction == _RouteDirection.goingTo ? route.goingTo : route.goingBack;
+          if (list.length < 2) continue;
+          final sorted = List.of(list)
+            ..sort((a, b) => a.sequence.compareTo(b.sequence));
           points = sorted.map((p) => LatLng(p.lat, p.lon)).toList();
         }
+
         if (points.length < 2) continue;
+        if (_debugPolylineDiagnostics) {
+          final dirLabel = direction == _RouteDirection.goingTo ? 'to' : 'back';
+          diagParts.add(
+            '${route.id}:$dirLabel:${usedDecoded ? 'decoded' : 'fallback'}:${points.length}',
+          );
+        }
         polylines.add(
           Polyline<Object>(
             points: points,
-            color: routeColor,
-            strokeWidth: MapColors.jeepneyRouteStrokeWidth,
+            color: usedDecoded
+                ? routeColor
+                : routeColor.withValues(alpha: 0.35), // visually obvious fallback
+            strokeWidth: usedDecoded
+                ? MapColors.jeepneyRouteStrokeWidth
+                : (MapColors.jeepneyRouteStrokeWidth - 1).clamp(1, 999).toDouble(),
           ),
         );
+      }
+    }
+
+    if (_debugPolylineDiagnostics && diagParts.isNotEmpty) {
+      final signature = diagParts.join('|');
+      if (signature != _lastPolylineDiagnosticsSignature) {
+        _lastPolylineDiagnosticsSignature = signature;
+        debugPrint('PolylineDiagnostics: $signature');
       }
     }
     return polylines;

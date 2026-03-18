@@ -9,6 +9,8 @@ class JeepneyRoute {
     required this.routeColor,
     required this.goingTo,
     required this.goingBack,
+    required this.polylineGoingTo,
+    required this.polylineGoingBack,
   });
 
   final String id;
@@ -20,6 +22,12 @@ class JeepneyRoute {
   final List<RoutePoint> goingTo;
   /// Return direction points (e.g. terminal B → terminal A).
   final List<RoutePoint> goingBack;
+  /// Encoded polyline for outbound direction (Valhalla-style, precision 1e6).
+  /// Prefer this for rendering when present to avoid recomputing geometry.
+  final String? polylineGoingTo;
+  /// Encoded polyline for return direction (Valhalla-style, precision 1e6).
+  /// Prefer this for rendering when present to avoid recomputing geometry.
+  final String? polylineGoingBack;
 
   /// Parses from API shape: { "id", "routeNumber", "routeName", "routeColor", "points": { "goingTo": [], "goingBack": [] } }
   /// or legacy { "points": [] } (single list used as goingTo, goingBack empty).
@@ -27,9 +35,15 @@ class JeepneyRoute {
     final pointsJson = json['points'];
     List<RoutePoint> goingTo;
     List<RoutePoint> goingBack;
+    String? polylineGoingTo;
+    String? polylineGoingBack;
     if (pointsJson is Map<String, dynamic>) {
       goingTo = _parsePointList(pointsJson['goingTo']);
       goingBack = _parsePointList(pointsJson['goingBack']);
+      final to = pointsJson['polylineGoingTo'];
+      final back = pointsJson['polylineGoingBack'];
+      if (to is String && to.trim().isNotEmpty) polylineGoingTo = to;
+      if (back is String && back.trim().isNotEmpty) polylineGoingBack = back;
     } else if (pointsJson is List) {
       goingTo = _parsePointList(pointsJson);
       goingBack = [];
@@ -49,6 +63,8 @@ class JeepneyRoute {
       routeColor: routeColor,
       goingTo: goingTo,
       goingBack: goingBack,
+      polylineGoingTo: polylineGoingTo,
+      polylineGoingBack: polylineGoingBack,
     );
   }
 
