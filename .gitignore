@@ -44,5 +44,5 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Temporary Files
-/doc_files/
+# secrets
+/secrets
