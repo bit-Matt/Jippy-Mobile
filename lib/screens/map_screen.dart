@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:vector_map_tiles/vector_map_tiles.dart';
 
 import '../core/theme/map_colors.dart';
 import '../data/map_data_loader.dart';
@@ -24,6 +25,10 @@ const double _initialZoom = 14.0;
 /// OSM tile layer URL. Use [userAgentPackageName] to comply with OSM tile usage policy.
 /// For production, consider switching to a dedicated tile provider (MapTiler, Stadia, etc.).
 const String _osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+/// Vector tile style (MapLibre/Mapbox style.json) served by our tile server.
+const String _vectorStyleUrl =
+    'https://jippy.shinosawa-laboratories.dev/tileserver/style.json';
 
 /// App package name for OSM User-Agent (required to avoid tile request blocks).
 const String _userAgentPackageName = 'com.example.jippy_mobile';
@@ -57,11 +62,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Loaded routes and stations from API (or asset fallback).
   RoutesAndStationsData? _mapData;
 
+  /// Loaded vector style. When null, we fall back to raster OSM tiles.
+  Style? _vectorStyle;
+
   /// True while routes are being fetched and during the first render pass.
   bool _loadingRoutes = true;
-
-  /// True while fetching routes from API or loading fallback.
-  bool _isLoadingMapData = false;
 
   /// Selected route IDs currently visible on the map.
   Set<String>? _selectedRouteIds;
@@ -96,6 +101,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadVectorStyle();
     _initLocation();
     _loadMapData();
   }
@@ -103,7 +109,30 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _loadVectorStyle();
       _loadMapData();
+    }
+  }
+
+  Future<void> _loadVectorStyle() async {
+    // Best-effort: if this fails (no internet, server down), we keep using the
+    // default raster OSM layer.
+    try {
+      final style = await StyleReader(
+        uri: _vectorStyleUrl,
+        httpHeaders: const {
+          'User-Agent':
+              'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
+        },
+      ).read().timeout(const Duration(seconds: 6));
+
+      if (!mounted) return;
+      setState(() => _vectorStyle = style);
+    } catch (_) {
+      if (!mounted) return;
+      if (_vectorStyle != null) {
+        setState(() => _vectorStyle = null);
+      }
     }
   }
 
@@ -112,7 +141,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {
       _loadingRoutes = true;
-      _isLoadingMapData = true;
     });
     try {
       final previousAllIds = _allRouteIds;
@@ -131,7 +159,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         final incomingRouteIds = data.routes.map((r) => r.id).toSet();
         setState(() {
           _mapData = data;
-          _isLoadingMapData = false;
 
           // Selection semantics:
           // - First load: select all routes by default (map shows all, list highlights all).
@@ -159,7 +186,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _mapData = const RoutesAndStationsData(routes: [], stations: []);
-          _isLoadingMapData = false;
           _selectedRouteIdsSafe.clear();
         });
         _completeRouteLoadingAfterRender();
@@ -265,6 +291,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final vectorStyle = _vectorStyle;
     return Scaffold(
       body: Stack(
         children: [
@@ -277,16 +304,23 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 backgroundColor: MapColors.background,
               ),
               children: [
-                TileLayer(
-                  urlTemplate: _osmTileUrl,
-                  userAgentPackageName: _userAgentPackageName,
-                  tileProvider: NetworkTileProvider(
-                    headers: {
-                      'User-Agent':
-                          'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
-                    },
+                if (vectorStyle != null)
+                  VectorTileLayer(
+                    tileProviders: vectorStyle.providers,
+                    theme: vectorStyle.theme,
+                    sprites: vectorStyle.sprites,
+                  )
+                else
+                  TileLayer(
+                    urlTemplate: _osmTileUrl,
+                    userAgentPackageName: _userAgentPackageName,
+                    tileProvider: NetworkTileProvider(
+                      headers: const {
+                        'User-Agent':
+                            'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
+                      },
+                    ),
                   ),
-                ),
                 // Polylines for static jeepney routes and A* path.
                 PolylineLayer<Object>(polylines: _routePolylines),
                 if (_showStations &&
@@ -764,14 +798,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               selected: _areAllRoutesSelected,
               onSelected: (selected) {
                 if (selected) {
-                  final allIds = _allRouteIds;
-                  if (allIds.isEmpty) return;
-                  setState(() {
-                    _selectedRouteIdsSafe
-                      ..clear()
-                      ..addAll(allIds);
-                  });
-                  _fitRoutesBounds(_mapData?.routes ?? const <JeepneyRoute>[]);
+                  _showAllRoutes();
                 } else {
                   setState(() => _selectedRouteIdsSafe.clear());
                 }
@@ -904,9 +931,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   Widget _buildRouteDetailsView(ScrollController scrollController) {
     final route = _selectedRouteForDetails;
-    final hasDetails = route != null && route.routeDetails.trim().isNotEmpty;
-    final detailText = hasDetails
-        ? route!.routeDetails.trim()
+    final detailText = (route != null && route.routeDetails.trim().isNotEmpty)
+        ? route.routeDetails.trim()
         : 'No route details available for this route yet.';
 
     return ListView(
@@ -1085,7 +1111,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           _buildBottomNavItem(
             index: 3,
             icon: Icons.person_outline,
-            label: 'Setting',
+            label: 'Settings',
           ),
         ],
       ),
