@@ -58,6 +58,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
   int _selectedNavIndex = 1;
+  DateTime? _lastNavRefreshAt;
 
   /// Loaded routes and stations from API (or asset fallback).
   RoutesAndStationsData? _mapData;
@@ -1128,7 +1129,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ? MapColors.primary
         : MapColors.text.withValues(alpha: 0.35);
     return InkWell(
-      onTap: () => setState(() => _selectedNavIndex = index),
+      onTap: () => _onBottomNavSelected(index),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1149,6 +1150,26 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  void _onBottomNavSelected(int index) {
+    if (!mounted) return;
+
+    final now = DateTime.now();
+    final last = _lastNavRefreshAt;
+    // Prevent rapid taps from spamming API/style requests.
+    if (last != null &&
+        now.difference(last) < const Duration(milliseconds: 800)) {
+      setState(() => _selectedNavIndex = index);
+      return;
+    }
+    _lastNavRefreshAt = now;
+
+    setState(() => _selectedNavIndex = index);
+
+    // Best-effort refresh when user switches sections.
+    _loadVectorStyle();
+    _loadMapData();
   }
 
   Widget _buildLocationMessage(String message) {
