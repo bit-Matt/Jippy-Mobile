@@ -33,6 +33,9 @@ const int _positionStreamDistanceFilterMeters = 8;
 /// Debug-only diagnostics for route polylines (decoded vs fallback).
 const bool _debugPolylineDiagnostics = kDebugMode;
 
+/// Temporary UI toggle to hide the search bar overlay.
+const bool _showSearchBar = false;
+
 /// Full-screen map with OpenStreetMap tiles, user location dot, and structure for
 /// static route polylines and A* path segments.
 class MapScreen extends StatefulWidget {
@@ -64,6 +67,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Prevents log spam by only printing when the signature changes.
   String? _lastPolylineDiagnosticsSignature;
 
+  Set<String> get _allRouteIds =>
+      (_mapData?.routes ?? const <JeepneyRoute>[]).map((r) => r.id).toSet();
+
+  bool get _areAllRoutesSelected {
+    final all = _allRouteIds;
+    if (all.isEmpty) return false;
+    final selected = _selectedRouteIdsSafe;
+    return selected.length == all.length && selected.containsAll(all);
+  }
+
+  bool get _areAnyRoutesSelected => _selectedRouteIdsSafe.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +99,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() => _isLoadingMapData = true);
     try {
+      final previousAllIds = _allRouteIds;
+      final bool wasAllSelected = previousAllIds.isNotEmpty &&
+          _selectedRouteIdsSafe.length == previousAllIds.length &&
+          _selectedRouteIdsSafe.containsAll(previousAllIds);
+
       RoutesAndStationsData data;
       try {
         data = await loadRoutesFromApi();
@@ -95,7 +115,23 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         setState(() {
           _mapData = data;
           _isLoadingMapData = false;
-          _selectedRouteIdsSafe.removeWhere((id) => !incomingRouteIds.contains(id));
+
+          // Selection semantics:
+          // - First load: select all routes by default (map shows all, list highlights all).
+          // - If user previously hid all routes (empty selection), keep it empty.
+          // - If user previously had "all selected", keep it "all selected" after refresh.
+          // - Otherwise, keep existing partial selection and drop missing IDs.
+          if (_selectedRouteIds == null) {
+            _selectedRouteIdsSafe.addAll(incomingRouteIds);
+          } else if (_selectedRouteIdsSafe.isEmpty) {
+            // Keep empty.
+          } else if (wasAllSelected) {
+            _selectedRouteIdsSafe
+              ..clear()
+              ..addAll(incomingRouteIds);
+          } else {
+            _selectedRouteIdsSafe.removeWhere((id) => !incomingRouteIds.contains(id));
+          }
         });
       }
     } catch (_) {
@@ -234,7 +270,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             ],
           ),
           ),
-          _buildSearchBar(context),
+          if (_showSearchBar) _buildSearchBar(context),
           _buildMapActionButtons(context),
           _buildBottomDrawer(context),
           if (_isLoadingMapData) _buildLoadingOverlay(),
@@ -319,7 +355,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   List<JeepneyRoute> get _visibleRoutes {
     final routes = _mapData?.routes ?? const <JeepneyRoute>[];
-    if (_selectedRouteIdsSafe.isEmpty) return routes;
+    if (_selectedRouteIdsSafe.isEmpty) return const <JeepneyRoute>[];
     return routes.where((r) => _selectedRouteIdsSafe.contains(r.id)).toList();
   }
 
@@ -346,12 +382,28 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _fitRoutesBounds(routesToFit);
   }
 
-  void _showAllRoutes() {
-    final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
+  void _toggleAllRoutesSelection() {
+    final allIds = _allRouteIds;
+    if (allIds.isEmpty) return;
+
+    late bool willSelectAll;
     setState(() {
-      _selectedRouteIdsSafe.clear();
+      if (_areAllRoutesSelected) {
+        // Hide everything.
+        _selectedRouteIdsSafe.clear();
+        willSelectAll = false;
+      } else {
+        // Show everything.
+        _selectedRouteIdsSafe
+          ..clear()
+          ..addAll(allIds);
+        willSelectAll = true;
+      }
     });
-    _fitRoutesBounds(allRoutes);
+
+    if (willSelectAll) {
+      _fitRoutesBounds(_mapData?.routes ?? const <JeepneyRoute>[]);
+    }
   }
 
   /// Fits map camera to route points; falls back to city center if no points.
@@ -629,16 +681,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ),
         const Spacer(),
         TextButton(
-          onPressed: _showAllRoutes,
+          onPressed: _toggleAllRoutesSelection,
           style: TextButton.styleFrom(
             foregroundColor: MapColors.primary,
             padding: EdgeInsets.zero,
             minimumSize: const Size(56, 24),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          child: const Text(
-            'Show all routes',
-            style: TextStyle(fontWeight: FontWeight.w600),
+          child: Text(
+            _areAnyRoutesSelected
+                ? (_areAllRoutesSelected ? 'Hide all routes' : 'Show all routes')
+                : 'Show all routes',
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
       ],
