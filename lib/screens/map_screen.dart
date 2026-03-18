@@ -59,8 +59,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   bool _isLoadingMapData = false;
   /// Selected route IDs currently visible on the map.
   Set<String>? _selectedRouteIds;
-  /// When true, tricycle stations are shown. Ready for future checkbox UI.
-  final bool _showStations = true;
+  /// When true, tricycle stations are shown.
+  bool _showStations = true;
 
   Set<String> get _selectedRouteIdsSafe => _selectedRouteIds ??= <String>{};
 
@@ -76,8 +76,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final selected = _selectedRouteIdsSafe;
     return selected.length == all.length && selected.containsAll(all);
   }
-
-  bool get _areAnyRoutesSelected => _selectedRouteIdsSafe.isNotEmpty;
 
   @override
   void initState() {
@@ -382,30 +380,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _fitRoutesBounds(routesToFit);
   }
 
-  void _toggleAllRoutesSelection() {
-    final allIds = _allRouteIds;
-    if (allIds.isEmpty) return;
-
-    late bool willSelectAll;
-    setState(() {
-      if (_areAllRoutesSelected) {
-        // Hide everything.
-        _selectedRouteIdsSafe.clear();
-        willSelectAll = false;
-      } else {
-        // Show everything.
-        _selectedRouteIdsSafe
-          ..clear()
-          ..addAll(allIds);
-        willSelectAll = true;
-      }
-    });
-
-    if (willSelectAll) {
-      _fitRoutesBounds(_mapData?.routes ?? const <JeepneyRoute>[]);
-    }
-  }
-
   /// Fits map camera to route points; falls back to city center if no points.
   void _fitRoutesBounds(List<JeepneyRoute> routes) {
     final points = <LatLng>[];
@@ -668,7 +642,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildRoutesHeader() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'Routes',
@@ -679,21 +654,64 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             height: 1,
           ),
         ),
-        const Spacer(),
-        TextButton(
-          onPressed: _toggleAllRoutesSelection,
-          style: TextButton.styleFrom(
-            foregroundColor: MapColors.primary,
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(56, 24),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(
-            _areAnyRoutesSelected
-                ? (_areAllRoutesSelected ? 'Hide all routes' : 'Show all routes')
-                : 'Show all routes',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            FilterChip(
+              label: const Text('Show all routes'),
+              selected: _areAllRoutesSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  final allIds = _allRouteIds;
+                  if (allIds.isEmpty) return;
+                  setState(() {
+                    _selectedRouteIdsSafe
+                      ..clear()
+                      ..addAll(allIds);
+                  });
+                  _fitRoutesBounds(_mapData?.routes ?? const <JeepneyRoute>[]);
+                } else {
+                  setState(() => _selectedRouteIdsSafe.clear());
+                }
+              },
+              showCheckmark: false,
+              selectedColor: MapColors.primary.withValues(alpha: 0.18),
+              checkmarkColor: MapColors.primary,
+              labelStyle: TextStyle(
+                color: _areAllRoutesSelected
+                    ? MapColors.primary
+                    : MapColors.text.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w600,
+              ),
+              side: BorderSide(
+                color: _areAllRoutesSelected
+                    ? MapColors.primary.withValues(alpha: 0.7)
+                    : MapColors.text.withValues(alpha: 0.18),
+              ),
+            ),
+            const SizedBox(width: 10),
+            FilterChip(
+              label: const Text('Show Tricycle Stations'),
+              selected: _showStations,
+              onSelected: (selected) {
+                setState(() => _showStations = selected);
+              },
+              showCheckmark: false,
+              selectedColor: MapColors.accentColor.withValues(alpha: 0.18),
+              checkmarkColor: MapColors.accentColor,
+              labelStyle: TextStyle(
+                color: _showStations
+                    ? MapColors.accentColor
+                    : MapColors.text.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w600,
+              ),
+              side: BorderSide(
+                color: _showStations
+                    ? MapColors.accentColor.withValues(alpha: 0.7)
+                    : MapColors.text.withValues(alpha: 0.18),
+              ),
+            ),
+          ],
         ),
       ],
     );
