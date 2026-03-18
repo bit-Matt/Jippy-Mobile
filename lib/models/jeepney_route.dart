@@ -8,7 +8,8 @@ class JeepneyRoute {
     required this.routeName,
     required this.routeColor,
     required this.routeDetail,
-    required this.points,
+    required this.goingTo,
+    required this.goingBack,
   });
 
   final String id;
@@ -18,13 +19,13 @@ class JeepneyRoute {
   final String routeColor;
   /// Route details text from backend. Used by the panel details view.
   final String routeDetail;
-  final List<RoutePoint> points;
-
-  /// Parses from API shape: { "id", "routeNumber", "routeName", "routeColor", "routeDetail", "points": [] }.
   /// Outbound direction points (e.g. terminal A → terminal B).
   final List<RoutePoint> goingTo;
   /// Return direction points (e.g. terminal B → terminal A).
   final List<RoutePoint> goingBack;
+
+  /// Combined points view for legacy consumers.
+  List<RoutePoint> get points => [...goingTo, ...goingBack];
 
   /// Parses from API shape: { "id", "routeNumber", "routeName", "routeColor", "points": { "goingTo": [], "goingBack": [] } }
   /// or legacy { "points": [] } (single list used as goingTo, goingBack empty).
@@ -54,7 +55,6 @@ class JeepneyRoute {
       routeName: routeName,
       routeColor: routeColor,
       routeDetail: routeDetail,
-      points: points,
       goingTo: goingTo,
       goingBack: goingBack,
     );

@@ -82,7 +82,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Loads routes from API; on failure falls back to asset data.
   Future<void> _loadMapData() async {
     if (!mounted) return;
-    setState(() => _loadingRoutes = true);
+    setState(() {
+      _loadingRoutes = true;
+      _isLoadingMapData = true;
+    });
     try {
       RoutesAndStationsData data;
       try {
@@ -94,13 +97,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         final incomingRouteIds = data.routes.map((r) => r.id).toSet();
         setState(() {
           _mapData = data;
-          _selectedRouteIdsSafe.removeWhere((id) => !incomingRouteIds.contains(id));
-        });
-        _completeRouteLoadingAfterRender();
           _isLoadingMapData = false;
           _roadAlignedPointsByKey = {};
           _selectedRouteIdsSafe.removeWhere((id) => !incomingRouteIds.contains(id));
         });
+        _completeRouteLoadingAfterRender();
         _fetchValhallaRoutesForMapData(data);
       }
     } catch (_) {
@@ -121,6 +122,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() => _loadingRoutes = false);
     });
+  }
+
   /// Fetches road-aligned geometry from Valhalla for each route direction; updates state on success.
   /// If the Valhalla status check fails, skips requests so routes stay as straight segments.
   Future<void> _fetchValhallaRoutesForMapData(RoutesAndStationsData data) async {

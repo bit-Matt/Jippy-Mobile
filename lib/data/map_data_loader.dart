@@ -11,7 +11,6 @@ const String apiBaseUrl = 'http://172.24.0.1:3000'; // Local Development
 
 /// Public API URL for all routes and regions (dashboard API shape).
 // const String routesApiUrl = 'http://localhost:3000/api/public/all'; // Production
-const String routesApiUrl = 'http://172.25.176.1:3000/api/public/all'; // Local Development
 const String routesApiUrl = '$apiBaseUrl/api/public/all';
 
 /// Timeout for the routes API request.
