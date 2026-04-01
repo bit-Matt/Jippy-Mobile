@@ -6,7 +6,8 @@ import 'package:http/http.dart' as http;
 import '../models/routes_and_stations_data.dart';
 
 /// Dashboard API base URL (no trailing slash). Used for routes and Valhalla proxy.
-const String apiBaseUrl = 'https://jippy.shinosawa-laboratories.dev'; // Production
+const String apiBaseUrl =
+    'https://jippy.shinosawa-laboratories.dev'; // Production
 // const String apiBaseUrl = 'http://192.168.1.21:6769'; // Local Development
 
 /// Public API URL for all routes and regions (dashboard API shape).
@@ -51,6 +52,6 @@ Future<RoutesAndStationsData> loadSampleMapData() async {
         jsonDecode(jsonString) as Map<String, dynamic>;
     return RoutesAndStationsData.fromJson(json);
   } catch (_) {
-    return const RoutesAndStationsData(routes: [], stations: []);
+    return const RoutesAndStationsData(routes: [], stations: [], closures: []);
   }
 }

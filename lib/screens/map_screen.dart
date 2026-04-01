@@ -41,6 +41,9 @@ const bool _debugPolylineDiagnostics = kDebugMode;
 
 /// Temporary UI toggle to hide the search bar overlay.
 const bool _showSearchBar = false;
+const Color _closureColor = Color(0xFFE81123);
+const double _closureFillOpacity = 0.25;
+const double _closureStrokeWidth = 2;
 
 /// Full-screen map with OpenStreetMap tiles, user location dot, and structure for
 /// static route polylines and A* path segments.
@@ -186,7 +189,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _mapData = const RoutesAndStationsData(routes: [], stations: []);
+          _mapData = const RoutesAndStationsData(
+            routes: [],
+            stations: [],
+            closures: [],
+          );
           _selectedRouteIdsSafe.clear();
         });
         _completeRouteLoadingAfterRender();
@@ -324,6 +331,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 // Polylines for static jeepney routes and A* path.
                 PolylineLayer<Object>(polylines: _routePolylines),
+                if (_closurePolygons.isNotEmpty)
+                  PolygonLayer<Object>(polygons: _closurePolygons),
                 if (_showStations &&
                     _mapData != null &&
                     _mapData!.stations.isNotEmpty)
@@ -473,6 +482,29 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final routes = _mapData?.routes ?? const <JeepneyRoute>[];
     if (_selectedRouteIdsSafe.isEmpty) return const <JeepneyRoute>[];
     return routes.where((r) => _selectedRouteIdsSafe.contains(r.id)).toList();
+  }
+
+  List<Polygon<Object>> get _closurePolygons {
+    final closures = _mapData?.closures ?? const [];
+    final polygons = <Polygon<Object>>[];
+
+    for (final closure in closures) {
+      if (!closure.canRenderPolygon) continue;
+      final ordered = closure.orderedPoints;
+
+      final points = ordered.map((p) => LatLng(p.lat, p.lng)).toList();
+      if (points.length < 3) continue;
+
+      polygons.add(
+        Polygon<Object>(
+          points: points,
+          color: _closureColor.withValues(alpha: _closureFillOpacity),
+          borderColor: _closureColor,
+          borderStrokeWidth: _closureStrokeWidth,
+        ),
+      );
+    }
+    return polygons;
   }
 
   void _onRouteTap(JeepneyRoute route) {
