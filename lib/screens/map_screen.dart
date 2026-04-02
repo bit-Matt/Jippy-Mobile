@@ -11,6 +11,7 @@ import '../core/theme/map_colors.dart';
 import '../data/map_data_loader.dart';
 import '../data/valhalla_route_client.dart';
 import '../models/jeepney_route.dart';
+import '../models/road_closure.dart';
 import '../models/routes_and_stations_data.dart';
 import '../utils/polyline_1e6.dart';
 
@@ -85,6 +86,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Road-aligned route points fetched from Valhalla (when API polylines missing).
   /// Key format: `${route.id}_goingTo` / `${route.id}_goingBack`.
   Map<String, List<LatLng>> _roadAlignedPointsByKey = <String, List<LatLng>>{};
+  final LayerHitNotifier<String> _closureHitNotifier = ValueNotifier(null);
+  bool _isShowingClosureSheet = false;
 
   Set<String> get _selectedRouteIdsSafe => _selectedRouteIds ??= <String>{};
 
@@ -105,6 +108,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _closureHitNotifier.addListener(_onClosureLayerHit);
     _loadVectorStyle();
     _initLocation();
     _loadMapData();
@@ -294,6 +298,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
+    _closureHitNotifier.removeListener(_onClosureLayerHit);
+    _closureHitNotifier.dispose();
     super.dispose();
   }
 
@@ -332,7 +338,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 // Polylines for static jeepney routes and A* path.
                 PolylineLayer<Object>(polylines: _routePolylines),
                 if (_closurePolygons.isNotEmpty)
-                  PolygonLayer<Object>(polygons: _closurePolygons),
+                  PolygonLayer<Object>(
+                    polygons: _closurePolygons,
+                    hitNotifier: _closureHitNotifier,
+                  ),
                 if (_showStations &&
                     _mapData != null &&
                     _mapData!.stations.isNotEmpty)
@@ -501,10 +510,81 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           color: _closureColor.withValues(alpha: _closureFillOpacity),
           borderColor: _closureColor,
           borderStrokeWidth: _closureStrokeWidth,
+          hitValue: closure.id,
         ),
       );
     }
     return polygons;
+  }
+
+  void _onClosureLayerHit() {
+    if (!mounted || _isShowingClosureSheet) return;
+    final hit = _closureHitNotifier.value;
+    final hitId = hit?.hitValues.isNotEmpty == true
+        ? hit!.hitValues.first
+        : null;
+    if (hitId == null) return;
+
+    final closures = _mapData?.closures ?? const <RoadClosure>[];
+    RoadClosure? selected;
+    for (final closure in closures) {
+      if (closure.id == hitId) {
+        selected = closure;
+        break;
+      }
+    }
+    if (selected == null) return;
+    _showClosureDetailsSheet(selected);
+  }
+
+  Future<void> _showClosureDetailsSheet(RoadClosure closure) async {
+    _isShowingClosureSheet = true;
+    final title = closure.closureName.trim().isEmpty
+        ? '(untitled)'
+        : closure.closureName.trim();
+    final description = closure.closureDescription.trim().isEmpty
+        ? 'No description available.'
+        : closure.closureDescription.trim();
+
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: MapColors.background,
+        builder: (sheetContext) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: MapColors.text,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      color: MapColors.text,
+                      fontSize: 15,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } finally {
+      _isShowingClosureSheet = false;
+    }
   }
 
   void _onRouteTap(JeepneyRoute route) {
