@@ -329,7 +329,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     urlTemplate: _osmTileUrl,
                     userAgentPackageName: _userAgentPackageName,
                     tileProvider: NetworkTileProvider(
-                      headers: const {
+                      headers: {
                         'User-Agent':
                             'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
                       },
