@@ -11,6 +11,7 @@ import '../core/theme/map_colors.dart';
 import '../data/map_data_loader.dart';
 import '../data/valhalla_route_client.dart';
 import '../models/jeepney_route.dart';
+import '../models/road_closure.dart';
 import '../models/routes_and_stations_data.dart';
 import '../utils/polyline_1e6.dart';
 
@@ -41,6 +42,9 @@ const bool _debugPolylineDiagnostics = kDebugMode;
 
 /// Temporary UI toggle to hide the search bar overlay.
 const bool _showSearchBar = false;
+const Color _closureColor = Color(0xFFE81123);
+const double _closureFillOpacity = 0.25;
+const double _closureStrokeWidth = 2;
 
 /// Full-screen map with OpenStreetMap tiles, user location dot, and structure for
 /// static route polylines and A* path segments.
@@ -69,6 +73,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// True while routes are being fetched and during the first render pass.
   bool _loadingRoutes = true;
 
+  /// True when the map is showing only a selected subset of routes.
+  bool _isFocusedMode = false;
+
+  /// True when route taps can build a comparison set instead of replacing selection.
+  bool _isCompareMode = false;
+
   /// Selected route IDs currently visible on the map.
   Set<String>? _selectedRouteIds;
 
@@ -76,14 +86,28 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   JeepneyRoute? _selectedRouteForDetails;
   bool _showingRouteDetails = false;
 
+  /// Selected road closure for in-drawer details (same sheet as routes).
+  RoadClosure? _selectedClosureForDetails;
+  bool _showingClosureDetails = false;
+
   /// When true, tricycle stations are shown.
   bool _showStations = true;
 
   /// Road-aligned route points fetched from Valhalla (when API polylines missing).
   /// Key format: `${route.id}_goingTo` / `${route.id}_goingBack`.
   Map<String, List<LatLng>> _roadAlignedPointsByKey = <String, List<LatLng>>{};
+  final Map<String, List<LatLng>> _decodedPolylineCache =
+      <String, List<LatLng>>{};
+  bool _hasAppliedInitialRouteFit = false;
+  final LayerHitNotifier<String> _closureHitNotifier = ValueNotifier(null);
 
-  Set<String> get _selectedRouteIdsSafe => _selectedRouteIds ??= <String>{};
+  Set<String> _selectedRouteIdsMutable() {
+    _selectedRouteIds ??= <String>{};
+    return _selectedRouteIds!;
+  }
+
+  Set<String> get _selectedRouteIdsReadOnly =>
+      _selectedRouteIds ?? const <String>{};
 
   /// Prevents log spam by only printing when the signature changes.
   String? _lastPolylineDiagnosticsSignature;
@@ -91,17 +115,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   Set<String> get _allRouteIds =>
       (_mapData?.routes ?? const <JeepneyRoute>[]).map((r) => r.id).toSet();
 
-  bool get _areAllRoutesSelected {
-    final all = _allRouteIds;
-    if (all.isEmpty) return false;
-    final selected = _selectedRouteIdsSafe;
-    return selected.length == all.length && selected.containsAll(all);
-  }
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _closureHitNotifier.addListener(_onClosureLayerHit);
     _loadVectorStyle();
     _initLocation();
     _loadMapData();
@@ -144,12 +162,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _loadingRoutes = true;
     });
     try {
-      final previousAllIds = _allRouteIds;
-      final bool wasAllSelected =
-          previousAllIds.isNotEmpty &&
-          _selectedRouteIdsSafe.length == previousAllIds.length &&
-          _selectedRouteIdsSafe.containsAll(previousAllIds);
-
       RoutesAndStationsData data;
       try {
         data = await loadRoutesFromApi();
@@ -162,32 +174,34 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           _mapData = data;
 
           // Selection semantics:
-          // - First load: select all routes by default (map shows all, list highlights all).
-          // - If user previously hid all routes (empty selection), keep it empty.
-          // - If user previously had "all selected", keep it "all selected" after refresh.
-          // - Otherwise, keep existing partial selection and drop missing IDs.
-          if (_selectedRouteIds == null) {
-            _selectedRouteIdsSafe.addAll(incomingRouteIds);
-          } else if (_selectedRouteIdsSafe.isEmpty) {
-            // Keep empty.
-          } else if (wasAllSelected) {
-            _selectedRouteIdsSafe
-              ..clear()
-              ..addAll(incomingRouteIds);
+          // - Show All mode keeps every route selected.
+          // - Focused mode keeps the current selection set and drops missing IDs.
+          // - Single-select focused mode collapses any stale multi-selection to one route.
+          if (!_isFocusedMode || _selectedRouteIds == null) {
+            _selectedRouteIds = Set<String>.from(incomingRouteIds);
           } else {
-            _selectedRouteIdsSafe.removeWhere(
+            _selectedRouteIds!.removeWhere(
               (id) => !incomingRouteIds.contains(id),
             );
+            if (!_isCompareMode && _selectedRouteIds!.length > 1) {
+              final retainedRouteId = _selectedRouteIds!.last;
+              _selectedRouteIds = <String>{retainedRouteId};
+            }
           }
         });
         _completeRouteLoadingAfterRender();
+        _fitAllRoutesOnInitialLoad(data.routes);
         _fetchValhallaRoutesForMapData(data);
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _mapData = const RoutesAndStationsData(routes: [], stations: []);
-          _selectedRouteIdsSafe.clear();
+          _mapData = const RoutesAndStationsData(
+            routes: [],
+            stations: [],
+            closures: [],
+          );
+          _selectedRouteIdsMutable().clear();
         });
         _completeRouteLoadingAfterRender();
       }
@@ -198,6 +212,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() => _loadingRoutes = false);
+    });
+  }
+
+  void _fitAllRoutesOnInitialLoad(List<JeepneyRoute> routes) {
+    if (_hasAppliedInitialRouteFit || routes.isEmpty) return;
+    _hasAppliedInitialRouteFit = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _fitRoutesBounds(routes);
     });
   }
 
@@ -287,6 +310,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
+    _closureHitNotifier.removeListener(_onClosureLayerHit);
+    _closureHitNotifier.dispose();
     super.dispose();
   }
 
@@ -316,7 +341,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     urlTemplate: _osmTileUrl,
                     userAgentPackageName: _userAgentPackageName,
                     tileProvider: NetworkTileProvider(
-                      headers: const {
+                      headers: {
                         'User-Agent':
                             'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
                       },
@@ -324,6 +349,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 // Polylines for static jeepney routes and A* path.
                 PolylineLayer<Object>(polylines: _routePolylines),
+                if (_closurePolygons.isNotEmpty)
+                  PolygonLayer<Object>(
+                    polygons: _closurePolygons,
+                    hitNotifier: _closureHitNotifier,
+                  ),
+                if (_closureLabelMarkers.isNotEmpty)
+                  MarkerLayer(markers: _closureLabelMarkers),
                 if (_showStations &&
                     _mapData != null &&
                     _mapData!.stations.isNotEmpty)
@@ -408,10 +440,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         bool usedDecoded = false;
         bool usedValhalla = false;
         if (encoded != null && encoded.trim().isNotEmpty) {
-          final decoded = decodeApiRoutePolyline(encoded);
+          final cacheKey = '${route.id}:${direction.name}:$encoded';
+          final decoded = _decodedPolylineCache[cacheKey] ??
+              decodeApiRoutePolyline(encoded);
           if (decoded != null) {
             points = decoded;
             usedDecoded = true;
+            _decodedPolylineCache[cacheKey] = decoded;
           }
         }
 
@@ -471,24 +506,179 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   List<JeepneyRoute> get _visibleRoutes {
     final routes = _mapData?.routes ?? const <JeepneyRoute>[];
-    if (_selectedRouteIdsSafe.isEmpty) return const <JeepneyRoute>[];
-    return routes.where((r) => _selectedRouteIdsSafe.contains(r.id)).toList();
+    if (!_isFocusedMode) return routes;
+    if (_selectedRouteIdsReadOnly.isEmpty) return const <JeepneyRoute>[];
+    return routes.where((r) => _selectedRouteIdsReadOnly.contains(r.id)).toList();
+  }
+
+  List<Polygon<Object>> get _closurePolygons {
+    final closures = _mapData?.closures ?? const [];
+    final polygons = <Polygon<Object>>[];
+
+    for (final closure in closures) {
+      if (!closure.canRenderPolygon) continue;
+      final ordered = closure.orderedPoints;
+
+      final points = ordered.map((p) => LatLng(p.lat, p.lng)).toList();
+      if (points.length < 3) continue;
+
+      polygons.add(
+        Polygon<Object>(
+          points: points,
+          color: _closureColor.withValues(alpha: _closureFillOpacity),
+          borderColor: _closureColor,
+          borderStrokeWidth: _closureStrokeWidth,
+          hitValue: closure.id,
+        ),
+      );
+    }
+    return polygons;
+  }
+
+  /// Centroid of ordered closure vertices (map label anchor).
+  LatLng _closureLabelPoint(RoadClosure closure) {
+    final ordered = closure.orderedPoints;
+    var latSum = 0.0;
+    var lngSum = 0.0;
+    for (final p in ordered) {
+      latSum += p.lat;
+      lngSum += p.lng;
+    }
+    final n = ordered.length;
+    return LatLng(latSum / n, lngSum / n);
+  }
+
+  /// Floating "Road Closure" chips above each polygon (tap opens in-drawer details).
+  List<Marker> get _closureLabelMarkers {
+    final closures = _mapData?.closures ?? const <RoadClosure>[];
+    final markers = <Marker>[];
+    for (final closure in closures) {
+      if (!closure.canRenderPolygon) continue;
+      markers.add(
+        Marker(
+          point: _closureLabelPoint(closure),
+          width: 76,
+          height: 20,
+          alignment: Alignment.bottomCenter,
+          child: GestureDetector(
+            onTap: () => _openClosureDetails(closure),
+            child: Material(
+              elevation: 3,
+              shadowColor: Colors.black38,
+              borderRadius: BorderRadius.circular(6),
+              color: MapColors.background,
+              child: Container(
+                width: 76,
+                height: 20,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: _closureColor, width: 1),
+                ),
+                child: const Text(
+                  '❌ Road Closed',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: MapColors.text,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return markers;
+  }
+
+  void _onClosureLayerHit() {
+    if (!mounted) return;
+    final hit = _closureHitNotifier.value;
+    final hitId = hit?.hitValues.isNotEmpty == true
+        ? hit!.hitValues.first
+        : null;
+    if (hitId == null) return;
+
+    final closures = _mapData?.closures ?? const <RoadClosure>[];
+    RoadClosure? selected;
+    for (final closure in closures) {
+      if (closure.id == hitId) {
+        selected = closure;
+        break;
+      }
+    }
+    if (selected == null) return;
+    _openClosureDetails(selected);
+  }
+
+  void _openClosureDetails(RoadClosure closure) {
+    if (!mounted) return;
+    setState(() {
+      _selectedClosureForDetails = closure;
+      _showingClosureDetails = true;
+      _showingRouteDetails = false;
+      _selectedRouteForDetails = null;
+    });
+  }
+
+  void _closeClosureDetails() {
+    setState(() {
+      _showingClosureDetails = false;
+      _selectedClosureForDetails = null;
+    });
   }
 
   void _onRouteTap(JeepneyRoute route) {
     late List<JeepneyRoute> routesToFit;
     setState(() {
-      // Focus mode: first selection isolates the tapped route.
-      if (_selectedRouteIdsSafe.isEmpty) {
-        _selectedRouteIdsSafe.add(route.id);
-      } else if (_selectedRouteIdsSafe.contains(route.id)) {
-        _selectedRouteIdsSafe.remove(route.id);
+      if (!_isFocusedMode) {
+        _isFocusedMode = true;
+        _selectedRouteIds = <String>{route.id};
+      } else if (_isCompareMode) {
+        final selectedRouteIds = _selectedRouteIdsMutable();
+        if (selectedRouteIds.contains(route.id)) {
+          selectedRouteIds.remove(route.id);
+        } else {
+          selectedRouteIds.add(route.id);
+        }
       } else {
-        _selectedRouteIdsSafe.add(route.id);
+        _selectedRouteIds = <String>{route.id};
       }
-      routesToFit = _selectedRouteIdsSafe.isEmpty
-          ? (_mapData?.routes ?? const <JeepneyRoute>[])
-          : _visibleRoutes;
+      routesToFit = _isFocusedMode
+          ? _visibleRoutes
+          : (_mapData?.routes ?? const <JeepneyRoute>[]);
+    });
+
+    if (routesToFit.isEmpty) {
+      _mapController.move(_iloiloCenter, _initialZoom);
+      return;
+    }
+    _fitRoutesBounds(routesToFit);
+  }
+
+  void _setMultiSelectMode(bool enabled) {
+    if (_isCompareMode == enabled) return;
+
+    late List<JeepneyRoute> routesToFit;
+    setState(() {
+      _isCompareMode = enabled;
+      if (_isFocusedMode && !_isCompareMode && _selectedRouteIds != null) {
+        final selectedRouteIds = _selectedRouteIdsMutable();
+        if (selectedRouteIds.length > 1) {
+          final retainedRouteId = selectedRouteIds.last;
+          _selectedRouteIds = <String>{retainedRouteId};
+        }
+      }
+      routesToFit = _isFocusedMode
+          ? _visibleRoutes
+          : (_mapData?.routes ?? const <JeepneyRoute>[]);
     });
 
     if (routesToFit.isEmpty) {
@@ -502,7 +692,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
     final allIds = allRoutes.map((r) => r.id).toSet();
     setState(() {
-      _selectedRouteIdsSafe
+      _isFocusedMode = false;
+      _selectedRouteIdsMutable()
         ..clear()
         ..addAll(allIds);
     });
@@ -513,6 +704,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     setState(() {
       _selectedRouteForDetails = route;
       _showingRouteDetails = true;
+      _showingClosureDetails = false;
+      _selectedClosureForDetails = null;
     });
   }
 
@@ -760,7 +953,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   duration: const Duration(milliseconds: 220),
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
-                  child: _showingRouteDetails
+                  child: _showingClosureDetails
+                      ? _buildClosureDetailsView(scrollController)
+                      : _showingRouteDetails
                       ? _buildRouteDetailsView(scrollController)
                       : _buildRoutesListView(scrollController),
                 ),
@@ -792,35 +987,55 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
           children: [
             FilterChip(
               label: const Text('Show all routes'),
-              selected: _areAllRoutesSelected,
+              selected: !_isFocusedMode,
               onSelected: (selected) {
                 if (selected) {
                   _showAllRoutes();
-                } else {
-                  setState(() => _selectedRouteIdsSafe.clear());
                 }
               },
               showCheckmark: false,
               selectedColor: MapColors.primary.withValues(alpha: 0.18),
               checkmarkColor: MapColors.primary,
               labelStyle: TextStyle(
-                color: _areAllRoutesSelected
+                color: !_isFocusedMode
                     ? MapColors.primary
                     : MapColors.text.withValues(alpha: 0.7),
                 fontWeight: FontWeight.w600,
               ),
               side: BorderSide(
-                color: _areAllRoutesSelected
+                color: !_isFocusedMode
                     ? MapColors.primary.withValues(alpha: 0.7)
                     : MapColors.text.withValues(alpha: 0.18),
               ),
             ),
-            const SizedBox(width: 10),
             FilterChip(
+                  label: const Text('Compare Routes'),
+                  selected: _isCompareMode,
+                  onSelected: (selected) {
+                    _setMultiSelectMode(selected);
+                  },
+                  showCheckmark: false,
+                  selectedColor: MapColors.accentColor.withValues(alpha: 0.18),
+                  checkmarkColor: MapColors.accentColor,
+                  labelStyle: TextStyle(
+                    color: _isCompareMode
+                        ? MapColors.accentColor
+                        : MapColors.text.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  side: BorderSide(
+                    color: _isCompareMode
+                        ? MapColors.accentColor.withValues(alpha: 0.7)
+                        : MapColors.text.withValues(alpha: 0.18),
+                  ),
+                ),
+                FilterChip(
               label: const Text('Show Tricycle Stations'),
               selected: _showStations,
               onSelected: (selected) {
@@ -874,12 +1089,82 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       );
     }
 
+    final selectedRoutes = (_isFocusedMode && _isCompareMode)
+      ? routes
+        .where((route) => _selectedRouteIdsReadOnly.contains(route.id))
+        .toList()
+        : const <JeepneyRoute>[];
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_isFocusedMode && _isCompareMode) ...[
+          const Text(
+            'Selected Routes',
+            style: TextStyle(
+              color: MapColors.text,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (selectedRoutes.isEmpty)
+            Text(
+              'No routes selected.',
+              style: TextStyle(
+                color: MapColors.text.withValues(alpha: 0.65),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final route in selectedRoutes)
+                  FilterChip(
+                    label: Text(
+                      route.routeNumber.trim().isEmpty
+                          ? route.routeName
+                          : route.routeNumber.trim(),
+                    ),
+                    selected: true,
+                    onSelected: (_) => _onRouteTap(route),
+                    showCheckmark: true,
+                    selectedColor:
+                        _parseRouteColor(route.routeColor).withValues(alpha: 0.18),
+                    checkmarkColor: _parseRouteColor(route.routeColor),
+                    labelStyle: TextStyle(
+                      color: _parseRouteColor(route.routeColor),
+                      fontWeight: FontWeight.w700,
+                    ),
+                    side: BorderSide(
+                      color: _parseRouteColor(route.routeColor).withValues(
+                        alpha: 0.55,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          const SizedBox(height: 18),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+        ],
+        const Text(
+          'All Routes',
+          style: TextStyle(
+            color: MapColors.text,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
         for (int index = 0; index < routes.length; index++) ...[
           _buildRouteListItem(
             routes[index],
-            isSelected: _selectedRouteIdsSafe.contains(routes[index].id),
+            isSelected:
+                _isFocusedMode && _selectedRouteIdsReadOnly.contains(routes[index].id),
           ),
           if (index < routes.length - 1) const SizedBox(height: 12),
         ],
@@ -951,6 +1236,24 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Padding so ink/hover fully covers icon + label on web/desktop.
+  Widget _buildDetailsBackButton({required VoidCallback onPressed}) {
+    return TextButton.icon(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: MapColors.primary,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.padded,
+      ),
+      icon: const Icon(Icons.arrow_back, size: 16),
+      label: const Text(
+        'Back',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
   Widget _buildRoutesListView(ScrollController scrollController) {
     return ListView(
       key: const ValueKey<String>('routes-list-view'),
@@ -995,21 +1298,69 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(width: 12),
-            TextButton.icon(
-              onPressed: _closeRouteDetails,
-              style: TextButton.styleFrom(
-                foregroundColor: MapColors.primary,
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(72, 40),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                alignment: Alignment.centerRight,
-              ),
-              label: const Text(
-                'Back',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              icon: const Icon(Icons.arrow_forward, size: 20),
+            _buildDetailsBackButton(onPressed: _closeRouteDetails),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: MapColors.primary.withValues(alpha: 0.18),
             ),
+            color: MapColors.background,
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Text(
+            detailText,
+            style: const TextStyle(
+              color: MapColors.text,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildClosureDetailsView(ScrollController scrollController) {
+    final closure = _selectedClosureForDetails;
+    final title = (closure != null && closure.closureName.trim().isNotEmpty)
+        ? closure.closureName.trim()
+        : '(untitled)';
+    final detailText =
+        (closure != null && closure.closureDescription.trim().isNotEmpty)
+        ? closure.closureDescription.trim()
+        : 'No description available.';
+
+    return ListView(
+      key: const ValueKey<String>('closure-details-view'),
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MapColors.text,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            _buildDetailsBackButton(onPressed: _closeClosureDetails),
           ],
         ),
         const SizedBox(height: 16),

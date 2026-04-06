@@ -1,22 +1,30 @@
 import 'jeepney_route.dart';
+import 'road_closure.dart';
 import 'tricycle_station.dart';
 
-/// Parsed dashboard API data: jeepney routes and tricycle stations (flattened from regions).
+/// Parsed dashboard API data: routes, stations, and road closures.
 class RoutesAndStationsData {
   const RoutesAndStationsData({
     required this.routes,
     required this.stations,
+    required this.closures,
   });
 
   final List<JeepneyRoute> routes;
   final List<TricycleStation> stations;
+  final List<RoadClosure> closures;
 
-  /// Parses from the API root: { "ok", "data": { "routes": [], "regions": [ { "stations": [] } ] } }.
-  /// Returns empty data if structure is invalid; skips malformed route/station entries.
+  /// Parses from API root:
+  /// { "ok", "data": { "routes": [], "regions": [ { "stations": [] } ], "closures": [] } }.
+  /// Returns empty data if structure is invalid; skips malformed route/station/closure entries.
   static RoutesAndStationsData fromJson(Map<String, dynamic> json) {
     final data = json['data'];
     if (data is! Map<String, dynamic>) {
-      return const RoutesAndStationsData(routes: [], stations: []);
+      return const RoutesAndStationsData(
+        routes: [],
+        stations: [],
+        closures: [],
+      );
     }
 
     final routes = <JeepneyRoute>[];
@@ -48,6 +56,21 @@ class RoutesAndStationsData {
       }
     }
 
-    return RoutesAndStationsData(routes: routes, stations: stations);
+    final closures = <RoadClosure>[];
+    final closuresList = data['closures'];
+    if (closuresList is List) {
+      for (final e in closuresList) {
+        if (e is Map<String, dynamic>) {
+          final closure = RoadClosure.fromJson(e);
+          if (closure != null) closures.add(closure);
+        }
+      }
+    }
+
+    return RoutesAndStationsData(
+      routes: routes,
+      stations: stations,
+      closures: closures,
+    );
   }
 }
