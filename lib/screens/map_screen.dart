@@ -98,6 +98,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   bool _showingOverlappingRoutes = false;
   List<JeepneyRoute> _overlappingRoutes = const <JeepneyRoute>[];
 
+  /// When true, closing route details returns to the overlap list instead of the main list.
+  bool _returnToOverlappingRoutesAfterDetails = false;
+
   /// Bumps when route geometry used for hit-testing must be rebuilt.
   int _hitGeometryGeneration = 0;
   List<RouteHitPolyline>? _hitTestPolylineCache;
@@ -718,6 +721,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _selectedRouteForDetails = null;
       _showingOverlappingRoutes = false;
       _overlappingRoutes = const <JeepneyRoute>[];
+      _returnToOverlappingRoutesAfterDetails = false;
     });
   }
 
@@ -770,13 +774,29 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _selectedClosureForDetails = null;
       _showingOverlappingRoutes = false;
       _overlappingRoutes = const <JeepneyRoute>[];
+      _returnToOverlappingRoutesAfterDetails = false;
     });
   }
 
   void _closeRouteDetails() {
+    final resumeOverlap = _returnToOverlappingRoutesAfterDetails &&
+        _overlappingRoutes.isNotEmpty;
     setState(() {
       _showingRouteDetails = false;
+      _selectedRouteForDetails = null;
+      if (resumeOverlap) {
+        _returnToOverlappingRoutesAfterDetails = false;
+        _showingOverlappingRoutes = true;
+        _selectedRouteIdsSafe
+          ..clear()
+          ..addAll(_overlappingRoutes.map((r) => r.id));
+      } else {
+        _returnToOverlappingRoutesAfterDetails = false;
+      }
     });
+    if (resumeOverlap) {
+      _fitRoutesBounds(_overlappingRoutes);
+    }
   }
 
   /// Fits map camera to route geometry (decoded/Valhalla polylines when present).
@@ -834,6 +854,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _selectedClosureForDetails = null;
       _showingRouteDetails = false;
       _selectedRouteForDetails = null;
+      _returnToOverlappingRoutesAfterDetails = false;
     });
   }
 
@@ -841,6 +862,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     setState(() {
       _showingOverlappingRoutes = false;
       _overlappingRoutes = const <JeepneyRoute>[];
+      _returnToOverlappingRoutesAfterDetails = false;
     });
   }
 
@@ -850,11 +872,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ..clear()
         ..add(route.id);
       _showingOverlappingRoutes = false;
-      _overlappingRoutes = const <JeepneyRoute>[];
       _selectedRouteForDetails = route;
       _showingRouteDetails = true;
       _showingClosureDetails = false;
       _selectedClosureForDetails = null;
+      _returnToOverlappingRoutesAfterDetails = true;
     });
     _fitRoutesBounds([route]);
   }
