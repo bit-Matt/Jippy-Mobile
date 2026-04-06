@@ -1186,7 +1186,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           runSpacing: 10,
           children: [
             FilterChip(
-              label: const Text('Show all routes'),
+              label: const Text('All routes'),
               selected: !_isFocusedMode,
               onSelected: (selected) {
                 if (selected) {
@@ -1230,7 +1230,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 FilterChip(
-              label: const Text('Show Tricycle Stations'),
+              label: const Text('Tricycle Stations'),
               selected: _showStations,
               onSelected: (selected) {
                 setState(() => _showStations = selected);
