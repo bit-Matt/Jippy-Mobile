@@ -48,10 +48,14 @@ const Color _closureColor = Color(0xFFE81123);
 const double _closureFillOpacity = 0.25;
 const double _closureStrokeWidth = 2;
 
-/// Map tap: max distance to a route polyline to count as "on this road" (meters).
-/// Scales slightly with zoom via [_overlapThresholdMetersForZoom].
-const double _overlapThresholdMetersMin = 22;
-const double _overlapThresholdMetersMax = 48;
+/// Logical pixels around the tap treated as "near" a route (converted to meters
+/// at tap latitude and zoom via [metersPerPixelAtLatitude]).
+const double _overlapTapRadiusLogicalPixels = 38;
+
+/// Clamp for overlap distance (meters): avoids tiny thresholds when zoomed in
+/// and excessive matches when zoomed out.
+const double _overlapThresholdMetersMin = 28;
+const double _overlapThresholdMetersMax = 220;
 
 /// After a map tap for overlap, ensure at least this zoom when nudging the camera.
 const double _overlapTapMinZoom = 15;
@@ -543,12 +547,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return built;
   }
 
-  double _overlapThresholdMetersForZoom(double zoom) {
-    final t = ((18.0 - zoom) / 6.0).clamp(0.0, 1.0);
-    return _overlapThresholdMetersMin +
-        t * (_overlapThresholdMetersMax - _overlapThresholdMetersMin);
-  }
-
   /// Polylines to draw (jeepney routes: goingTo and goingBack).
   ///
   /// Prefers encoded polylines from the API (`polylineGoingTo` / `polylineGoingBack`).
@@ -827,7 +825,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _onMapTapForOverlappingRoutes(TapPosition tapPosition, LatLng point) {
     if (_loadingRoutes) return;
     final cam = _mapController.camera;
-    final threshold = _overlapThresholdMetersForZoom(cam.zoom);
+    final rawThreshold = _overlapTapRadiusLogicalPixels *
+        metersPerPixelAtLatitude(point.latitude, cam.zoom);
+    final threshold = rawThreshold.clamp(
+      _overlapThresholdMetersMin,
+      _overlapThresholdMetersMax,
+    );
     final matchIds = routeIdsNearPolylines(point, _hitTestPolylines, threshold);
 
     _mapController.move(point, math.max(cam.zoom, _overlapTapMinZoom));
