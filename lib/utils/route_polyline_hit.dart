@@ -10,6 +10,14 @@ class RouteHitPolyline {
   final List<LatLng> points;
 }
 
+/// Web Mercator ground resolution (meters per logical pixel) at [latitude] and
+/// map [zoom] (same model as OSM/slippy tiles). Use with a pixel tap radius to
+/// get a zoom-aware distance threshold for hit testing.
+double metersPerPixelAtLatitude(double latitude, double zoom) {
+  final latRad = latitude * math.pi / 180.0;
+  return 156543.03392 * math.cos(latRad) / math.pow(2.0, zoom);
+}
+
 /// Earth radius in meters (mean), for local equirectangular projection.
 const double _earthRadiusM = 6371000.0;
 
