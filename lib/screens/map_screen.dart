@@ -80,6 +80,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   JeepneyRoute? _selectedRouteForDetails;
   bool _showingRouteDetails = false;
 
+  /// Selected road closure for in-drawer details (same sheet as routes).
+  RoadClosure? _selectedClosureForDetails;
+  bool _showingClosureDetails = false;
+
   /// When true, tricycle stations are shown.
   bool _showStations = true;
 
@@ -87,7 +91,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Key format: `${route.id}_goingTo` / `${route.id}_goingBack`.
   Map<String, List<LatLng>> _roadAlignedPointsByKey = <String, List<LatLng>>{};
   final LayerHitNotifier<String> _closureHitNotifier = ValueNotifier(null);
-  bool _isShowingClosureSheet = false;
 
   Set<String> get _selectedRouteIdsSafe => _selectedRouteIds ??= <String>{};
 
@@ -342,6 +345,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     polygons: _closurePolygons,
                     hitNotifier: _closureHitNotifier,
                   ),
+                if (_closureLabelMarkers.isNotEmpty)
+                  MarkerLayer(markers: _closureLabelMarkers),
                 if (_showStations &&
                     _mapData != null &&
                     _mapData!.stations.isNotEmpty)
@@ -517,8 +522,71 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return polygons;
   }
 
+  /// Centroid of ordered closure vertices (map label anchor).
+  LatLng _closureLabelPoint(RoadClosure closure) {
+    final ordered = closure.orderedPoints;
+    var latSum = 0.0;
+    var lngSum = 0.0;
+    for (final p in ordered) {
+      latSum += p.lat;
+      lngSum += p.lng;
+    }
+    final n = ordered.length;
+    return LatLng(latSum / n, lngSum / n);
+  }
+
+  /// Floating "Road Closure" chips above each polygon (tap opens in-drawer details).
+  List<Marker> get _closureLabelMarkers {
+    final closures = _mapData?.closures ?? const <RoadClosure>[];
+    final markers = <Marker>[];
+    for (final closure in closures) {
+      if (!closure.canRenderPolygon) continue;
+      markers.add(
+        Marker(
+          point: _closureLabelPoint(closure),
+          width: 76,
+          height: 20,
+          alignment: Alignment.bottomCenter,
+          child: GestureDetector(
+            onTap: () => _openClosureDetails(closure),
+            child: Material(
+              elevation: 3,
+              shadowColor: Colors.black38,
+              borderRadius: BorderRadius.circular(6),
+              color: MapColors.background,
+              child: Container(
+                width: 76,
+                height: 20,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: _closureColor, width: 1),
+                ),
+                child: const Text(
+                  '❌ Road Closed',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: MapColors.text,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return markers;
+  }
+
   void _onClosureLayerHit() {
-    if (!mounted || _isShowingClosureSheet) return;
+    if (!mounted) return;
     final hit = _closureHitNotifier.value;
     final hitId = hit?.hitValues.isNotEmpty == true
         ? hit!.hitValues.first
@@ -534,57 +602,24 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       }
     }
     if (selected == null) return;
-    _showClosureDetailsSheet(selected);
+    _openClosureDetails(selected);
   }
 
-  Future<void> _showClosureDetailsSheet(RoadClosure closure) async {
-    _isShowingClosureSheet = true;
-    final title = closure.closureName.trim().isEmpty
-        ? '(untitled)'
-        : closure.closureName.trim();
-    final description = closure.closureDescription.trim().isEmpty
-        ? 'No description available.'
-        : closure.closureDescription.trim();
+  void _openClosureDetails(RoadClosure closure) {
+    if (!mounted) return;
+    setState(() {
+      _selectedClosureForDetails = closure;
+      _showingClosureDetails = true;
+      _showingRouteDetails = false;
+      _selectedRouteForDetails = null;
+    });
+  }
 
-    try {
-      await showModalBottomSheet<void>(
-        context: context,
-        showDragHandle: true,
-        backgroundColor: MapColors.background,
-        builder: (sheetContext) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: MapColors.text,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      color: MapColors.text,
-                      fontSize: 15,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    } finally {
-      _isShowingClosureSheet = false;
-    }
+  void _closeClosureDetails() {
+    setState(() {
+      _showingClosureDetails = false;
+      _selectedClosureForDetails = null;
+    });
   }
 
   void _onRouteTap(JeepneyRoute route) {
@@ -625,6 +660,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     setState(() {
       _selectedRouteForDetails = route;
       _showingRouteDetails = true;
+      _showingClosureDetails = false;
+      _selectedClosureForDetails = null;
     });
   }
 
@@ -872,7 +909,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   duration: const Duration(milliseconds: 220),
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
-                  child: _showingRouteDetails
+                  child: _showingClosureDetails
+                      ? _buildClosureDetailsView(scrollController)
+                      : _showingRouteDetails
                       ? _buildRouteDetailsView(scrollController)
                       : _buildRoutesListView(scrollController),
                 ),
@@ -1063,6 +1102,24 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Padding so ink/hover fully covers icon + label on web/desktop.
+  Widget _buildDetailsBackButton({required VoidCallback onPressed}) {
+    return TextButton.icon(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: MapColors.primary,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.padded,
+      ),
+      icon: const Icon(Icons.arrow_back, size: 16),
+      label: const Text(
+        'Back',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
   Widget _buildRoutesListView(ScrollController scrollController) {
     return ListView(
       key: const ValueKey<String>('routes-list-view'),
@@ -1107,21 +1164,69 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(width: 12),
-            TextButton.icon(
-              onPressed: _closeRouteDetails,
-              style: TextButton.styleFrom(
-                foregroundColor: MapColors.primary,
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(72, 40),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                alignment: Alignment.centerRight,
-              ),
-              label: const Text(
-                'Back',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              icon: const Icon(Icons.arrow_forward, size: 20),
+            _buildDetailsBackButton(onPressed: _closeRouteDetails),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: MapColors.primary.withValues(alpha: 0.18),
             ),
+            color: MapColors.background,
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Text(
+            detailText,
+            style: const TextStyle(
+              color: MapColors.text,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildClosureDetailsView(ScrollController scrollController) {
+    final closure = _selectedClosureForDetails;
+    final title = (closure != null && closure.closureName.trim().isNotEmpty)
+        ? closure.closureName.trim()
+        : '(untitled)';
+    final detailText =
+        (closure != null && closure.closureDescription.trim().isNotEmpty)
+        ? closure.closureDescription.trim()
+        : 'No description available.';
+
+    return ListView(
+      key: const ValueKey<String>('closure-details-view'),
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MapColors.text,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            _buildDetailsBackButton(onPressed: _closeClosureDetails),
           ],
         ),
         const SizedBox(height: 16),
