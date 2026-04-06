@@ -87,6 +87,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// True while routes are being fetched and during the first render pass.
   bool _loadingRoutes = true;
 
+  /// True when the map is showing only a selected subset of routes.
+  bool _isFocusedMode = false;
+
+  /// True when route taps can build a comparison set instead of replacing selection.
+  bool _isCompareMode = false;
+
   /// Selected route IDs currently visible on the map.
   Set<String>? _selectedRouteIds;
 
@@ -109,6 +115,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   int _hitGeometryGeneration = 0;
   List<RouteHitPolyline>? _hitTestPolylineCache;
   int? _hitTestPolylineCacheAtGeneration;
+  final Map<String, ({List<LatLng> points, bool usedDecoded, bool usedValhalla})>
+      _resolvedDirectionGeometryCache = <String, ({List<LatLng> points, bool usedDecoded, bool usedValhalla})>{};
+  int? _resolvedDirectionGeometryCacheAtGeneration;
 
   /// When true, tricycle stations are shown.
   bool _showStations = true;
@@ -116,22 +125,19 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Road-aligned route points fetched from Valhalla (when API polylines missing).
   /// Key format: `${route.id}_goingTo` / `${route.id}_goingBack`.
   Map<String, List<LatLng>> _roadAlignedPointsByKey = <String, List<LatLng>>{};
+  bool _hasAppliedInitialRouteFit = false;
   final LayerHitNotifier<String> _closureHitNotifier = ValueNotifier(null);
 
-  Set<String> get _selectedRouteIdsSafe => _selectedRouteIds ??= <String>{};
+  Set<String> _selectedRouteIdsMutable() {
+    _selectedRouteIds ??= <String>{};
+    return _selectedRouteIds!;
+  }
+
+  Set<String> get _selectedRouteIdsReadOnly =>
+      _selectedRouteIds ?? const <String>{};
 
   /// Prevents log spam by only printing when the signature changes.
   String? _lastPolylineDiagnosticsSignature;
-
-  Set<String> get _allRouteIds =>
-      (_mapData?.routes ?? const <JeepneyRoute>[]).map((r) => r.id).toSet();
-
-  bool get _areAllRoutesSelected {
-    final all = _allRouteIds;
-    if (all.isEmpty) return false;
-    final selected = _selectedRouteIdsSafe;
-    return selected.length == all.length && selected.containsAll(all);
-  }
 
   @override
   void initState() {
@@ -180,12 +186,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _loadingRoutes = true;
     });
     try {
-      final previousAllIds = _allRouteIds;
-      final bool wasAllSelected =
-          previousAllIds.isNotEmpty &&
-          _selectedRouteIdsSafe.length == previousAllIds.length &&
-          _selectedRouteIdsSafe.containsAll(previousAllIds);
-
       RoutesAndStationsData data;
       try {
         data = await loadRoutesFromApi();
@@ -199,25 +199,23 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           _hitGeometryGeneration++;
 
           // Selection semantics:
-          // - First load: select all routes by default (map shows all, list highlights all).
-          // - If user previously hid all routes (empty selection), keep it empty.
-          // - If user previously had "all selected", keep it "all selected" after refresh.
-          // - Otherwise, keep existing partial selection and drop missing IDs.
-          if (_selectedRouteIds == null) {
-            _selectedRouteIdsSafe.addAll(incomingRouteIds);
-          } else if (_selectedRouteIdsSafe.isEmpty) {
-            // Keep empty.
-          } else if (wasAllSelected) {
-            _selectedRouteIdsSafe
-              ..clear()
-              ..addAll(incomingRouteIds);
+          // - Show All mode keeps every route selected.
+          // - Focused mode keeps the current selection set and drops missing IDs.
+          // - Single-select focused mode collapses any stale multi-selection to one route.
+          if (!_isFocusedMode || _selectedRouteIds == null) {
+            _selectedRouteIds = Set<String>.from(incomingRouteIds);
           } else {
-            _selectedRouteIdsSafe.removeWhere(
+            _selectedRouteIds!.removeWhere(
               (id) => !incomingRouteIds.contains(id),
             );
+            if (!_isCompareMode && _selectedRouteIds!.length > 1) {
+              final retainedRouteId = _selectedRouteIds!.last;
+              _selectedRouteIds = <String>{retainedRouteId};
+            }
           }
         });
         _completeRouteLoadingAfterRender();
+        _fitAllRoutesOnInitialLoad(data.routes);
         _fetchValhallaRoutesForMapData(data);
       }
     } catch (_) {
@@ -228,7 +226,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             stations: [],
             closures: [],
           );
-          _selectedRouteIdsSafe.clear();
+          _selectedRouteIdsMutable().clear();
           _hitGeometryGeneration++;
         });
         _completeRouteLoadingAfterRender();
@@ -240,6 +238,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() => _loadingRoutes = false);
+    });
+  }
+
+  void _fitAllRoutesOnInitialLoad(List<JeepneyRoute> routes) {
+    if (_hasAppliedInitialRouteFit || routes.isEmpty) return;
+    _hasAppliedInitialRouteFit = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _fitRoutesBounds(routes);
     });
   }
 
@@ -446,6 +453,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Shared resolution for drawing, camera fit, and map-tap hit testing.
   ({List<LatLng> points, bool usedDecoded, bool usedValhalla})
   _resolveDirectionGeometry(JeepneyRoute route, _RouteDirection direction) {
+    if (_resolvedDirectionGeometryCacheAtGeneration != _hitGeometryGeneration) {
+      _resolvedDirectionGeometryCache.clear();
+      _resolvedDirectionGeometryCacheAtGeneration = _hitGeometryGeneration;
+    }
+    final cacheKey = '${route.id}:${direction.name}';
+    final cached = _resolvedDirectionGeometryCache[cacheKey];
+    if (cached != null) return cached;
+
     final encoded = direction == _RouteDirection.goingTo
         ? route.polylineGoingTo
         : route.polylineGoingBack;
@@ -476,11 +491,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             ? route.goingTo
             : route.goingBack;
         if (list.length < 2) {
-          return (
+          final result = (
             points: const <LatLng>[],
             usedDecoded: false,
             usedValhalla: false,
           );
+          _resolvedDirectionGeometryCache[cacheKey] = result;
+          return result;
         }
         final sorted = List.of(list)
           ..sort((a, b) => a.sequence.compareTo(b.sequence));
@@ -491,17 +508,21 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
 
     if (points.length < 2) {
-      return (
+      final result = (
         points: const <LatLng>[],
         usedDecoded: false,
         usedValhalla: false,
       );
+      _resolvedDirectionGeometryCache[cacheKey] = result;
+      return result;
     }
-    return (
+    final result = (
       points: points,
       usedDecoded: usedDecoded,
       usedValhalla: usedValhalla,
     );
+    _resolvedDirectionGeometryCache[cacheKey] = result;
+    return result;
   }
 
   List<LatLng> _collectFitPointsForRoute(JeepneyRoute route) {
@@ -599,8 +620,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   List<JeepneyRoute> get _visibleRoutes {
     final routes = _mapData?.routes ?? const <JeepneyRoute>[];
-    if (_selectedRouteIdsSafe.isEmpty) return const <JeepneyRoute>[];
-    return routes.where((r) => _selectedRouteIdsSafe.contains(r.id)).toList();
+    if (!_isFocusedMode) return routes;
+    if (_selectedRouteIdsReadOnly.isEmpty) return const <JeepneyRoute>[];
+    return routes.where((r) => _selectedRouteIdsReadOnly.contains(r.id)).toList();
   }
 
   List<Polygon<Object>> get _closurePolygons {
@@ -733,17 +755,47 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _onRouteTap(JeepneyRoute route) {
     late List<JeepneyRoute> routesToFit;
     setState(() {
-      // Focus mode: first selection isolates the tapped route.
-      if (_selectedRouteIdsSafe.isEmpty) {
-        _selectedRouteIdsSafe.add(route.id);
-      } else if (_selectedRouteIdsSafe.contains(route.id)) {
-        _selectedRouteIdsSafe.remove(route.id);
+      if (!_isFocusedMode) {
+        _isFocusedMode = true;
+        _selectedRouteIds = <String>{route.id};
+      } else if (_isCompareMode) {
+        final selectedRouteIds = _selectedRouteIdsMutable();
+        if (selectedRouteIds.contains(route.id)) {
+          selectedRouteIds.remove(route.id);
+        } else {
+          selectedRouteIds.add(route.id);
+        }
       } else {
-        _selectedRouteIdsSafe.add(route.id);
+        _selectedRouteIds = <String>{route.id};
       }
-      routesToFit = _selectedRouteIdsSafe.isEmpty
-          ? (_mapData?.routes ?? const <JeepneyRoute>[])
-          : _visibleRoutes;
+      routesToFit = _isFocusedMode
+          ? _visibleRoutes
+          : (_mapData?.routes ?? const <JeepneyRoute>[]);
+    });
+
+    if (routesToFit.isEmpty) {
+      _mapController.move(_iloiloCenter, _initialZoom);
+      return;
+    }
+    _fitRoutesBounds(routesToFit);
+  }
+
+  void _setMultiSelectMode(bool enabled) {
+    if (_isCompareMode == enabled) return;
+
+    late List<JeepneyRoute> routesToFit;
+    setState(() {
+      _isCompareMode = enabled;
+      if (_isFocusedMode && !_isCompareMode && _selectedRouteIds != null) {
+        final selectedRouteIds = _selectedRouteIdsMutable();
+        if (selectedRouteIds.length > 1) {
+          final retainedRouteId = selectedRouteIds.last;
+          _selectedRouteIds = <String>{retainedRouteId};
+        }
+      }
+      routesToFit = _isFocusedMode
+          ? _visibleRoutes
+          : (_mapData?.routes ?? const <JeepneyRoute>[]);
     });
 
     if (routesToFit.isEmpty) {
@@ -757,7 +809,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
     final allIds = allRoutes.map((r) => r.id).toSet();
     setState(() {
-      _selectedRouteIdsSafe
+      _isFocusedMode = false;
+      _selectedRouteIdsMutable()
         ..clear()
         ..addAll(allIds);
     });
@@ -785,7 +838,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       if (resumeOverlap) {
         _returnToOverlappingRoutesAfterDetails = false;
         _showingOverlappingRoutes = true;
-        _selectedRouteIdsSafe
+        _selectedRouteIdsMutable()
           ..clear()
           ..addAll(_overlappingRoutes.map((r) => r.id));
       } else {
@@ -871,7 +924,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   void _openRouteFromOverlap(JeepneyRoute route) {
     setState(() {
-      _selectedRouteIdsSafe
+      _selectedRouteIdsMutable()
         ..clear()
         ..add(route.id);
       _showingOverlappingRoutes = false;
@@ -1128,35 +1181,55 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 8),
-        Row(
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
           children: [
             FilterChip(
               label: const Text('Show all routes'),
-              selected: _areAllRoutesSelected,
+              selected: !_isFocusedMode,
               onSelected: (selected) {
                 if (selected) {
                   _showAllRoutes();
-                } else {
-                  setState(() => _selectedRouteIdsSafe.clear());
                 }
               },
               showCheckmark: false,
               selectedColor: MapColors.primary.withValues(alpha: 0.18),
               checkmarkColor: MapColors.primary,
               labelStyle: TextStyle(
-                color: _areAllRoutesSelected
+                color: !_isFocusedMode
                     ? MapColors.primary
                     : MapColors.text.withValues(alpha: 0.7),
                 fontWeight: FontWeight.w600,
               ),
               side: BorderSide(
-                color: _areAllRoutesSelected
+                color: !_isFocusedMode
                     ? MapColors.primary.withValues(alpha: 0.7)
                     : MapColors.text.withValues(alpha: 0.18),
               ),
             ),
-            const SizedBox(width: 10),
             FilterChip(
+                  label: const Text('Compare Routes'),
+                  selected: _isCompareMode,
+                  onSelected: (selected) {
+                    _setMultiSelectMode(selected);
+                  },
+                  showCheckmark: false,
+                  selectedColor: MapColors.accentColor.withValues(alpha: 0.18),
+                  checkmarkColor: MapColors.accentColor,
+                  labelStyle: TextStyle(
+                    color: _isCompareMode
+                        ? MapColors.accentColor
+                        : MapColors.text.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  side: BorderSide(
+                    color: _isCompareMode
+                        ? MapColors.accentColor.withValues(alpha: 0.7)
+                        : MapColors.text.withValues(alpha: 0.18),
+                  ),
+                ),
+                FilterChip(
               label: const Text('Show Tricycle Stations'),
               selected: _showStations,
               onSelected: (selected) {
@@ -1210,12 +1283,82 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       );
     }
 
+    final selectedRoutes = (_isFocusedMode && _isCompareMode)
+      ? routes
+        .where((route) => _selectedRouteIdsReadOnly.contains(route.id))
+        .toList()
+        : const <JeepneyRoute>[];
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_isFocusedMode && _isCompareMode) ...[
+          const Text(
+            'Selected Routes',
+            style: TextStyle(
+              color: MapColors.text,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (selectedRoutes.isEmpty)
+            Text(
+              'No routes selected.',
+              style: TextStyle(
+                color: MapColors.text.withValues(alpha: 0.65),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final route in selectedRoutes)
+                  FilterChip(
+                    label: Text(
+                      route.routeNumber.trim().isEmpty
+                          ? route.routeName
+                          : route.routeNumber.trim(),
+                    ),
+                    selected: true,
+                    onSelected: (_) => _onRouteTap(route),
+                    showCheckmark: true,
+                    selectedColor:
+                        _parseRouteColor(route.routeColor).withValues(alpha: 0.18),
+                    checkmarkColor: _parseRouteColor(route.routeColor),
+                    labelStyle: TextStyle(
+                      color: _parseRouteColor(route.routeColor),
+                      fontWeight: FontWeight.w700,
+                    ),
+                    side: BorderSide(
+                      color: _parseRouteColor(route.routeColor).withValues(
+                        alpha: 0.55,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          const SizedBox(height: 18),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+        ],
+        const Text(
+          'All Routes',
+          style: TextStyle(
+            color: MapColors.text,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
         for (int index = 0; index < routes.length; index++) ...[
           _buildRouteListItem(
             routes[index],
-            isSelected: _selectedRouteIdsSafe.contains(routes[index].id),
+            isSelected:
+                _isFocusedMode && _selectedRouteIdsReadOnly.contains(routes[index].id),
           ),
           if (index < routes.length - 1) const SizedBox(height: 12),
         ],
@@ -1371,7 +1514,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               for (int index = 0; index < routes.length; index++) ...[
                 _buildRouteListItem(
                   routes[index],
-                  isSelected: _selectedRouteIdsSafe.contains(routes[index].id),
+                  isSelected: _selectedRouteIdsReadOnly.contains(routes[index].id),
                   overlapMode: true,
                 ),
                 if (index < routes.length - 1) const SizedBox(height: 12),
