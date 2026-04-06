@@ -1,8 +1,33 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jippy_mobile/utils/route_polyline_hit.dart';
 import 'package:latlong2/latlong.dart';
 
 void main() {
+  group('metersPerPixelAtLatitude', () {
+    test('equator zoom 0 matches Web Mercator constant', () {
+      final mpp = metersPerPixelAtLatitude(0, 0);
+      expect(mpp, closeTo(156543.03392, 0.001));
+    });
+
+    test('halves when zoom increases by one at equator', () {
+      final z0 = metersPerPixelAtLatitude(0, 0);
+      final z1 = metersPerPixelAtLatitude(0, 1);
+      expect(z1, closeTo(z0 / 2, z0 * 1e-9));
+    });
+
+    test('Iloilo-scale zoom 14 is single-digit to tens of meters per pixel', () {
+      const iloiloLat = 10.7202;
+      final mpp = metersPerPixelAtLatitude(iloiloLat, 14);
+      final cosLat = math.cos(iloiloLat * math.pi / 180.0);
+      final expected = 156543.03392 * cosLat / math.pow(2, 14);
+      expect(mpp, closeTo(expected, 1e-6));
+      expect(mpp, greaterThan(5));
+      expect(mpp, lessThan(50));
+    });
+  });
+
   group('minDistanceMetersPointToPolyline', () {
     test('point on segment returns small distance', () {
       final a = LatLng(10.0, 122.0);
