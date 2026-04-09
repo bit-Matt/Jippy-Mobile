@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import '../models/jeepney_route.dart';
 import '../models/road_closure.dart';
 import '../models/routes_and_stations_data.dart';
 import '../utils/polyline_1e6.dart';
+import '../utils/route_polyline_hit.dart';
 
 /// Default center for the map: Iloilo City, Philippines.
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
@@ -45,6 +47,18 @@ const bool _showSearchBar = false;
 const Color _closureColor = Color(0xFFE81123);
 const double _closureFillOpacity = 0.25;
 const double _closureStrokeWidth = 2;
+
+/// Logical pixels around the tap treated as "near" a route (converted to meters
+/// at tap latitude and zoom via [metersPerPixelAtLatitude]).
+const double _overlapTapRadiusLogicalPixels = 38;
+
+/// Clamp for overlap distance (meters): avoids tiny thresholds when zoomed in
+/// and excessive matches when zoomed out.
+const double _overlapThresholdMetersMin = 28;
+const double _overlapThresholdMetersMax = 220;
+
+/// After a map tap for overlap, ensure at least this zoom when nudging the camera.
+const double _overlapTapMinZoom = 15;
 
 /// Full-screen map with OpenStreetMap tiles, user location dot, and structure for
 /// static route polylines and A* path segments.
@@ -90,14 +104,27 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   RoadClosure? _selectedClosureForDetails;
   bool _showingClosureDetails = false;
 
+  /// Map-tap overlap mode: routes whose geometry passes near the tap point.
+  bool _showingOverlappingRoutes = false;
+  List<JeepneyRoute> _overlappingRoutes = const <JeepneyRoute>[];
+
+  /// When true, closing route details returns to the overlap list instead of the main list.
+  bool _returnToOverlappingRoutesAfterDetails = false;
+
+  /// Bumps when route geometry used for hit-testing must be rebuilt.
+  int _hitGeometryGeneration = 0;
+  List<RouteHitPolyline>? _hitTestPolylineCache;
+  int? _hitTestPolylineCacheAtGeneration;
+  final Map<String, ({List<LatLng> points, bool usedDecoded, bool usedValhalla})>
+      _resolvedDirectionGeometryCache = <String, ({List<LatLng> points, bool usedDecoded, bool usedValhalla})>{};
+  int? _resolvedDirectionGeometryCacheAtGeneration;
+
   /// When true, tricycle stations are shown.
   bool _showStations = true;
 
   /// Road-aligned route points fetched from Valhalla (when API polylines missing).
   /// Key format: `${route.id}_goingTo` / `${route.id}_goingBack`.
   Map<String, List<LatLng>> _roadAlignedPointsByKey = <String, List<LatLng>>{};
-  final Map<String, List<LatLng>> _decodedPolylineCache =
-      <String, List<LatLng>>{};
   bool _hasAppliedInitialRouteFit = false;
   final LayerHitNotifier<String> _closureHitNotifier = ValueNotifier(null);
 
@@ -111,9 +138,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Prevents log spam by only printing when the signature changes.
   String? _lastPolylineDiagnosticsSignature;
-
-  Set<String> get _allRouteIds =>
-      (_mapData?.routes ?? const <JeepneyRoute>[]).map((r) => r.id).toSet();
 
   @override
   void initState() {
@@ -172,6 +196,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         final incomingRouteIds = data.routes.map((r) => r.id).toSet();
         setState(() {
           _mapData = data;
+          _hitGeometryGeneration++;
 
           // Selection semantics:
           // - Show All mode keeps every route selected.
@@ -202,6 +227,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             closures: [],
           );
           _selectedRouteIdsMutable().clear();
+          _hitGeometryGeneration++;
         });
         _completeRouteLoadingAfterRender();
       }
@@ -240,6 +266,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 setState(() {
                   _roadAlignedPointsByKey = Map.of(_roadAlignedPointsByKey)
                     ..[key] = points;
+                  _hitGeometryGeneration++;
                 });
               }
             })
@@ -253,6 +280,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 setState(() {
                   _roadAlignedPointsByKey = Map.of(_roadAlignedPointsByKey)
                     ..[key] = points;
+                  _hitGeometryGeneration++;
                 });
               }
             })
@@ -328,6 +356,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 initialCenter: _iloiloCenter,
                 initialZoom: _initialZoom,
                 backgroundColor: MapColors.background,
+                onTap: _onMapTapForOverlappingRoutes,
               ),
               children: [
                 if (vectorStyle != null)
@@ -421,6 +450,124 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Shared resolution for drawing, camera fit, and map-tap hit testing.
+  ({List<LatLng> points, bool usedDecoded, bool usedValhalla})
+  _resolveDirectionGeometry(JeepneyRoute route, _RouteDirection direction) {
+    if (_resolvedDirectionGeometryCacheAtGeneration != _hitGeometryGeneration) {
+      _resolvedDirectionGeometryCache.clear();
+      _resolvedDirectionGeometryCacheAtGeneration = _hitGeometryGeneration;
+    }
+    final cacheKey = '${route.id}:${direction.name}';
+    final cached = _resolvedDirectionGeometryCache[cacheKey];
+    if (cached != null) return cached;
+
+    final encoded = direction == _RouteDirection.goingTo
+        ? route.polylineGoingTo
+        : route.polylineGoingBack;
+
+    List<LatLng> points = const <LatLng>[];
+    var usedDecoded = false;
+    var usedValhalla = false;
+
+    if (encoded != null && encoded.trim().isNotEmpty) {
+      final decoded = decodeApiRoutePolyline(encoded);
+      if (decoded != null) {
+        points = decoded;
+        usedDecoded = decoded.length >= 2;
+      }
+    }
+
+    if (points.length < 2) {
+      final key = direction == _RouteDirection.goingTo
+          ? '${route.id}_goingTo'
+          : '${route.id}_goingBack';
+      final valhallaPoints = _roadAlignedPointsByKey[key];
+      if (valhallaPoints != null && valhallaPoints.length >= 2) {
+        points = valhallaPoints;
+        usedValhalla = true;
+        usedDecoded = false;
+      } else {
+        final list = direction == _RouteDirection.goingTo
+            ? route.goingTo
+            : route.goingBack;
+        if (list.length < 2) {
+          final result = (
+            points: const <LatLng>[],
+            usedDecoded: false,
+            usedValhalla: false,
+          );
+          _resolvedDirectionGeometryCache[cacheKey] = result;
+          return result;
+        }
+        final sorted = List.of(list)
+          ..sort((a, b) => a.sequence.compareTo(b.sequence));
+        points = sorted.map((p) => LatLng(p.lat, p.lon)).toList();
+        usedDecoded = false;
+        usedValhalla = false;
+      }
+    }
+
+    if (points.length < 2) {
+      final result = (
+        points: const <LatLng>[],
+        usedDecoded: false,
+        usedValhalla: false,
+      );
+      _resolvedDirectionGeometryCache[cacheKey] = result;
+      return result;
+    }
+    final result = (
+      points: points,
+      usedDecoded: usedDecoded,
+      usedValhalla: usedValhalla,
+    );
+    _resolvedDirectionGeometryCache[cacheKey] = result;
+    return result;
+  }
+
+  List<LatLng> _collectFitPointsForRoute(JeepneyRoute route) {
+    final points = <LatLng>[];
+    for (final direction in _RouteDirection.values) {
+      final g = _resolveDirectionGeometry(route, direction);
+      if (g.points.length >= 2) {
+        points.addAll(g.points);
+      }
+    }
+    if (points.isNotEmpty) return points;
+    for (final p in route.goingTo) {
+      points.add(LatLng(p.lat, p.lon));
+    }
+    for (final p in route.goingBack) {
+      points.add(LatLng(p.lat, p.lon));
+    }
+    return points;
+  }
+
+  List<RouteHitPolyline> _buildHitTestPolylines() {
+    final routes = _mapData?.routes ?? const <JeepneyRoute>[];
+    final out = <RouteHitPolyline>[];
+    for (final route in routes) {
+      for (final direction in _RouteDirection.values) {
+        final g = _resolveDirectionGeometry(route, direction);
+        if (g.points.length >= 2) {
+          out.add(RouteHitPolyline(routeId: route.id, points: g.points));
+        }
+      }
+    }
+    return out;
+  }
+
+  List<RouteHitPolyline> get _hitTestPolylines {
+    if (_hitTestPolylineCache != null &&
+        _hitTestPolylineCacheAtGeneration == _hitGeometryGeneration) {
+      return _hitTestPolylineCache!;
+    }
+    final built = _buildHitTestPolylines();
+    _hitTestPolylineCache = built;
+    _hitTestPolylineCacheAtGeneration = _hitGeometryGeneration;
+    return built;
+  }
+
   /// Polylines to draw (jeepney routes: goingTo and goingBack).
   ///
   /// Prefers encoded polylines from the API (`polylineGoingTo` / `polylineGoingBack`).
@@ -432,44 +579,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     for (final route in routes) {
       final routeColor = _parseRouteColor(route.routeColor);
       for (final direction in _RouteDirection.values) {
-        final encoded = direction == _RouteDirection.goingTo
-            ? route.polylineGoingTo
-            : route.polylineGoingBack;
-
-        List<LatLng> points = const <LatLng>[];
-        bool usedDecoded = false;
-        bool usedValhalla = false;
-        if (encoded != null && encoded.trim().isNotEmpty) {
-          final cacheKey = '${route.id}:${direction.name}:$encoded';
-          final decoded = _decodedPolylineCache[cacheKey] ??
-              decodeApiRoutePolyline(encoded);
-          if (decoded != null) {
-            points = decoded;
-            usedDecoded = true;
-            _decodedPolylineCache[cacheKey] = decoded;
-          }
-        }
-
-        if (points.length < 2) {
-          final key = direction == _RouteDirection.goingTo
-              ? '${route.id}_goingTo'
-              : '${route.id}_goingBack';
-          final valhallaPoints = _roadAlignedPointsByKey[key];
-          if (valhallaPoints != null && valhallaPoints.length >= 2) {
-            points = valhallaPoints;
-            usedValhalla = true;
-          } else {
-            final list = direction == _RouteDirection.goingTo
-                ? route.goingTo
-                : route.goingBack;
-            if (list.length < 2) continue;
-            final sorted = List.of(list)
-              ..sort((a, b) => a.sequence.compareTo(b.sequence));
-            points = sorted.map((p) => LatLng(p.lat, p.lon)).toList();
-          }
-        }
-
-        if (points.length < 2) continue;
+        final g = _resolveDirectionGeometry(route, direction);
+        if (g.points.length < 2) continue;
+        final points = g.points;
+        final usedDecoded = g.usedDecoded;
+        final usedValhalla = g.usedValhalla;
         if (_debugPolylineDiagnostics) {
           final dirLabel = direction == _RouteDirection.goingTo ? 'to' : 'back';
           diagParts.add(
@@ -625,6 +739,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _showingClosureDetails = true;
       _showingRouteDetails = false;
       _selectedRouteForDetails = null;
+      _showingOverlappingRoutes = false;
+      _overlappingRoutes = const <JeepneyRoute>[];
+      _returnToOverlappingRoutesAfterDetails = false;
     });
   }
 
@@ -706,25 +823,38 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _showingRouteDetails = true;
       _showingClosureDetails = false;
       _selectedClosureForDetails = null;
+      _showingOverlappingRoutes = false;
+      _overlappingRoutes = const <JeepneyRoute>[];
+      _returnToOverlappingRoutesAfterDetails = false;
     });
   }
 
   void _closeRouteDetails() {
+    final resumeOverlap = _returnToOverlappingRoutesAfterDetails &&
+        _overlappingRoutes.isNotEmpty;
     setState(() {
       _showingRouteDetails = false;
+      _selectedRouteForDetails = null;
+      if (resumeOverlap) {
+        _returnToOverlappingRoutesAfterDetails = false;
+        _showingOverlappingRoutes = true;
+        _selectedRouteIdsMutable()
+          ..clear()
+          ..addAll(_overlappingRoutes.map((r) => r.id));
+      } else {
+        _returnToOverlappingRoutesAfterDetails = false;
+      }
     });
+    if (resumeOverlap) {
+      _fitRoutesBounds(_overlappingRoutes);
+    }
   }
 
-  /// Fits map camera to route points; falls back to city center if no points.
+  /// Fits map camera to route geometry (decoded/Valhalla polylines when present).
   void _fitRoutesBounds(List<JeepneyRoute> routes) {
     final points = <LatLng>[];
     for (final route in routes) {
-      for (final p in route.goingTo) {
-        points.add(LatLng(p.lat, p.lon));
-      }
-      for (final p in route.goingBack) {
-        points.add(LatLng(p.lat, p.lon));
-      }
+      points.addAll(_collectFitPointsForRoute(route));
     }
 
     if (points.isEmpty) {
@@ -743,6 +873,68 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     } catch (_) {
       _mapController.move(bounds.center, _mapController.camera.zoom);
     }
+  }
+
+  void _onMapTapForOverlappingRoutes(TapPosition tapPosition, LatLng point) {
+    if (_loadingRoutes) return;
+    final cam = _mapController.camera;
+    final rawThreshold = _overlapTapRadiusLogicalPixels *
+        metersPerPixelAtLatitude(point.latitude, cam.zoom);
+    final threshold = rawThreshold.clamp(
+      _overlapThresholdMetersMin,
+      _overlapThresholdMetersMax,
+    );
+    final matchIds = routeIdsNearPolylines(point, _hitTestPolylines, threshold);
+
+    _mapController.move(point, math.max(cam.zoom, _overlapTapMinZoom));
+
+    if (matchIds.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No routes near this point.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
+    final matched = allRoutes.where((r) => matchIds.contains(r.id)).toList()
+      ..sort(_compareRouteNumbersAsc);
+
+    setState(() {
+      _showingOverlappingRoutes = true;
+      _overlappingRoutes = matched;
+      _showingClosureDetails = false;
+      _selectedClosureForDetails = null;
+      _showingRouteDetails = false;
+      _selectedRouteForDetails = null;
+      _returnToOverlappingRoutesAfterDetails = false;
+    });
+  }
+
+  void _closeOverlappingRoutes() {
+    setState(() {
+      _showingOverlappingRoutes = false;
+      _overlappingRoutes = const <JeepneyRoute>[];
+      _returnToOverlappingRoutesAfterDetails = false;
+    });
+  }
+
+  void _openRouteFromOverlap(JeepneyRoute route) {
+    setState(() {
+      _selectedRouteIdsMutable()
+        ..clear()
+        ..add(route.id);
+      _showingOverlappingRoutes = false;
+      _selectedRouteForDetails = route;
+      _showingRouteDetails = true;
+      _showingClosureDetails = false;
+      _selectedClosureForDetails = null;
+      _returnToOverlappingRoutesAfterDetails = true;
+    });
+    _fitRoutesBounds([route]);
   }
 
   /// Tricycle station markers (white circle, purple border, tricycle icon).
@@ -957,6 +1149,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       ? _buildClosureDetailsView(scrollController)
                       : _showingRouteDetails
                       ? _buildRouteDetailsView(scrollController)
+                      : _showingOverlappingRoutes
+                      ? _buildOverlappingRoutesView(scrollController)
                       : _buildRoutesListView(scrollController),
                 ),
               ),
@@ -992,7 +1186,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           runSpacing: 10,
           children: [
             FilterChip(
-              label: const Text('Show all routes'),
+              label: const Text('All routes'),
               selected: !_isFocusedMode,
               onSelected: (selected) {
                 if (selected) {
@@ -1036,7 +1230,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 FilterChip(
-              label: const Text('Show Tricycle Stations'),
+              label: const Text('Tricycle Stations'),
               selected: _showStations,
               onSelected: (selected) {
                 setState(() => _showStations = selected);
@@ -1247,10 +1441,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         tapTargetSize: MaterialTapTargetSize.padded,
       ),
       icon: const Icon(Icons.arrow_back, size: 16),
-      label: const Text(
-        'Back',
-        style: TextStyle(fontWeight: FontWeight.w700),
-      ),
+      label: const Text('Back', style: TextStyle(fontWeight: FontWeight.w700)),
     );
   }
 
@@ -1263,6 +1454,73 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         _buildRoutesHeader(),
         const SizedBox(height: 16),
         _buildRoutesList(),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildOverlappingRoutesView(ScrollController scrollController) {
+    final routes = _overlappingRoutes;
+    return ListView(
+      key: const ValueKey<String>('overlapping-routes-view'),
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  'Overlapping Routes',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MapColors.text,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            _buildDetailsBackButton(onPressed: _closeOverlappingRoutes),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (routes.isEmpty)
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: MapColors.primary.withValues(alpha: 0.18),
+              ),
+              color: MapColors.background,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+            child: const Text(
+              'No overlapping routes for this tap.',
+              style: TextStyle(
+                color: MapColors.text,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          )
+        else
+          Column(
+            children: [
+              for (int index = 0; index < routes.length; index++) ...[
+                _buildRouteListItem(
+                  routes[index],
+                  isSelected: _selectedRouteIdsReadOnly.contains(routes[index].id),
+                  overlapMode: true,
+                ),
+                if (index < routes.length - 1) const SizedBox(height: 12),
+              ],
+            ],
+          ),
         const SizedBox(height: 16),
       ],
     );
@@ -1388,14 +1646,20 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildRouteListItem(JeepneyRoute route, {required bool isSelected}) {
+  Widget _buildRouteListItem(
+    JeepneyRoute route, {
+    required bool isSelected,
+    bool overlapMode = false,
+  }) {
     final color = _parseRouteColor(route.routeColor);
     final routeNumber = route.routeNumber.trim().isEmpty
         ? '--'
         : route.routeNumber.trim();
 
+    void openFromOverlap() => _openRouteFromOverlap(route);
+
     return InkWell(
-      onTap: () => _onRouteTap(route),
+      onTap: overlapMode ? openFromOverlap : () => _onRouteTap(route),
       borderRadius: BorderRadius.circular(14),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -1445,36 +1709,37 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(width: 8),
-            InkWell(
-              onTap: () => _openRouteDetails(route),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: color.withValues(alpha: 0.25)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Details',
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+            if (!overlapMode)
+              InkWell(
+                onTap: () => _openRouteDetails(route),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: color.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Details',
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(Icons.chevron_right, color: color, size: 18),
-                  ],
+                      const SizedBox(width: 4),
+                      Icon(Icons.chevron_right, color: color, size: 18),
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
