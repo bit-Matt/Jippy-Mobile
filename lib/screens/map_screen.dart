@@ -832,15 +832,20 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _closeRouteDetails() {
     final resumeOverlap = _returnToOverlappingRoutesAfterDetails &&
         _overlappingRoutes.isNotEmpty;
+    final allIds = (_mapData?.routes ?? const <JeepneyRoute>[])
+        .map((r) => r.id)
+        .toSet();
     setState(() {
       _showingRouteDetails = false;
       _selectedRouteForDetails = null;
       if (resumeOverlap) {
         _returnToOverlappingRoutesAfterDetails = false;
         _showingOverlappingRoutes = true;
+        // Return to overlap-list context and unhide all routes on the map.
+        _isFocusedMode = false;
         _selectedRouteIdsMutable()
           ..clear()
-          ..addAll(_overlappingRoutes.map((r) => r.id));
+          ..addAll(allIds);
       } else {
         _returnToOverlappingRoutesAfterDetails = false;
       }
@@ -924,6 +929,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   void _openRouteFromOverlap(JeepneyRoute route) {
     setState(() {
+      // When picking from overlap list, isolate the selected route on map.
+      _isFocusedMode = true;
       _selectedRouteIdsMutable()
         ..clear()
         ..add(route.id);
