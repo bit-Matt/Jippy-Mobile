@@ -15,7 +15,9 @@ import '../models/jeepney_route.dart';
 import '../models/road_closure.dart';
 import '../models/routes_and_stations_data.dart';
 import '../utils/polyline_1e6.dart';
+import '../utils/route_color_parser.dart';
 import '../utils/route_polyline_hit.dart';
+import '../utils/route_sort.dart';
 
 /// Default center for the map: Iloilo City, Philippines.
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
@@ -577,7 +579,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final polylines = <Polyline<Object>>[];
     final diagParts = <String>[];
     for (final route in routes) {
-      final routeColor = _parseRouteColor(route.routeColor);
+      final routeColor = parseRouteColor(route.routeColor);
       for (final direction in _RouteDirection.values) {
         final g = _resolveDirectionGeometry(route, direction);
         if (g.points.length < 2) continue;
@@ -906,7 +908,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
     final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
     final matched = allRoutes.where((r) => matchIds.contains(r.id)).toList()
-      ..sort(_compareRouteNumbersAsc);
+      ..sort(compareRouteNumbersAsc);
 
     setState(() {
       _showingOverlappingRoutes = true;
@@ -978,18 +980,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
         )
         .toList();
-  }
-
-  /// Parses hex route color (e.g. "#009e49"); returns [MapColors.jeepneyRouteColor] on failure.
-  Color _parseRouteColor(String hex) {
-    try {
-      String s = hex.trim();
-      if (s.startsWith('#')) s = s.substring(1);
-      if (s.length == 6) s = 'FF$s';
-      return Color(int.parse(s, radix: 16));
-    } catch (_) {
-      return MapColors.jeepneyRouteColor;
-    }
   }
 
   /// Floating pill-shaped search bar at top (design system: "Where do you want to go?").
@@ -1270,7 +1260,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
     final routes = List<JeepneyRoute>.from(
       _mapData?.routes ?? const <JeepneyRoute>[],
-    )..sort(_compareRouteNumbersAsc);
+    )..sort(compareRouteNumbersAsc);
     if (routes.isEmpty) {
       return Container(
         decoration: BoxDecoration(
@@ -1334,14 +1324,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     onSelected: (_) => _onRouteTap(route),
                     showCheckmark: true,
                     selectedColor:
-                        _parseRouteColor(route.routeColor).withValues(alpha: 0.18),
-                    checkmarkColor: _parseRouteColor(route.routeColor),
+                        parseRouteColor(route.routeColor).withValues(alpha: 0.18),
+                    checkmarkColor: parseRouteColor(route.routeColor),
                     labelStyle: TextStyle(
-                      color: _parseRouteColor(route.routeColor),
+                      color: parseRouteColor(route.routeColor),
                       fontWeight: FontWeight.w700,
                     ),
                     side: BorderSide(
-                      color: _parseRouteColor(route.routeColor).withValues(
+                      color: parseRouteColor(route.routeColor).withValues(
                         alpha: 0.55,
                       ),
                     ),
@@ -1371,39 +1361,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ],
       ],
     );
-  }
-
-  int _compareRouteNumbersAsc(JeepneyRoute a, JeepneyRoute b) {
-    final aRaw = a.routeNumber.trim();
-    final bRaw = b.routeNumber.trim();
-
-    final aKey = _routeNumberSortKey(aRaw);
-    final bKey = _routeNumberSortKey(bRaw);
-
-    // Primary: numeric prefix when present.
-    if (aKey.number != null && bKey.number != null) {
-      final n = aKey.number!.compareTo(bKey.number!);
-      if (n != 0) return n;
-    } else if (aKey.number != null && bKey.number == null) {
-      return -1; // numeric route numbers come first
-    } else if (aKey.number == null && bKey.number != null) {
-      return 1;
-    }
-
-    // Secondary: suffix (e.g. 2A after 2).
-    final s = aKey.suffix.compareTo(bKey.suffix);
-    if (s != 0) return s;
-
-    // Tertiary: full string compare (stable/consistent).
-    return aKey.full.compareTo(bKey.full);
-  }
-
-  ({int? number, String suffix, String full}) _routeNumberSortKey(String raw) {
-    final lower = raw.toLowerCase();
-    final match = RegExp(r'^\s*(\d+)').firstMatch(lower);
-    final int? number = match != null ? int.tryParse(match.group(1)!) : null;
-    final suffix = match != null ? lower.substring(match.end).trim() : lower;
-    return (number: number, suffix: suffix, full: lower);
   }
 
   Widget _buildRoutesLoadingState() {
@@ -1658,7 +1615,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     required bool isSelected,
     bool overlapMode = false,
   }) {
-    final color = _parseRouteColor(route.routeColor);
+    final color = parseRouteColor(route.routeColor);
     final routeNumber = route.routeNumber.trim().isEmpty
         ? '--'
         : route.routeNumber.trim();
