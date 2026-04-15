@@ -9,9 +9,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
 import 'package:jippy_mobile/screens/map/widgets/bottom_nav_bar.dart';
+import 'package:jippy_mobile/screens/map/widgets/details_back_button.dart';
 import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
 import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
 import 'package:jippy_mobile/screens/map/widgets/map_action_buttons.dart';
+import 'package:jippy_mobile/screens/map/widgets/route_list_item.dart';
+import 'package:jippy_mobile/screens/map/widgets/search_bar_overlay.dart';
 
 import '../core/theme/map_colors.dart';
 import '../data/map_data_loader.dart';
@@ -439,7 +442,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
-          if (_showSearchBar) _buildSearchBar(context),
+          if (_showSearchBar) const SearchBarOverlay(),
           MapActionButtons(
             userPosition: _userPosition,
             mapController: _mapController,
@@ -990,64 +993,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         .toList();
   }
 
-  /// Floating pill-shaped search bar at top (design system: "Where do you want to go?").
-  /// Tapping will later expand to full-screen search; placeholder for now.
-  Widget _buildSearchBar(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top + 8;
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Padding(
-        padding: EdgeInsets.only(top: topPadding, left: 16, right: 16),
-        child: Material(
-          elevation: 2,
-          shadowColor: Colors.black26,
-          borderRadius: BorderRadius.circular(24),
-          color: MapColors.background,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Icon(Icons.search, color: MapColors.primary, size: 24),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      // TODO: Expand to full-screen search view when implemented.
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      child: Text(
-                        'Where do you want to go?',
-                        style: TextStyle(
-                          color: MapColors.text.withValues(alpha: 0.6),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Icon(
-                    Icons.mic_none,
-                    color: MapColors.text.withValues(alpha: 0.7),
-                    size: 22,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   /// Draggable bottom panel with grab handle, route chips, and mobile bottom nav.
   Widget _buildBottomDrawer(BuildContext context) {
     return DraggableScrollableSheet(
@@ -1292,10 +1237,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 12),
         for (int index = 0; index < routes.length; index++) ...[
-          _buildRouteListItem(
-            routes[index],
+          RouteListItem(
+            route: routes[index],
             isSelected:
                 _isFocusedMode && _selectedRouteIdsReadOnly.contains(routes[index].id),
+            onTap: () => _onRouteTap(routes[index]),
+            onDetailsTap: () => _openRouteDetails(routes[index]),
           ),
           if (index < routes.length - 1) const SizedBox(height: 12),
         ],
@@ -1331,21 +1278,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-    );
-  }
-
-  /// Padding so ink/hover fully covers icon + label on web/desktop.
-  Widget _buildDetailsBackButton({required VoidCallback onPressed}) {
-    return TextButton.icon(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: MapColors.primary,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.padded,
-      ),
-      icon: const Icon(Icons.arrow_back, size: 16),
-      label: const Text('Back', style: TextStyle(fontWeight: FontWeight.w700)),
     );
   }
 
@@ -1389,7 +1321,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(width: 12),
-            _buildDetailsBackButton(onPressed: _closeOverlappingRoutes),
+            DetailsBackButton(onPressed: _closeOverlappingRoutes),
           ],
         ),
         const SizedBox(height: 16),
@@ -1416,10 +1348,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           Column(
             children: [
               for (int index = 0; index < routes.length; index++) ...[
-                _buildRouteListItem(
-                  routes[index],
+                RouteListItem(
+                  route: routes[index],
                   isSelected: _selectedRouteIdsReadOnly.contains(routes[index].id),
                   overlapMode: true,
+                  onTap: () => _openRouteFromOverlap(routes[index]),
                 ),
                 if (index < routes.length - 1) const SizedBox(height: 12),
               ],
@@ -1460,7 +1393,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(width: 12),
-            _buildDetailsBackButton(onPressed: _closeRouteDetails),
+            DetailsBackButton(onPressed: _closeRouteDetails),
           ],
         ),
         const SizedBox(height: 16),
@@ -1522,7 +1455,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(width: 12),
-            _buildDetailsBackButton(onPressed: _closeClosureDetails),
+            DetailsBackButton(onPressed: _closeClosureDetails),
           ],
         ),
         const SizedBox(height: 16),
@@ -1547,106 +1480,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 16),
       ],
-    );
-  }
-
-  Widget _buildRouteListItem(
-    JeepneyRoute route, {
-    required bool isSelected,
-    bool overlapMode = false,
-  }) {
-    final color = parseRouteColor(route.routeColor);
-    final routeNumber = route.routeNumber.trim().isEmpty
-        ? '--'
-        : route.routeNumber.trim();
-
-    void openFromOverlap() => _openRouteFromOverlap(route);
-
-    return InkWell(
-      onTap: overlapMode ? openFromOverlap : () => _onRouteTap(route),
-      borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? color : color.withValues(alpha: 0.18),
-            width: isSelected ? 2 : 1,
-          ),
-          color: MapColors.background,
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              constraints: const BoxConstraints(minWidth: 52, minHeight: 52),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                routeNumber,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  height: 1,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                route.routeName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MapColors.text,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (!overlapMode)
-              InkWell(
-                onTap: () => _openRouteDetails(route),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: color.withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Details',
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.chevron_right, color: color, size: 18),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 
