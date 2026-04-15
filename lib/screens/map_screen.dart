@@ -8,7 +8,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
-import 'package:jippy_mobile/screens/map/widgets/bottom_nav_bar.dart';
 import 'package:jippy_mobile/screens/map/widgets/details_back_button.dart';
 import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
 import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
@@ -22,7 +21,6 @@ import '../data/valhalla_route_client.dart';
 import '../models/jeepney_route.dart';
 import '../models/road_closure.dart';
 import '../models/routes_and_stations_data.dart';
-import 'settings_screen.dart';
 import '../utils/polyline_1e6.dart';
 import '../utils/route_color_parser.dart';
 import '../utils/route_polyline_hit.dart';
@@ -86,8 +84,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   StreamSubscription<Position>? _positionSubscription;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
-  int _selectedNavIndex = 1;
-  DateTime? _lastNavRefreshAt;
 
   /// Loaded routes and stations from API (or asset fallback).
   RoutesAndStationsData? _mapData;
@@ -368,100 +364,108 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       body: Stack(
         children: [
           Positioned.fill(
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: _iloiloCenter,
-                initialZoom: _initialZoom,
-                backgroundColor: MapColors.background,
-                onTap: _onMapTapForOverlappingRoutes,
-              ),
+            child: Stack(
               children: [
-                if (vectorStyle != null)
-                  VectorTileLayer(
-                    tileProviders: vectorStyle.providers,
-                    theme: vectorStyle.theme,
-                    sprites: vectorStyle.sprites,
-                  )
-                else
-                  TileLayer(
-                    urlTemplate: _osmTileUrl,
-                    userAgentPackageName: _userAgentPackageName,
-                    tileProvider: NetworkTileProvider(
-                      headers: {
-                        'User-Agent':
-                            'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
-                      },
-                    ),
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _iloiloCenter,
+                    initialZoom: _initialZoom,
+                    backgroundColor: MapColors.background,
+                    onTap: _onMapTapForOverlappingRoutes,
                   ),
-                // Polylines for static jeepney routes and A* path.
-                PolylineLayer<Object>(polylines: _routePolylines),
-                if (_showingOverlappingRoutes &&
-                    _overlapTapCenter != null &&
-                    _overlapTapRadiusMeters != null)
-                  CircleLayer(
-                    circles: [
-                      CircleMarker<Object>(
-                        point: _overlapTapCenter!,
-                        useRadiusInMeter: true,
-                        radius: _overlapTapRadiusMeters!,
-                        color: MapColors.primary.withValues(alpha: 0.14),
-                        borderColor: MapColors.primary.withValues(alpha: 0.5),
-                        borderStrokeWidth: 2,
-                      ),
-                    ],
-                  ),
-                if (_closurePolygons.isNotEmpty)
-                  PolygonLayer<Object>(
-                    polygons: _closurePolygons,
-                    hitNotifier: _closureHitNotifier,
-                  ),
-                if (_closureLabelMarkers.isNotEmpty)
-                  MarkerLayer(markers: _closureLabelMarkers),
-                if (_showStations &&
-                    _mapData != null &&
-                    _mapData!.stations.isNotEmpty)
-                  MarkerLayer(markers: _stationMarkers),
-                if (_userPosition != null)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: LatLng(
-                          _userPosition!.latitude,
-                          _userPosition!.longitude,
+                  children: [
+                    if (vectorStyle != null)
+                      VectorTileLayer(
+                        tileProviders: vectorStyle.providers,
+                        theme: vectorStyle.theme,
+                        sprites: vectorStyle.sprites,
+                      )
+                    else
+                      TileLayer(
+                        urlTemplate: _osmTileUrl,
+                        userAgentPackageName: _userAgentPackageName,
+                        tileProvider: NetworkTileProvider(
+                          headers: {
+                            'User-Agent':
+                                'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
+                          },
                         ),
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.center,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: MapColors.userLocationColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 6,
-                                spreadRadius: 1,
+                      ),
+                    // Polylines for static jeepney routes and A* path.
+                    PolylineLayer<Object>(polylines: _routePolylines),
+                    if (_showingOverlappingRoutes &&
+                        _overlapTapCenter != null &&
+                        _overlapTapRadiusMeters != null)
+                      CircleLayer(
+                        circles: [
+                          CircleMarker<Object>(
+                            point: _overlapTapCenter!,
+                            useRadiusInMeter: true,
+                            radius: _overlapTapRadiusMeters!,
+                            color: MapColors.primary.withValues(alpha: 0.14),
+                            borderColor: MapColors.primary.withValues(alpha: 0.5),
+                            borderStrokeWidth: 2,
+                          ),
+                        ],
+                      ),
+                    if (_closurePolygons.isNotEmpty)
+                      PolygonLayer<Object>(
+                        polygons: _closurePolygons,
+                        hitNotifier: _closureHitNotifier,
+                      ),
+                    if (_closureLabelMarkers.isNotEmpty)
+                      MarkerLayer(markers: _closureLabelMarkers),
+                    if (_showStations &&
+                        _mapData != null &&
+                        _mapData!.stations.isNotEmpty)
+                      MarkerLayer(markers: _stationMarkers),
+                    if (_userPosition != null)
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: LatLng(
+                              _userPosition!.latitude,
+                              _userPosition!.longitude,
+                            ),
+                            width: 40,
+                            height: 40,
+                            alignment: Alignment.center,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: MapColors.userLocationColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 6,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
                               ),
-                            ],
+                              child: const Icon(
+                                Icons.my_location,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.my_location,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                RichAttributionWidget(
-                  animationConfig: const ScaleRAWA(),
-                  showFlutterMapAttribution: false,
-                  attributions: [
-                    const TextSourceAttribution('OpenStreetMap contributors'),
+                    RichAttributionWidget(
+                      animationConfig: const ScaleRAWA(),
+                      showFlutterMapAttribution: false,
+                      attributions: [
+                        const TextSourceAttribution('OpenStreetMap contributors'),
+                      ],
+                    ),
                   ],
                 ),
+                if (_loadingRoutes) const LoadingOverlay(),
               ],
             ),
           ),
@@ -471,7 +475,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             mapController: _mapController,
           ),
           _buildBottomDrawer(context),
-          if (_loadingRoutes) const LoadingOverlay(),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
@@ -1058,9 +1061,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   duration: const Duration(milliseconds: 220),
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
-                  child: _selectedNavIndex == 3
-                      ? SettingsScreen(key: const ValueKey<String>('settings-screen'))
-                      : _showingClosureDetails
+                  child: _showingClosureDetails
                       ? _buildClosureDetailsView(scrollController)
                       : _showingRouteDetails
                       ? _buildRouteDetailsView(scrollController)
@@ -1068,15 +1069,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       ? _buildOverlappingRoutesView(scrollController)
                       : _buildRoutesListView(scrollController),
                 ),
-              ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: MapColors.text.withValues(alpha: 0.08),
-              ),
-              MapBottomNavBar(
-                selectedIndex: _selectedNavIndex,
-                onItemSelected: _onBottomNavSelected,
               ),
             ],
           ),
@@ -1517,28 +1509,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         const SizedBox(height: 16),
       ],
     );
-  }
-
-  void _onBottomNavSelected(int index) {
-    if (!mounted) return;
-
-    final now = DateTime.now();
-    final last = _lastNavRefreshAt;
-    // Prevent rapid taps from spamming API/style requests.
-    if (last != null &&
-        now.difference(last) < const Duration(milliseconds: 800)) {
-      setState(() => _selectedNavIndex = index);
-      return;
-    }
-    _lastNavRefreshAt = now;
-
-    setState(() => _selectedNavIndex = index);
-
-    if (index == 3) return;
-
-    // Best-effort refresh when user switches sections.
-    _loadVectorStyle();
-    _loadMapData();
   }
 
 }
