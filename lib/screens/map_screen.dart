@@ -22,6 +22,7 @@ import '../data/valhalla_route_client.dart';
 import '../models/jeepney_route.dart';
 import '../models/road_closure.dart';
 import '../models/routes_and_stations_data.dart';
+import 'settings_screen.dart';
 import '../utils/polyline_1e6.dart';
 import '../utils/route_color_parser.dart';
 import '../utils/route_polyline_hit.dart';
@@ -1024,7 +1025,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   duration: const Duration(milliseconds: 220),
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
-                  child: _showingClosureDetails
+                  child: _selectedNavIndex == 3
+                      ? SettingsScreen(key: const ValueKey<String>('settings-screen'))
+                      : _showingClosureDetails
                       ? _buildClosureDetailsView(scrollController)
                       : _showingRouteDetails
                       ? _buildRouteDetailsView(scrollController)
@@ -1497,6 +1500,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _lastNavRefreshAt = now;
 
     setState(() => _selectedNavIndex = index);
+
+    if (index == 3) return;
 
     // Best-effort refresh when user switches sections.
     _loadVectorStyle();
