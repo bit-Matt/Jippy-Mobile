@@ -14,7 +14,6 @@ import '../data/valhalla_route_client.dart';
 import '../models/jeepney_route.dart';
 import '../models/road_closure.dart';
 import '../models/routes_and_stations_data.dart';
-import 'settings_screen.dart';
 import '../utils/polyline_1e6.dart';
 import '../utils/route_polyline_hit.dart';
 
@@ -76,8 +75,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   StreamSubscription<Position>? _positionSubscription;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
-  int _selectedNavIndex = 1;
-  DateTime? _lastNavRefreshAt;
 
   /// Loaded routes and stations from API (or asset fallback).
   RoutesAndStationsData? _mapData;
@@ -1146,9 +1143,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   duration: const Duration(milliseconds: 220),
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
-                  child: _selectedNavIndex == 3
-                      ? SettingsScreen(key: const ValueKey<String>('settings-screen'))
-                      : _showingClosureDetails
+                  child: _showingClosureDetails
                       ? _buildClosureDetailsView(scrollController)
                       : _showingRouteDetails
                       ? _buildRouteDetailsView(scrollController)
@@ -1157,12 +1152,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       : _buildRoutesListView(scrollController),
                 ),
               ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: MapColors.text.withValues(alpha: 0.08),
-              ),
-              _buildBottomNavBar(context),
             ],
           ),
         );
@@ -1747,85 +1736,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ),
       ),
     );
-  }
-
-  Widget _buildBottomNavBar(BuildContext context) {
-    final bottomPadding = MediaQuery.paddingOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        8,
-        8,
-        8,
-        bottomPadding > 0 ? bottomPadding : 8,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildBottomNavItem(index: 0, icon: Icons.map_outlined, label: 'Map'),
-          _buildBottomNavItem(index: 1, icon: Icons.alt_route, label: 'Routes'),
-          _buildBottomNavItem(
-            index: 3,
-            icon: Icons.person_outline,
-            label: 'Settings',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
-    final selected = _selectedNavIndex == index;
-    final color = selected
-        ? MapColors.primary
-        : MapColors.text.withValues(alpha: 0.35);
-    return InkWell(
-      onTap: () => _onBottomNavSelected(index),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _onBottomNavSelected(int index) {
-    if (!mounted) return;
-
-    final now = DateTime.now();
-    final last = _lastNavRefreshAt;
-    // Prevent rapid taps from spamming API/style requests.
-    if (last != null &&
-        now.difference(last) < const Duration(milliseconds: 800)) {
-      setState(() => _selectedNavIndex = index);
-      return;
-    }
-    _lastNavRefreshAt = now;
-
-    setState(() => _selectedNavIndex = index);
-
-    if (index == 3) return;
-
-    // Best-effort refresh when user switches sections.
-    _loadVectorStyle();
-    _loadMapData();
   }
 
   Widget _buildLocationMessage(String message) {
