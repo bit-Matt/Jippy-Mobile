@@ -8,6 +8,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
+import 'package:jippy_mobile/screens/map/widgets/bottom_nav_bar.dart';
+import 'package:jippy_mobile/screens/map/widgets/details_back_button.dart';
+import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
+import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
+import 'package:jippy_mobile/screens/map/widgets/map_action_buttons.dart';
+import 'package:jippy_mobile/screens/map/widgets/route_list_item.dart';
+import 'package:jippy_mobile/screens/map/widgets/search_bar_overlay.dart';
+
 import '../core/theme/map_colors.dart';
 import '../data/map_data_loader.dart';
 import '../data/valhalla_route_client.dart';
@@ -16,7 +24,9 @@ import '../models/road_closure.dart';
 import '../models/routes_and_stations_data.dart';
 import 'settings_screen.dart';
 import '../utils/polyline_1e6.dart';
+import '../utils/route_color_parser.dart';
 import '../utils/route_polyline_hit.dart';
+import '../utils/route_sort.dart';
 
 /// Default center for the map: Iloilo City, Philippines.
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
@@ -81,6 +91,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Loaded routes and stations from API (or asset fallback).
   RoutesAndStationsData? _mapData;
+  bool _isUsingFallbackMapData = false;
 
   /// Loaded vector style. When null, we fall back to raster OSM tiles.
   Style? _vectorStyle;
@@ -108,6 +119,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Map-tap overlap mode: routes whose geometry passes near the tap point.
   bool _showingOverlappingRoutes = false;
   List<JeepneyRoute> _overlappingRoutes = const <JeepneyRoute>[];
+  LatLng? _overlapTapCenter;
+  double? _overlapTapRadiusMeters;
 
   /// When true, closing route details returns to the overlap list instead of the main list.
   bool _returnToOverlappingRoutesAfterDetails = false;
@@ -188,15 +201,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     });
     try {
       RoutesAndStationsData data;
+      var usedFallbackData = false;
       try {
         data = await loadRoutesFromApi();
       } catch (_) {
         data = await loadSampleMapData();
+        usedFallbackData = true;
       }
       if (mounted) {
         final incomingRouteIds = data.routes.map((r) => r.id).toSet();
         setState(() {
           _mapData = data;
+          _isUsingFallbackMapData = usedFallbackData;
           _hitGeometryGeneration++;
 
           // Selection semantics:
@@ -227,6 +243,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             stations: [],
             closures: [],
           );
+          _isUsingFallbackMapData = false;
           _selectedRouteIdsMutable().clear();
           _hitGeometryGeneration++;
         });
@@ -379,6 +396,21 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 // Polylines for static jeepney routes and A* path.
                 PolylineLayer<Object>(polylines: _routePolylines),
+                if (_showingOverlappingRoutes &&
+                    _overlapTapCenter != null &&
+                    _overlapTapRadiusMeters != null)
+                  CircleLayer(
+                    circles: [
+                      CircleMarker<Object>(
+                        point: _overlapTapCenter!,
+                        useRadiusInMeter: true,
+                        radius: _overlapTapRadiusMeters!,
+                        color: MapColors.primary.withValues(alpha: 0.14),
+                        borderColor: MapColors.primary.withValues(alpha: 0.5),
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
+                  ),
                 if (_closurePolygons.isNotEmpty)
                   PolygonLayer<Object>(
                     polygons: _closurePolygons,
@@ -433,16 +465,19 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
-          if (_showSearchBar) _buildSearchBar(context),
-          _buildMapActionButtons(context),
+          if (_showSearchBar) const SearchBarOverlay(),
+          MapActionButtons(
+            userPosition: _userPosition,
+            mapController: _mapController,
+          ),
           _buildBottomDrawer(context),
-          if (_loadingRoutes) _buildLoadingOverlay(),
+          if (_loadingRoutes) const LoadingOverlay(),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
                   _locationPermission == null))
-            _buildLocationMessage(
-              _locationPermission == null
+            MapLocationMessage(
+              message: _locationPermission == null
                   ? 'Location service is disabled.'
                   : 'Location permission denied. Enable it to see your position on the map.',
             ),
@@ -578,13 +613,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final polylines = <Polyline<Object>>[];
     final diagParts = <String>[];
     for (final route in routes) {
-      final routeColor = _parseRouteColor(route.routeColor);
+      final routeColor = parseRouteColor(route.routeColor);
       for (final direction in _RouteDirection.values) {
         final g = _resolveDirectionGeometry(route, direction);
         if (g.points.length < 2) continue;
         final points = g.points;
         final usedDecoded = g.usedDecoded;
         final usedValhalla = g.usedValhalla;
+        final shouldUseOfflineTranslucency = _isUsingFallbackMapData;
         if (_debugPolylineDiagnostics) {
           final dirLabel = direction == _RouteDirection.goingTo ? 'to' : 'back';
           diagParts.add(
@@ -594,12 +630,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         polylines.add(
           Polyline<Object>(
             points: points,
-            color: usedDecoded || usedValhalla
+            color: shouldUseOfflineTranslucency
+                ? routeColor.withValues(alpha: 0.35)
+                : usedDecoded || usedValhalla
                 ? routeColor
                 : routeColor.withValues(
                     alpha: 0.35,
                   ), // visually obvious fallback
-            strokeWidth: usedDecoded || usedValhalla
+            strokeWidth: shouldUseOfflineTranslucency
+                ? (MapColors.jeepneyRouteStrokeWidth - 1).clamp(1, 999).toDouble()
+                : usedDecoded || usedValhalla
                 ? MapColors.jeepneyRouteStrokeWidth
                 : (MapColors.jeepneyRouteStrokeWidth - 1)
                       .clamp(1, 999)
@@ -833,15 +873,20 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _closeRouteDetails() {
     final resumeOverlap = _returnToOverlappingRoutesAfterDetails &&
         _overlappingRoutes.isNotEmpty;
+    final allIds = (_mapData?.routes ?? const <JeepneyRoute>[])
+        .map((r) => r.id)
+        .toSet();
     setState(() {
       _showingRouteDetails = false;
       _selectedRouteForDetails = null;
       if (resumeOverlap) {
         _returnToOverlappingRoutesAfterDetails = false;
         _showingOverlappingRoutes = true;
+        // Return to overlap-list context and unhide all routes on the map.
+        _isFocusedMode = false;
         _selectedRouteIdsMutable()
           ..clear()
-          ..addAll(_overlappingRoutes.map((r) => r.id));
+          ..addAll(allIds);
       } else {
         _returnToOverlappingRoutesAfterDetails = false;
       }
@@ -902,11 +947,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
     final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
     final matched = allRoutes.where((r) => matchIds.contains(r.id)).toList()
-      ..sort(_compareRouteNumbersAsc);
+      ..sort(compareRouteNumbersAsc);
 
     setState(() {
       _showingOverlappingRoutes = true;
       _overlappingRoutes = matched;
+      _overlapTapCenter = point;
+      _overlapTapRadiusMeters = threshold.toDouble();
       _showingClosureDetails = false;
       _selectedClosureForDetails = null;
       _showingRouteDetails = false;
@@ -919,12 +966,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     setState(() {
       _showingOverlappingRoutes = false;
       _overlappingRoutes = const <JeepneyRoute>[];
+      _overlapTapCenter = null;
+      _overlapTapRadiusMeters = null;
       _returnToOverlappingRoutesAfterDetails = false;
     });
   }
 
   void _openRouteFromOverlap(JeepneyRoute route) {
     setState(() {
+      // When picking from overlap list, isolate the selected route on map.
+      _isFocusedMode = true;
       _selectedRouteIdsMutable()
         ..clear()
         ..add(route.id);
@@ -934,6 +985,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _showingClosureDetails = false;
       _selectedClosureForDetails = null;
       _returnToOverlappingRoutesAfterDetails = true;
+      _overlapTapCenter = null;
+      _overlapTapRadiusMeters = null;
     });
     _fitRoutesBounds([route]);
   }
@@ -972,147 +1025,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
         )
         .toList();
-  }
-
-  /// Parses hex route color (e.g. "#009e49"); returns [MapColors.jeepneyRouteColor] on failure.
-  Color _parseRouteColor(String hex) {
-    try {
-      String s = hex.trim();
-      if (s.startsWith('#')) s = s.substring(1);
-      if (s.length == 6) s = 'FF$s';
-      return Color(int.parse(s, radix: 16));
-    } catch (_) {
-      return MapColors.jeepneyRouteColor;
-    }
-  }
-
-  /// Floating pill-shaped search bar at top (design system: "Where do you want to go?").
-  /// Tapping will later expand to full-screen search; placeholder for now.
-  Widget _buildSearchBar(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top + 8;
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Padding(
-        padding: EdgeInsets.only(top: topPadding, left: 16, right: 16),
-        child: Material(
-          elevation: 2,
-          shadowColor: Colors.black26,
-          borderRadius: BorderRadius.circular(24),
-          color: MapColors.background,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Icon(Icons.search, color: MapColors.primary, size: 24),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      // TODO: Expand to full-screen search view when implemented.
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      child: Text(
-                        'Where do you want to go?',
-                        style: TextStyle(
-                          color: MapColors.text.withValues(alpha: 0.6),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Icon(
-                    Icons.mic_none,
-                    color: MapColors.text.withValues(alpha: 0.7),
-                    size: 22,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Semi-transparent overlay with a circular progress indicator while routes are loading.
-  Widget _buildLoadingOverlay() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black26,
-        alignment: Alignment.center,
-        child: const SizedBox(
-          width: 40,
-          height: 40,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-    );
-  }
-
-  /// Right-side map actions (layers and recenter).
-  Widget _buildMapActionButtons(BuildContext context) {
-    return Positioned(
-      right: 16,
-      top: MediaQuery.sizeOf(context).height * 0.34,
-      child: Column(
-        children: [
-          _mapActionButton(
-            icon: Icons.layers_outlined,
-            onTap: () {
-              // TODO: Toggle map overlays or route layers.
-            },
-          ),
-          const SizedBox(height: 12),
-          _mapActionButton(
-            icon: Icons.gps_fixed,
-            iconColor: MapColors.primary,
-            onTap: () {
-              final position = _userPosition;
-              if (position == null) return;
-              _mapController.move(
-                LatLng(position.latitude, position.longitude),
-                _mapController.camera.zoom,
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mapActionButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    Color? iconColor,
-  }) {
-    return Material(
-      color: MapColors.background,
-      borderRadius: BorderRadius.circular(14),
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Icon(
-            icon,
-            color: iconColor ?? MapColors.text.withValues(alpha: 0.75),
-            size: 24,
-          ),
-        ),
-      ),
-    );
   }
 
   /// Draggable bottom panel with grab handle, route chips, and mobile bottom nav.
@@ -1162,7 +1074,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 thickness: 1,
                 color: MapColors.text.withValues(alpha: 0.08),
               ),
-              _buildBottomNavBar(context),
+              MapBottomNavBar(
+                selectedIndex: _selectedNavIndex,
+                onItemSelected: _onBottomNavSelected,
+              ),
             ],
           ),
         );
@@ -1266,7 +1181,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
     final routes = List<JeepneyRoute>.from(
       _mapData?.routes ?? const <JeepneyRoute>[],
-    )..sort(_compareRouteNumbersAsc);
+    )..sort(compareRouteNumbersAsc);
     if (routes.isEmpty) {
       return Container(
         decoration: BoxDecoration(
@@ -1330,14 +1245,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     onSelected: (_) => _onRouteTap(route),
                     showCheckmark: true,
                     selectedColor:
-                        _parseRouteColor(route.routeColor).withValues(alpha: 0.18),
-                    checkmarkColor: _parseRouteColor(route.routeColor),
+                        parseRouteColor(route.routeColor).withValues(alpha: 0.18),
+                    checkmarkColor: parseRouteColor(route.routeColor),
                     labelStyle: TextStyle(
-                      color: _parseRouteColor(route.routeColor),
+                      color: parseRouteColor(route.routeColor),
                       fontWeight: FontWeight.w700,
                     ),
                     side: BorderSide(
-                      color: _parseRouteColor(route.routeColor).withValues(
+                      color: parseRouteColor(route.routeColor).withValues(
                         alpha: 0.55,
                       ),
                     ),
@@ -1358,48 +1273,17 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 12),
         for (int index = 0; index < routes.length; index++) ...[
-          _buildRouteListItem(
-            routes[index],
+          RouteListItem(
+            route: routes[index],
             isSelected:
                 _isFocusedMode && _selectedRouteIdsReadOnly.contains(routes[index].id),
+            onTap: () => _onRouteTap(routes[index]),
+            onDetailsTap: () => _openRouteDetails(routes[index]),
           ),
           if (index < routes.length - 1) const SizedBox(height: 12),
         ],
       ],
     );
-  }
-
-  int _compareRouteNumbersAsc(JeepneyRoute a, JeepneyRoute b) {
-    final aRaw = a.routeNumber.trim();
-    final bRaw = b.routeNumber.trim();
-
-    final aKey = _routeNumberSortKey(aRaw);
-    final bKey = _routeNumberSortKey(bRaw);
-
-    // Primary: numeric prefix when present.
-    if (aKey.number != null && bKey.number != null) {
-      final n = aKey.number!.compareTo(bKey.number!);
-      if (n != 0) return n;
-    } else if (aKey.number != null && bKey.number == null) {
-      return -1; // numeric route numbers come first
-    } else if (aKey.number == null && bKey.number != null) {
-      return 1;
-    }
-
-    // Secondary: suffix (e.g. 2A after 2).
-    final s = aKey.suffix.compareTo(bKey.suffix);
-    if (s != 0) return s;
-
-    // Tertiary: full string compare (stable/consistent).
-    return aKey.full.compareTo(bKey.full);
-  }
-
-  ({int? number, String suffix, String full}) _routeNumberSortKey(String raw) {
-    final lower = raw.toLowerCase();
-    final match = RegExp(r'^\s*(\d+)').firstMatch(lower);
-    final int? number = match != null ? int.tryParse(match.group(1)!) : null;
-    final suffix = match != null ? lower.substring(match.end).trim() : lower;
-    return (number: number, suffix: suffix, full: lower);
   }
 
   Widget _buildRoutesLoadingState() {
@@ -1430,21 +1314,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-    );
-  }
-
-  /// Padding so ink/hover fully covers icon + label on web/desktop.
-  Widget _buildDetailsBackButton({required VoidCallback onPressed}) {
-    return TextButton.icon(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: MapColors.primary,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.padded,
-      ),
-      icon: const Icon(Icons.arrow_back, size: 16),
-      label: const Text('Back', style: TextStyle(fontWeight: FontWeight.w700)),
     );
   }
 
@@ -1488,7 +1357,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(width: 12),
-            _buildDetailsBackButton(onPressed: _closeOverlappingRoutes),
+            DetailsBackButton(onPressed: _closeOverlappingRoutes),
           ],
         ),
         const SizedBox(height: 16),
@@ -1515,10 +1384,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           Column(
             children: [
               for (int index = 0; index < routes.length; index++) ...[
-                _buildRouteListItem(
-                  routes[index],
+                RouteListItem(
+                  route: routes[index],
                   isSelected: _selectedRouteIdsReadOnly.contains(routes[index].id),
                   overlapMode: true,
+                  onTap: () => _openRouteFromOverlap(routes[index]),
                 ),
                 if (index < routes.length - 1) const SizedBox(height: 12),
               ],
@@ -1559,7 +1429,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(width: 12),
-            _buildDetailsBackButton(onPressed: _closeRouteDetails),
+            DetailsBackButton(onPressed: _closeRouteDetails),
           ],
         ),
         const SizedBox(height: 16),
@@ -1621,7 +1491,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ),
             ),
             const SizedBox(width: 12),
-            _buildDetailsBackButton(onPressed: _closeClosureDetails),
+            DetailsBackButton(onPressed: _closeClosureDetails),
           ],
         ),
         const SizedBox(height: 16),
@@ -1649,163 +1519,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildRouteListItem(
-    JeepneyRoute route, {
-    required bool isSelected,
-    bool overlapMode = false,
-  }) {
-    final color = _parseRouteColor(route.routeColor);
-    final routeNumber = route.routeNumber.trim().isEmpty
-        ? '--'
-        : route.routeNumber.trim();
-
-    void openFromOverlap() => _openRouteFromOverlap(route);
-
-    return InkWell(
-      onTap: overlapMode ? openFromOverlap : () => _onRouteTap(route),
-      borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? color : color.withValues(alpha: 0.18),
-            width: isSelected ? 2 : 1,
-          ),
-          color: MapColors.background,
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              constraints: const BoxConstraints(minWidth: 52, minHeight: 52),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                routeNumber,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  height: 1,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                route.routeName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MapColors.text,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (!overlapMode)
-              InkWell(
-                onTap: () => _openRouteDetails(route),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: color.withValues(alpha: 0.25)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Details',
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.chevron_right, color: color, size: 18),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNavBar(BuildContext context) {
-    final bottomPadding = MediaQuery.paddingOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        8,
-        8,
-        8,
-        bottomPadding > 0 ? bottomPadding : 8,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildBottomNavItem(index: 0, icon: Icons.map_outlined, label: 'Map'),
-          _buildBottomNavItem(index: 1, icon: Icons.alt_route, label: 'Routes'),
-          _buildBottomNavItem(
-            index: 3,
-            icon: Icons.person_outline,
-            label: 'Settings',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
-    final selected = _selectedNavIndex == index;
-    final color = selected
-        ? MapColors.primary
-        : MapColors.text.withValues(alpha: 0.35);
-    return InkWell(
-      onTap: () => _onBottomNavSelected(index),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _onBottomNavSelected(int index) {
     if (!mounted) return;
 
@@ -1828,34 +1541,4 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _loadMapData();
   }
 
-  Widget _buildLocationMessage(String message) {
-    return Positioned(
-      bottom: 24,
-      left: 16,
-      right: 16,
-      child: Material(
-        elevation: 2,
-        borderRadius: BorderRadius.circular(8),
-        color: MapColors.background,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Icon(
-                Icons.location_off,
-                color: MapColors.text.withValues(alpha: 0.7),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(color: MapColors.text, fontSize: 13),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

@@ -57,7 +57,7 @@ class RoutesAndStationsData {
     }
 
     final closures = <RoadClosure>[];
-    final closuresList = data['closures'];
+    final closuresList = data['closures'] ?? data['closure'];
     if (closuresList is List) {
       for (final e in closuresList) {
         if (e is Map<String, dynamic>) {
