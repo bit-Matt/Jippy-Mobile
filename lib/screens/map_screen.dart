@@ -8,6 +8,11 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
+import 'package:jippy_mobile/screens/map/widgets/bottom_nav_bar.dart';
+import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
+import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
+import 'package:jippy_mobile/screens/map/widgets/map_action_buttons.dart';
+
 import '../core/theme/map_colors.dart';
 import '../data/map_data_loader.dart';
 import '../data/valhalla_route_client.dart';
@@ -435,15 +440,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             ),
           ),
           if (_showSearchBar) _buildSearchBar(context),
-          _buildMapActionButtons(context),
+          MapActionButtons(
+            userPosition: _userPosition,
+            mapController: _mapController,
+          ),
           _buildBottomDrawer(context),
-          if (_loadingRoutes) _buildLoadingOverlay(),
+          if (_loadingRoutes) const LoadingOverlay(),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
                   _locationPermission == null))
-            _buildLocationMessage(
-              _locationPermission == null
+            MapLocationMessage(
+              message: _locationPermission == null
                   ? 'Location service is disabled.'
                   : 'Location permission denied. Enable it to see your position on the map.',
             ),
@@ -1040,77 +1048,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Semi-transparent overlay with a circular progress indicator while routes are loading.
-  Widget _buildLoadingOverlay() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black26,
-        alignment: Alignment.center,
-        child: const SizedBox(
-          width: 40,
-          height: 40,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ),
-    );
-  }
-
-  /// Right-side map actions (layers and recenter).
-  Widget _buildMapActionButtons(BuildContext context) {
-    return Positioned(
-      right: 16,
-      top: MediaQuery.sizeOf(context).height * 0.34,
-      child: Column(
-        children: [
-          _mapActionButton(
-            icon: Icons.layers_outlined,
-            onTap: () {
-              // TODO: Toggle map overlays or route layers.
-            },
-          ),
-          const SizedBox(height: 12),
-          _mapActionButton(
-            icon: Icons.gps_fixed,
-            iconColor: MapColors.primary,
-            onTap: () {
-              final position = _userPosition;
-              if (position == null) return;
-              _mapController.move(
-                LatLng(position.latitude, position.longitude),
-                _mapController.camera.zoom,
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mapActionButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    Color? iconColor,
-  }) {
-    return Material(
-      color: MapColors.background,
-      borderRadius: BorderRadius.circular(14),
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Icon(
-            icon,
-            color: iconColor ?? MapColors.text.withValues(alpha: 0.75),
-            size: 24,
-          ),
-        ),
-      ),
-    );
-  }
-
   /// Draggable bottom panel with grab handle, route chips, and mobile bottom nav.
   Widget _buildBottomDrawer(BuildContext context) {
     return DraggableScrollableSheet(
@@ -1156,7 +1093,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 thickness: 1,
                 color: MapColors.text.withValues(alpha: 0.08),
               ),
-              _buildBottomNavBar(context),
+              MapBottomNavBar(
+                selectedIndex: _selectedNavIndex,
+                onItemSelected: _onBottomNavSelected,
+              ),
             ],
           ),
         );
@@ -1710,63 +1650,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildBottomNavBar(BuildContext context) {
-    final bottomPadding = MediaQuery.paddingOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        8,
-        8,
-        8,
-        bottomPadding > 0 ? bottomPadding : 8,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildBottomNavItem(index: 0, icon: Icons.map_outlined, label: 'Map'),
-          _buildBottomNavItem(index: 1, icon: Icons.alt_route, label: 'Routes'),
-          _buildBottomNavItem(
-            index: 3,
-            icon: Icons.person_outline,
-            label: 'Settings',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavItem({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
-    final selected = _selectedNavIndex == index;
-    final color = selected
-        ? MapColors.primary
-        : MapColors.text.withValues(alpha: 0.35);
-    return InkWell(
-      onTap: () => _onBottomNavSelected(index),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _onBottomNavSelected(int index) {
     if (!mounted) return;
 
@@ -1787,34 +1670,4 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _loadMapData();
   }
 
-  Widget _buildLocationMessage(String message) {
-    return Positioned(
-      bottom: 24,
-      left: 16,
-      right: 16,
-      child: Material(
-        elevation: 2,
-        borderRadius: BorderRadius.circular(8),
-        color: MapColors.background,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Icon(
-                Icons.location_off,
-                color: MapColors.text.withValues(alpha: 0.7),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(color: MapColors.text, fontSize: 13),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
