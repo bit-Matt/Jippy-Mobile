@@ -38,15 +38,26 @@ class JeepneyRoute {
   /// Combined points view for legacy consumers.
   List<RoutePoint> get points => [...goingTo, ...goingBack];
 
-  /// Parses from API shape: { "id", "routeNumber", "routeName", "routeColor", "points": { "goingTo": [], "goingBack": [] } }
-  /// or legacy { "points": [] } (single list used as goingTo, goingBack empty).
+  /// Parses either:
+  /// - New shape: { ..., "polylines": { "to": "...", "back": "..." } }
+  /// - Existing shape: { ..., "points": { "goingTo": [], "goingBack": [], "polylineGoingTo": "...", "polylineGoingBack": "..." } }
+  /// - Legacy shape: { ..., "points": [] } (single list used as goingTo, goingBack empty).
   static JeepneyRoute? fromJson(Map<String, dynamic> json) {
     final pointsJson = json['points'];
+    final polylinesJson = json['polylines'];
     List<RoutePoint> goingTo;
     List<RoutePoint> goingBack;
     String? polylineGoingTo;
     String? polylineGoingBack;
-    if (pointsJson is Map<String, dynamic>) {
+    if (polylinesJson is Map<String, dynamic>) {
+      // New dashboard payload: routes no longer carry full waypoint lists.
+      goingTo = [];
+      goingBack = [];
+      final to = polylinesJson['to'];
+      final back = polylinesJson['back'];
+      if (to is String && to.trim().isNotEmpty) polylineGoingTo = to;
+      if (back is String && back.trim().isNotEmpty) polylineGoingBack = back;
+    } else if (pointsJson is Map<String, dynamic>) {
       goingTo = _parsePointList(pointsJson['goingTo']);
       goingBack = _parsePointList(pointsJson['goingBack']);
       final to = pointsJson['polylineGoingTo'];
@@ -59,7 +70,12 @@ class JeepneyRoute {
     } else {
       return null;
     }
-    if (goingTo.isEmpty && goingBack.isEmpty) return null;
+    if (goingTo.isEmpty &&
+        goingBack.isEmpty &&
+        polylineGoingTo == null &&
+        polylineGoingBack == null) {
+      return null;
+    }
 
     final id = json['id']?.toString() ?? '';
     final routeNumber = json['routeNumber']?.toString() ?? '';

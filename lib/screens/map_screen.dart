@@ -91,6 +91,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Loaded routes and stations from API (or asset fallback).
   RoutesAndStationsData? _mapData;
+  bool _isUsingFallbackMapData = false;
 
   /// Loaded vector style. When null, we fall back to raster OSM tiles.
   Style? _vectorStyle;
@@ -118,6 +119,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// Map-tap overlap mode: routes whose geometry passes near the tap point.
   bool _showingOverlappingRoutes = false;
   List<JeepneyRoute> _overlappingRoutes = const <JeepneyRoute>[];
+  LatLng? _overlapTapCenter;
+  double? _overlapTapRadiusMeters;
 
   /// When true, closing route details returns to the overlap list instead of the main list.
   bool _returnToOverlappingRoutesAfterDetails = false;
@@ -198,15 +201,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     });
     try {
       RoutesAndStationsData data;
+      var usedFallbackData = false;
       try {
         data = await loadRoutesFromApi();
       } catch (_) {
         data = await loadSampleMapData();
+        usedFallbackData = true;
       }
       if (mounted) {
         final incomingRouteIds = data.routes.map((r) => r.id).toSet();
         setState(() {
           _mapData = data;
+          _isUsingFallbackMapData = usedFallbackData;
           _hitGeometryGeneration++;
 
           // Selection semantics:
@@ -237,6 +243,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             stations: [],
             closures: [],
           );
+          _isUsingFallbackMapData = false;
           _selectedRouteIdsMutable().clear();
           _hitGeometryGeneration++;
         });
@@ -389,6 +396,21 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ),
                 // Polylines for static jeepney routes and A* path.
                 PolylineLayer<Object>(polylines: _routePolylines),
+                if (_showingOverlappingRoutes &&
+                    _overlapTapCenter != null &&
+                    _overlapTapRadiusMeters != null)
+                  CircleLayer(
+                    circles: [
+                      CircleMarker<Object>(
+                        point: _overlapTapCenter!,
+                        useRadiusInMeter: true,
+                        radius: _overlapTapRadiusMeters!,
+                        color: MapColors.primary.withValues(alpha: 0.14),
+                        borderColor: MapColors.primary.withValues(alpha: 0.5),
+                        borderStrokeWidth: 2,
+                      ),
+                    ],
+                  ),
                 if (_closurePolygons.isNotEmpty)
                   PolygonLayer<Object>(
                     polygons: _closurePolygons,
@@ -598,6 +620,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         final points = g.points;
         final usedDecoded = g.usedDecoded;
         final usedValhalla = g.usedValhalla;
+        final shouldUseOfflineTranslucency = _isUsingFallbackMapData;
         if (_debugPolylineDiagnostics) {
           final dirLabel = direction == _RouteDirection.goingTo ? 'to' : 'back';
           diagParts.add(
@@ -607,12 +630,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         polylines.add(
           Polyline<Object>(
             points: points,
-            color: usedDecoded || usedValhalla
+            color: shouldUseOfflineTranslucency
+                ? routeColor.withValues(alpha: 0.35)
+                : usedDecoded || usedValhalla
                 ? routeColor
                 : routeColor.withValues(
                     alpha: 0.35,
                   ), // visually obvious fallback
-            strokeWidth: usedDecoded || usedValhalla
+            strokeWidth: shouldUseOfflineTranslucency
+                ? (MapColors.jeepneyRouteStrokeWidth - 1).clamp(1, 999).toDouble()
+                : usedDecoded || usedValhalla
                 ? MapColors.jeepneyRouteStrokeWidth
                 : (MapColors.jeepneyRouteStrokeWidth - 1)
                       .clamp(1, 999)
@@ -925,6 +952,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     setState(() {
       _showingOverlappingRoutes = true;
       _overlappingRoutes = matched;
+      _overlapTapCenter = point;
+      _overlapTapRadiusMeters = threshold.toDouble();
       _showingClosureDetails = false;
       _selectedClosureForDetails = null;
       _showingRouteDetails = false;
@@ -937,6 +966,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     setState(() {
       _showingOverlappingRoutes = false;
       _overlappingRoutes = const <JeepneyRoute>[];
+      _overlapTapCenter = null;
+      _overlapTapRadiusMeters = null;
       _returnToOverlappingRoutesAfterDetails = false;
     });
   }
@@ -954,6 +985,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _showingClosureDetails = false;
       _selectedClosureForDetails = null;
       _returnToOverlappingRoutesAfterDetails = true;
+      _overlapTapCenter = null;
+      _overlapTapRadiusMeters = null;
     });
     _fitRoutesBounds([route]);
   }
