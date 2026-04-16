@@ -13,6 +13,9 @@ import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
 import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
 import 'package:jippy_mobile/screens/map/widgets/map_action_buttons.dart';
 import 'package:jippy_mobile/screens/map/widgets/route_list_item.dart';
+import 'package:jippy_mobile/screens/map/widgets/routes_header.dart';
+import 'package:jippy_mobile/screens/map/widgets/routes_list_view.dart';
+import 'package:jippy_mobile/screens/map/widgets/routes_loading_state.dart';
 import 'package:jippy_mobile/screens/map/widgets/search_bar_overlay.dart';
 
 import '../core/theme/map_colors.dart';
@@ -1067,7 +1070,29 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       ? _buildRouteDetailsView(scrollController)
                       : _showingOverlappingRoutes
                       ? _buildOverlappingRoutesView(scrollController)
-                      : _buildRoutesListView(scrollController),
+                      : RoutesListView(
+                          scrollController: scrollController,
+                          header: RoutesHeader(
+                            isFocusedMode: _isFocusedMode,
+                            isCompareMode: _isCompareMode,
+                            showStations: _showStations,
+                            onShowAllRoutes: _showAllRoutes,
+                            onCompareModeChanged: _setMultiSelectMode,
+                            onShowStationsChanged: (selected) {
+                              setState(() => _showStations = selected);
+                            },
+                          ),
+                          body: RoutesListBody(
+                            routes: _sortedRoutes,
+                            isLoading: _loadingRoutes,
+                            isFocusedMode: _isFocusedMode,
+                            isCompareMode: _isCompareMode,
+                            selectedRouteIds: _selectedRouteIdsReadOnly,
+                            onRouteTap: _onRouteTap,
+                            onRouteDetailsTap: _openRouteDetails,
+                            loadingState: const RoutesLoadingState(),
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -1077,250 +1102,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildRoutesHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Routes',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 34,
-            fontWeight: FontWeight.w800,
-            height: 1,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            FilterChip(
-              label: const Text('All routes'),
-              selected: !_isFocusedMode,
-              onSelected: (selected) {
-                if (selected) {
-                  _showAllRoutes();
-                }
-              },
-              showCheckmark: false,
-              selectedColor: MapColors.primary.withValues(alpha: 0.18),
-              checkmarkColor: MapColors.primary,
-              labelStyle: TextStyle(
-                color: !_isFocusedMode
-                    ? MapColors.primary
-                    : MapColors.text.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w600,
-              ),
-              side: BorderSide(
-                color: !_isFocusedMode
-                    ? MapColors.primary.withValues(alpha: 0.7)
-                    : MapColors.text.withValues(alpha: 0.18),
-              ),
-            ),
-            FilterChip(
-                  label: const Text('Compare Routes'),
-                  selected: _isCompareMode,
-                  onSelected: (selected) {
-                    _setMultiSelectMode(selected);
-                  },
-                  showCheckmark: false,
-                  selectedColor: MapColors.accentColor.withValues(alpha: 0.18),
-                  checkmarkColor: MapColors.accentColor,
-                  labelStyle: TextStyle(
-                    color: _isCompareMode
-                        ? MapColors.accentColor
-                        : MapColors.text.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w600,
-                  ),
-                  side: BorderSide(
-                    color: _isCompareMode
-                        ? MapColors.accentColor.withValues(alpha: 0.7)
-                        : MapColors.text.withValues(alpha: 0.18),
-                  ),
-                ),
-                FilterChip(
-              label: const Text('Tricycle Stations'),
-              selected: _showStations,
-              onSelected: (selected) {
-                setState(() => _showStations = selected);
-              },
-              showCheckmark: false,
-              selectedColor: MapColors.accentColor.withValues(alpha: 0.18),
-              checkmarkColor: MapColors.accentColor,
-              labelStyle: TextStyle(
-                color: _showStations
-                    ? MapColors.accentColor
-                    : MapColors.text.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w600,
-              ),
-              side: BorderSide(
-                color: _showStations
-                    ? MapColors.accentColor.withValues(alpha: 0.7)
-                    : MapColors.text.withValues(alpha: 0.18),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRoutesList() {
-    if (_loadingRoutes) {
-      return _buildRoutesLoadingState();
-    }
-
+  List<JeepneyRoute> get _sortedRoutes {
     final routes = List<JeepneyRoute>.from(
       _mapData?.routes ?? const <JeepneyRoute>[],
     )..sort(compareRouteNumbersAsc);
-    if (routes.isEmpty) {
-      return Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
-          color: MapColors.background,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-        child: const Text(
-          'No routes available right now.',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      );
-    }
-
-    final selectedRoutes = (_isFocusedMode && _isCompareMode)
-      ? routes
-        .where((route) => _selectedRouteIdsReadOnly.contains(route.id))
-        .toList()
-        : const <JeepneyRoute>[];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (_isFocusedMode && _isCompareMode) ...[
-          const Text(
-            'Selected Routes',
-            style: TextStyle(
-              color: MapColors.text,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (selectedRoutes.isEmpty)
-            Text(
-              'No routes selected.',
-              style: TextStyle(
-                color: MapColors.text.withValues(alpha: 0.65),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            )
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final route in selectedRoutes)
-                  FilterChip(
-                    label: Text(
-                      route.routeNumber.trim().isEmpty
-                          ? route.routeName
-                          : route.routeNumber.trim(),
-                    ),
-                    selected: true,
-                    onSelected: (_) => _onRouteTap(route),
-                    showCheckmark: true,
-                    selectedColor:
-                        parseRouteColor(route.routeColor).withValues(alpha: 0.18),
-                    checkmarkColor: parseRouteColor(route.routeColor),
-                    labelStyle: TextStyle(
-                      color: parseRouteColor(route.routeColor),
-                      fontWeight: FontWeight.w700,
-                    ),
-                    side: BorderSide(
-                      color: parseRouteColor(route.routeColor).withValues(
-                        alpha: 0.55,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          const SizedBox(height: 18),
-          const Divider(height: 1),
-          const SizedBox(height: 14),
-        ],
-        const Text(
-          'All Routes',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 12),
-        for (int index = 0; index < routes.length; index++) ...[
-          RouteListItem(
-            route: routes[index],
-            isSelected:
-                _isFocusedMode && _selectedRouteIdsReadOnly.contains(routes[index].id),
-            onTap: () => _onRouteTap(routes[index]),
-            onDetailsTap: () => _openRouteDetails(routes[index]),
-          ),
-          if (index < routes.length - 1) const SizedBox(height: 12),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildRoutesLoadingState() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
-        color: MapColors.background,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-      child: Row(
-        children: const [
-          SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Loading routes...',
-              style: TextStyle(
-                color: MapColors.text,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRoutesListView(ScrollController scrollController) {
-    return ListView(
-      key: const ValueKey<String>('routes-list-view'),
-      controller: scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        _buildRoutesHeader(),
-        const SizedBox(height: 16),
-        _buildRoutesList(),
-        const SizedBox(height: 16),
-      ],
-    );
+    return routes;
   }
 
   Widget _buildOverlappingRoutesView(ScrollController scrollController) {
