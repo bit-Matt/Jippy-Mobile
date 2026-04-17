@@ -8,11 +8,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
-import 'package:jippy_mobile/screens/map/widgets/details_back_button.dart';
+import 'package:jippy_mobile/screens/map/widgets/closure_details_view.dart';
 import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
 import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
 import 'package:jippy_mobile/screens/map/widgets/map_action_buttons.dart';
-import 'package:jippy_mobile/screens/map/widgets/route_list_item.dart';
+import 'package:jippy_mobile/screens/map/widgets/overlapping_routes_view.dart';
+import 'package:jippy_mobile/screens/map/widgets/route_details_view.dart';
 import 'package:jippy_mobile/screens/map/widgets/routes_header.dart';
 import 'package:jippy_mobile/screens/map/widgets/routes_list_view.dart';
 import 'package:jippy_mobile/screens/map/widgets/routes_loading_state.dart';
@@ -1065,11 +1066,25 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
                   child: _showingClosureDetails
-                      ? _buildClosureDetailsView(scrollController)
+                      ? ClosureDetailsView(
+                          scrollController: scrollController,
+                          closure: _selectedClosureForDetails,
+                          onBackPressed: _closeClosureDetails,
+                        )
                       : _showingRouteDetails
-                      ? _buildRouteDetailsView(scrollController)
+                      ? RouteDetailsView(
+                          scrollController: scrollController,
+                          route: _selectedRouteForDetails,
+                          onBackPressed: _closeRouteDetails,
+                        )
                       : _showingOverlappingRoutes
-                      ? _buildOverlappingRoutesView(scrollController)
+                      ? OverlappingRoutesView(
+                          scrollController: scrollController,
+                          routes: _overlappingRoutes,
+                          selectedRouteIds: _selectedRouteIdsReadOnly,
+                          onBackPressed: _closeOverlappingRoutes,
+                          onRouteTap: _openRouteFromOverlap,
+                        )
                       : RoutesListView(
                           scrollController: scrollController,
                           header: RoutesHeader(
@@ -1107,194 +1122,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _mapData?.routes ?? const <JeepneyRoute>[],
     )..sort(compareRouteNumbersAsc);
     return routes;
-  }
-
-  Widget _buildOverlappingRoutesView(ScrollController scrollController) {
-    final routes = _overlappingRoutes;
-    return ListView(
-      key: const ValueKey<String>('overlapping-routes-view'),
-      controller: scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Text(
-                  'Overlapping Routes',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MapColors.text,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            DetailsBackButton(onPressed: _closeOverlappingRoutes),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (routes.isEmpty)
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: MapColors.primary.withValues(alpha: 0.18),
-              ),
-              color: MapColors.background,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-            child: const Text(
-              'No overlapping routes for this tap.',
-              style: TextStyle(
-                color: MapColors.text,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          )
-        else
-          Column(
-            children: [
-              for (int index = 0; index < routes.length; index++) ...[
-                RouteListItem(
-                  route: routes[index],
-                  isSelected: _selectedRouteIdsReadOnly.contains(routes[index].id),
-                  overlapMode: true,
-                  onTap: () => _openRouteFromOverlap(routes[index]),
-                ),
-                if (index < routes.length - 1) const SizedBox(height: 12),
-              ],
-            ],
-          ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildRouteDetailsView(ScrollController scrollController) {
-    final route = _selectedRouteForDetails;
-    final detailText = (route != null && route.routeDetails.trim().isNotEmpty)
-        ? route.routeDetails.trim()
-        : 'No route details available for this route yet.';
-
-    return ListView(
-      key: const ValueKey<String>('route-details-view'),
-      controller: scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Text(
-                  route?.routeName ?? 'Route details',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MapColors.text,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            DetailsBackButton(onPressed: _closeRouteDetails),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: MapColors.primary.withValues(alpha: 0.18),
-            ),
-            color: MapColors.background,
-          ),
-          padding: const EdgeInsets.all(14),
-          child: Text(
-            detailText,
-            style: const TextStyle(
-              color: MapColors.text,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              height: 1.35,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildClosureDetailsView(ScrollController scrollController) {
-    final closure = _selectedClosureForDetails;
-    final title = (closure != null && closure.closureName.trim().isNotEmpty)
-        ? closure.closureName.trim()
-        : '(untitled)';
-    final detailText =
-        (closure != null && closure.closureDescription.trim().isNotEmpty)
-        ? closure.closureDescription.trim()
-        : 'No description available.';
-
-    return ListView(
-      key: const ValueKey<String>('closure-details-view'),
-      controller: scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MapColors.text,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            DetailsBackButton(onPressed: _closeClosureDetails),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: MapColors.primary.withValues(alpha: 0.18),
-            ),
-            color: MapColors.background,
-          ),
-          padding: const EdgeInsets.all(14),
-          child: Text(
-            detailText,
-            style: const TextStyle(
-              color: MapColors.text,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              height: 1.35,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
   }
 
 }
