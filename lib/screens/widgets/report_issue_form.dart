@@ -1,23 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../data/feedback_client.dart';
 import '../../core/theme/map_colors.dart';
 
-class ReportIssueData {
-  const ReportIssueData({
-    required this.email,
-    required this.reportType,
-    required this.description,
-  });
-
-  final String email;
-  final String reportType;
-  final String description;
-}
-
 class ReportIssueForm extends StatefulWidget {
-  const ReportIssueForm({super.key, this.onSubmit});
-
-  final ValueChanged<ReportIssueData>? onSubmit;
+  const ReportIssueForm({super.key});
 
   @override
   State<ReportIssueForm> createState() => _ReportIssueFormState();
@@ -42,7 +29,7 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
   bool _emailTouched = false;
   bool _reportTypeTouched = false;
   bool _descriptionTouched = false;
-  int _dropdownResetToken = 0;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -133,7 +120,17 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
     return null;
   }
 
-  void _submit() {
+  void _showSnackBar(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
+
     setState(() {
       _submitted = true;
     });
@@ -143,31 +140,37 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
     final formValid = _formKey.currentState?.validate() ?? false;
     if (!formValid) return;
 
-    final payload = ReportIssueData(
-      email: _emailController.text.trim(),
-      reportType: _selectedReportType!,
-      description: _descriptionController.text.trim(),
-    );
-
-    widget.onSubmit?.call(payload);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Report submitted. Thank you for your feedback.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    final email = _emailController.text.trim();
+    final reportType = _selectedReportType!;
+    final description = _descriptionController.text.trim();
 
     setState(() {
-      _selectedReportType = null;
-      _submitted = false;
-      _emailTouched = false;
-      _reportTypeTouched = false;
-      _descriptionTouched = false;
-      _dropdownResetToken++;
+      _isSubmitting = true;
     });
-    _emailController.clear();
-    _descriptionController.clear();
+
+    try {
+      await submitFeedback(
+        email: email,
+        type: reportType,
+        details: description,
+      );
+
+      if (!mounted) return;
+      _showSnackBar('Report submitted. Thank you for your feedback.');
+      Navigator.of(context).pop();
+    } on FeedbackSubmissionException catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Unable to submit feedback right now. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 
   @override
@@ -198,6 +201,7 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
           TextFormField(
             controller: _emailController,
             focusNode: _emailFocusNode,
+            enabled: !_isSubmitting,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             autovalidateMode: _showEmailError
@@ -215,32 +219,32 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
           const SizedBox(height: 12),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            key: ValueKey<int>(_dropdownResetToken),
             initialValue: _selectedReportType,
+            onChanged: _isSubmitting
+                ? null
+                : (value) {
+                    setState(() {
+                      _selectedReportType = value;
+                      _reportTypeTouched = true;
+                    });
+                  },
             autovalidateMode: _showReportTypeError
                 ? AutovalidateMode.always
                 : AutovalidateMode.disabled,
             decoration: inputDecoration.copyWith(labelText: 'Report Type'),
             items: _reportTypes
                 .map(
-                  (type) => DropdownMenuItem<String>(
-                    value: type,
-                    child: Text(type),
-                  ),
+                  (type) =>
+                      DropdownMenuItem<String>(value: type, child: Text(type)),
                 )
                 .toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedReportType = value;
-                _reportTypeTouched = true;
-              });
-            },
             validator: (_) => _reportTypeErrorText(),
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _descriptionController,
             focusNode: _descriptionFocusNode,
+            enabled: !_isSubmitting,
             minLines: 5,
             maxLines: 8,
             textInputAction: TextInputAction.newline,
@@ -249,7 +253,8 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
                 : AutovalidateMode.disabled,
             decoration: inputDecoration.copyWith(
               labelText: 'Describe the problem',
-              hintText: 'Share as much detail as possible to help us investigate.',
+              hintText:
+                  'Share as much detail as possible to help us investigate.',
               alignLabelWithHint: true,
             ),
             validator: (_) => _descriptionErrorText(),
@@ -258,9 +263,18 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: _submit,
-              icon: const Icon(Icons.send_outlined),
-              label: const Text('Submit Report'),
+              onPressed: _isSubmitting ? null : _submit,
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.send_outlined),
+              label: Text(_isSubmitting ? 'Submitting...' : 'Submit Report'),
               style: FilledButton.styleFrom(
                 backgroundColor: MapColors.primary,
                 foregroundColor: Colors.white,
