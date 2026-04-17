@@ -5,9 +5,9 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/map_colors.dart';
 
-/// Right-side map actions (layers placeholder and recenter on user).
-class MapActionButtons extends StatelessWidget {
-  const MapActionButtons({
+/// Right-side routes map actions (layers placeholder and recenter on user).
+class RoutesActionButtons extends StatelessWidget {
+  const RoutesActionButtons({
     super.key,
     required this.userPosition,
     required this.mapController,

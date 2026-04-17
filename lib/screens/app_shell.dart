@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/map_colors.dart';
-import 'go_screen.dart';
-import 'map_screen.dart';
+import 'blank_map_screen.dart';
+import 'routes_screen/routes_screen.dart';
 import 'settings_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -23,7 +23,7 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      const GoScreen(),
+      const BlankMapScreen(),
       const MapScreen(),
       const SettingsScreen(),
     ];

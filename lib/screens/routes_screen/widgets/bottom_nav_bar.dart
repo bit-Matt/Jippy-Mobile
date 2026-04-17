@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/map_colors.dart';
 
-/// Bottom navigation strip for the map screen (Map / Routes / Settings).
+/// Bottom navigation strip for the routes map screen (Map / Routes / Settings).
 class MapBottomNavBar extends StatelessWidget {
   const MapBottomNavBar({
     super.key,
