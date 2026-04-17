@@ -10,6 +10,7 @@ import 'package:vector_map_tiles/vector_map_tiles.dart';
 
 import 'package:jippy_mobile/screens/map/widgets/closure_details_view.dart';
 import 'package:jippy_mobile/screens/map/widgets/bottom_drawer.dart';
+import 'package:jippy_mobile/screens/map/map_state.dart';
 import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
 import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
 import 'package:jippy_mobile/screens/map/widgets/map_canvas.dart';
@@ -101,31 +102,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   /// True while routes are being fetched and during the first render pass.
   bool _loadingRoutes = true;
 
-  /// True when the map is showing only a selected subset of routes.
-  bool _isFocusedMode = false;
+  /// Unified state for panel mode + route selection UI.
+  MapUiState _uiState = const MapUiState();
 
-  /// True when route taps can build a comparison set instead of replacing selection.
-  bool _isCompareMode = false;
-
-  /// Selected route IDs currently visible on the map.
-  Set<String>? _selectedRouteIds;
-
-  /// Selected route for details panel mode.
-  JeepneyRoute? _selectedRouteForDetails;
-  bool _showingRouteDetails = false;
-
-  /// Selected road closure for in-drawer details (same sheet as routes).
-  RoadClosure? _selectedClosureForDetails;
-  bool _showingClosureDetails = false;
-
-  /// Map-tap overlap mode: routes whose geometry passes near the tap point.
-  bool _showingOverlappingRoutes = false;
-  List<JeepneyRoute> _overlappingRoutes = const <JeepneyRoute>[];
+  /// Map-tap overlap mode visualization state (map-only overlay).
   LatLng? _overlapTapCenter;
   double? _overlapTapRadiusMeters;
-
-  /// When true, closing route details returns to the overlap list instead of the main list.
-  bool _returnToOverlappingRoutesAfterDetails = false;
 
   /// Bumps when route geometry used for hit-testing must be rebuilt.
   int _hitGeometryGeneration = 0;
@@ -135,25 +117,40 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _resolvedDirectionGeometryCache = <String, ({List<LatLng> points, bool usedDecoded, bool usedValhalla})>{};
   int? _resolvedDirectionGeometryCacheAtGeneration;
 
-  /// When true, tricycle stations are shown.
-  bool _showStations = true;
-
   /// Road-aligned route points fetched from Valhalla (when API polylines missing).
   /// Key format: `${route.id}_goingTo` / `${route.id}_goingBack`.
   Map<String, List<LatLng>> _roadAlignedPointsByKey = <String, List<LatLng>>{};
   bool _hasAppliedInitialRouteFit = false;
   final LayerHitNotifier<String> _closureHitNotifier = ValueNotifier(null);
 
-  Set<String> _selectedRouteIdsMutable() {
-    _selectedRouteIds ??= <String>{};
-    return _selectedRouteIds!;
-  }
-
-  Set<String> get _selectedRouteIdsReadOnly =>
-      _selectedRouteIds ?? const <String>{};
-
   /// Prevents log spam by only printing when the signature changes.
   String? _lastPolylineDiagnosticsSignature;
+
+  void _setPanelMode(
+    MapPanelMode mode, {
+    JeepneyRoute? selectedRoute,
+    bool clearSelectedRoute = false,
+    RoadClosure? selectedClosure,
+    bool clearSelectedClosure = false,
+    List<JeepneyRoute>? overlappingRoutes,
+    bool? returnToOverlappingRoutesAfterDetails,
+  }) {
+    _uiState = _uiState.copyWith(
+      panelMode: mode,
+      selectedRoute: selectedRoute,
+      clearSelectedRoute: clearSelectedRoute,
+      selectedClosure: selectedClosure,
+      clearSelectedClosure: clearSelectedClosure,
+      overlappingRoutes: overlappingRoutes,
+      returnToOverlappingRoutesAfterDetails:
+          returnToOverlappingRoutesAfterDetails,
+    );
+  }
+
+  void _clearOverlapTapVisuals() {
+    _overlapTapCenter = null;
+    _overlapTapRadiusMeters = null;
+  }
 
   @override
   void initState() {
@@ -221,15 +218,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           // - Show All mode keeps every route selected.
           // - Focused mode keeps the current selection set and drops missing IDs.
           // - Single-select focused mode collapses any stale multi-selection to one route.
-          if (!_isFocusedMode || _selectedRouteIds == null) {
-            _selectedRouteIds = Set<String>.from(incomingRouteIds);
-          } else {
-            _selectedRouteIds!.removeWhere(
-              (id) => !incomingRouteIds.contains(id),
+          if (!_uiState.isFocusedMode || _uiState.selectedRouteIds.isEmpty) {
+            _uiState = _uiState.copyWith(
+              selectedRouteIds: Set<String>.from(incomingRouteIds),
             );
-            if (!_isCompareMode && _selectedRouteIds!.length > 1) {
-              final retainedRouteId = _selectedRouteIds!.last;
-              _selectedRouteIds = <String>{retainedRouteId};
+          } else {
+            final nextIds = Set<String>.from(_uiState.selectedRouteIds)
+              ..removeWhere((id) => !incomingRouteIds.contains(id));
+            if (!_uiState.isCompareMode && nextIds.length > 1) {
+              final retainedRouteId = nextIds.last;
+              _uiState = _uiState.copyWith(selectedRouteIds: <String>{retainedRouteId});
+            } else {
+              _uiState = _uiState.copyWith(selectedRouteIds: nextIds);
             }
           }
         });
@@ -246,7 +246,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             closures: [],
           );
           _isUsingFallbackMapData = false;
-          _selectedRouteIdsMutable().clear();
+          _uiState = _uiState.copyWith(selectedRouteIds: <String>{});
           _hitGeometryGeneration++;
         });
         _completeRouteLoadingAfterRender();
@@ -379,14 +379,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   initialZoom: _initialZoom,
                   onMapTap: _onMapTapForOverlappingRoutes,
                   routePolylines: _routePolylines,
-                  showOverlapRadius: _showingOverlappingRoutes,
+                  showOverlapRadius: _uiState.panelMode == MapPanelMode.overlap,
                   overlapTapCenter: _overlapTapCenter,
                   overlapTapRadiusMeters: _overlapTapRadiusMeters,
                   closurePolygons: _closurePolygons,
                   closureHitNotifier: _closureHitNotifier,
                   closureLabelMarkers: _closureLabelMarkers,
                   stationMarkers: _stationMarkers,
-                  showStations: _showStations,
+                  showStations: _uiState.showStations,
                   userPosition: _userPosition == null
                       ? null
                       : LatLng(_userPosition!.latitude, _userPosition!.longitude),
@@ -403,45 +403,47 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             mapController: _mapController,
           ),
           MapBottomDrawer(
-            showingClosureDetails: _showingClosureDetails,
-            showingRouteDetails: _showingRouteDetails,
-            showingOverlappingRoutes: _showingOverlappingRoutes,
+            showingClosureDetails: _uiState.panelMode == MapPanelMode.closureDetails,
+            showingRouteDetails: _uiState.panelMode == MapPanelMode.routeDetails,
+            showingOverlappingRoutes: _uiState.panelMode == MapPanelMode.overlap,
             closureDetailsViewBuilder: (scrollController) => ClosureDetailsView(
               scrollController: scrollController,
-              closure: _selectedClosureForDetails,
+              closure: _uiState.selectedClosure,
               onBackPressed: _closeClosureDetails,
             ),
             routeDetailsViewBuilder: (scrollController) => RouteDetailsView(
               scrollController: scrollController,
-              route: _selectedRouteForDetails,
+              route: _uiState.selectedRoute,
               onBackPressed: _closeRouteDetails,
             ),
             overlappingRoutesViewBuilder: (scrollController) =>
                 OverlappingRoutesView(
                   scrollController: scrollController,
-                  routes: _overlappingRoutes,
-                  selectedRouteIds: _selectedRouteIdsReadOnly,
+                  routes: _uiState.overlappingRoutes,
+                  selectedRouteIds: _uiState.selectedRouteIds,
                   onBackPressed: _closeOverlappingRoutes,
                   onRouteTap: _openRouteFromOverlap,
                 ),
             routesListViewBuilder: (scrollController) => RoutesListView(
               scrollController: scrollController,
               header: RoutesHeader(
-                isFocusedMode: _isFocusedMode,
-                isCompareMode: _isCompareMode,
-                showStations: _showStations,
+                isFocusedMode: _uiState.isFocusedMode,
+                isCompareMode: _uiState.isCompareMode,
+                showStations: _uiState.showStations,
                 onShowAllRoutes: _showAllRoutes,
                 onCompareModeChanged: _setMultiSelectMode,
                 onShowStationsChanged: (selected) {
-                  setState(() => _showStations = selected);
+                  setState(() {
+                    _uiState = _uiState.copyWith(showStations: selected);
+                  });
                 },
               ),
               body: RoutesListBody(
                 routes: _sortedRoutes,
                 isLoading: _loadingRoutes,
-                isFocusedMode: _isFocusedMode,
-                isCompareMode: _isCompareMode,
-                selectedRouteIds: _selectedRouteIdsReadOnly,
+                isFocusedMode: _uiState.isFocusedMode,
+                isCompareMode: _uiState.isCompareMode,
+                selectedRouteIds: _uiState.selectedRouteIds,
                 onRouteTap: _onRouteTap,
                 onRouteDetailsTap: _openRouteDetails,
                 loadingState: const RoutesLoadingState(),
@@ -637,9 +639,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   List<JeepneyRoute> get _visibleRoutes {
     final routes = _mapData?.routes ?? const <JeepneyRoute>[];
-    if (!_isFocusedMode) return routes;
-    if (_selectedRouteIdsReadOnly.isEmpty) return const <JeepneyRoute>[];
-    return routes.where((r) => _selectedRouteIdsReadOnly.contains(r.id)).toList();
+    if (!_uiState.isFocusedMode) return routes;
+    if (_uiState.selectedRouteIds.isEmpty) return const <JeepneyRoute>[];
+    return routes.where((r) => _uiState.selectedRouteIds.contains(r.id)).toList();
   }
 
   List<Polygon<Object>> get _closurePolygons {
@@ -752,40 +754,42 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _openClosureDetails(RoadClosure closure) {
     if (!mounted) return;
     setState(() {
-      _selectedClosureForDetails = closure;
-      _showingClosureDetails = true;
-      _showingRouteDetails = false;
-      _selectedRouteForDetails = null;
-      _showingOverlappingRoutes = false;
-      _overlappingRoutes = const <JeepneyRoute>[];
-      _returnToOverlappingRoutesAfterDetails = false;
+      _setPanelMode(
+        MapPanelMode.closureDetails,
+        selectedClosure: closure,
+        clearSelectedRoute: true,
+        overlappingRoutes: const <JeepneyRoute>[],
+        returnToOverlappingRoutesAfterDetails: false,
+      );
     });
   }
 
   void _closeClosureDetails() {
     setState(() {
-      _showingClosureDetails = false;
-      _selectedClosureForDetails = null;
+      _setPanelMode(MapPanelMode.routes, clearSelectedClosure: true);
     });
   }
 
   void _onRouteTap(JeepneyRoute route) {
     late List<JeepneyRoute> routesToFit;
     setState(() {
-      if (!_isFocusedMode) {
-        _isFocusedMode = true;
-        _selectedRouteIds = <String>{route.id};
-      } else if (_isCompareMode) {
-        final selectedRouteIds = _selectedRouteIdsMutable();
+      if (!_uiState.isFocusedMode) {
+        _uiState = _uiState.copyWith(
+          isFocusedMode: true,
+          selectedRouteIds: <String>{route.id},
+        );
+      } else if (_uiState.isCompareMode) {
+        final selectedRouteIds = Set<String>.from(_uiState.selectedRouteIds);
         if (selectedRouteIds.contains(route.id)) {
           selectedRouteIds.remove(route.id);
         } else {
           selectedRouteIds.add(route.id);
         }
+        _uiState = _uiState.copyWith(selectedRouteIds: selectedRouteIds);
       } else {
-        _selectedRouteIds = <String>{route.id};
+        _uiState = _uiState.copyWith(selectedRouteIds: <String>{route.id});
       }
-      routesToFit = _isFocusedMode
+      routesToFit = _uiState.isFocusedMode
           ? _visibleRoutes
           : (_mapData?.routes ?? const <JeepneyRoute>[]);
     });
@@ -798,19 +802,19 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   void _setMultiSelectMode(bool enabled) {
-    if (_isCompareMode == enabled) return;
+    if (_uiState.isCompareMode == enabled) return;
 
     late List<JeepneyRoute> routesToFit;
     setState(() {
-      _isCompareMode = enabled;
-      if (_isFocusedMode && !_isCompareMode && _selectedRouteIds != null) {
-        final selectedRouteIds = _selectedRouteIdsMutable();
+      _uiState = _uiState.copyWith(isCompareMode: enabled);
+      if (_uiState.isFocusedMode && !_uiState.isCompareMode) {
+        final selectedRouteIds = Set<String>.from(_uiState.selectedRouteIds);
         if (selectedRouteIds.length > 1) {
           final retainedRouteId = selectedRouteIds.last;
-          _selectedRouteIds = <String>{retainedRouteId};
+          _uiState = _uiState.copyWith(selectedRouteIds: <String>{retainedRouteId});
         }
       }
-      routesToFit = _isFocusedMode
+      routesToFit = _uiState.isFocusedMode
           ? _visibleRoutes
           : (_mapData?.routes ?? const <JeepneyRoute>[]);
     });
@@ -826,49 +830,53 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
     final allIds = allRoutes.map((r) => r.id).toSet();
     setState(() {
-      _isFocusedMode = false;
-      _selectedRouteIdsMutable()
-        ..clear()
-        ..addAll(allIds);
+      _uiState = _uiState.copyWith(
+        isFocusedMode: false,
+        selectedRouteIds: allIds,
+      );
     });
     _fitRoutesBounds(allRoutes);
   }
 
   void _openRouteDetails(JeepneyRoute route) {
     setState(() {
-      _selectedRouteForDetails = route;
-      _showingRouteDetails = true;
-      _showingClosureDetails = false;
-      _selectedClosureForDetails = null;
-      _showingOverlappingRoutes = false;
-      _overlappingRoutes = const <JeepneyRoute>[];
-      _returnToOverlappingRoutesAfterDetails = false;
+      _setPanelMode(
+        MapPanelMode.routeDetails,
+        selectedRoute: route,
+        clearSelectedClosure: true,
+        overlappingRoutes: const <JeepneyRoute>[],
+        returnToOverlappingRoutesAfterDetails: false,
+      );
     });
   }
 
   void _closeRouteDetails() {
-    final resumeOverlap = _returnToOverlappingRoutesAfterDetails &&
-        _overlappingRoutes.isNotEmpty;
+    final resumeOverlap = _uiState.returnToOverlappingRoutesAfterDetails &&
+        _uiState.overlappingRoutes.isNotEmpty;
     final allIds = (_mapData?.routes ?? const <JeepneyRoute>[])
         .map((r) => r.id)
         .toSet();
     setState(() {
-      _showingRouteDetails = false;
-      _selectedRouteForDetails = null;
       if (resumeOverlap) {
-        _returnToOverlappingRoutesAfterDetails = false;
-        _showingOverlappingRoutes = true;
-        // Return to overlap-list context and unhide all routes on the map.
-        _isFocusedMode = false;
-        _selectedRouteIdsMutable()
-          ..clear()
-          ..addAll(allIds);
+        _setPanelMode(
+          MapPanelMode.overlap,
+          clearSelectedRoute: true,
+          returnToOverlappingRoutesAfterDetails: false,
+        );
+        _uiState = _uiState.copyWith(
+          isFocusedMode: false,
+          selectedRouteIds: allIds,
+        );
       } else {
-        _returnToOverlappingRoutesAfterDetails = false;
+        _setPanelMode(
+          MapPanelMode.routes,
+          clearSelectedRoute: true,
+          returnToOverlappingRoutesAfterDetails: false,
+        );
       }
     });
     if (resumeOverlap) {
-      _fitRoutesBounds(_overlappingRoutes);
+      _fitRoutesBounds(_uiState.overlappingRoutes);
     }
   }
 
@@ -926,43 +934,43 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       ..sort(compareRouteNumbersAsc);
 
     setState(() {
-      _showingOverlappingRoutes = true;
-      _overlappingRoutes = matched;
+      _setPanelMode(
+        MapPanelMode.overlap,
+        overlappingRoutes: matched,
+        clearSelectedClosure: true,
+        clearSelectedRoute: true,
+        returnToOverlappingRoutesAfterDetails: false,
+      );
       _overlapTapCenter = point;
       _overlapTapRadiusMeters = threshold.toDouble();
-      _showingClosureDetails = false;
-      _selectedClosureForDetails = null;
-      _showingRouteDetails = false;
-      _selectedRouteForDetails = null;
-      _returnToOverlappingRoutesAfterDetails = false;
     });
   }
 
   void _closeOverlappingRoutes() {
     setState(() {
-      _showingOverlappingRoutes = false;
-      _overlappingRoutes = const <JeepneyRoute>[];
-      _overlapTapCenter = null;
-      _overlapTapRadiusMeters = null;
-      _returnToOverlappingRoutesAfterDetails = false;
+      _setPanelMode(
+        MapPanelMode.routes,
+        overlappingRoutes: const <JeepneyRoute>[],
+        returnToOverlappingRoutesAfterDetails: false,
+      );
+      _clearOverlapTapVisuals();
     });
   }
 
   void _openRouteFromOverlap(JeepneyRoute route) {
     setState(() {
       // When picking from overlap list, isolate the selected route on map.
-      _isFocusedMode = true;
-      _selectedRouteIdsMutable()
-        ..clear()
-        ..add(route.id);
-      _showingOverlappingRoutes = false;
-      _selectedRouteForDetails = route;
-      _showingRouteDetails = true;
-      _showingClosureDetails = false;
-      _selectedClosureForDetails = null;
-      _returnToOverlappingRoutesAfterDetails = true;
-      _overlapTapCenter = null;
-      _overlapTapRadiusMeters = null;
+      _setPanelMode(
+        MapPanelMode.routeDetails,
+        selectedRoute: route,
+        clearSelectedClosure: true,
+        returnToOverlappingRoutesAfterDetails: true,
+      );
+      _uiState = _uiState.copyWith(
+        isFocusedMode: true,
+        selectedRouteIds: <String>{route.id},
+      );
+      _clearOverlapTapVisuals();
     });
     _fitRoutesBounds([route]);
   }
