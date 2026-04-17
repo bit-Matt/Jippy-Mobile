@@ -3,277 +3,636 @@
   "data": {
     "routes": [
       {
-        "id": "019c7a33-db0d-71df-8905-244b696ccc74",
-        "routeNumber": "01",
-        "routeName": "Savannnah 2",
-        "routeColor": "#009e49",
-        "points": [
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-5a80082708cc",
-            "sequence": 0,
-            "address": "Iloilo R-2 Road, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7454397285424, 122.513281702995]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-5c8a13d8c824",
-            "sequence": 1,
-            "address": "F. Gorriceta Avenue, Pandac, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7431063374748, 122.515062689781]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-600957f5df5b",
-            "sequence": 2,
-            "address": "F. Gorriceta Avenue, Pandac, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7462772166498, 122.51743376255]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-640e403a5608",
-            "sequence": 3,
-            "address": "F. Gorriceta Avenue, Pandac, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7490568454995, 122.519536614418]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-6a7a4b2ffd13",
-            "sequence": 4,
-            "address": "F. Gorriceta Avenue, Pandac, Jibao-an, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7524067438419, 122.52200961113]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-6e896780b13f",
-            "sequence": 5,
-            "address": "F. Gorriceta Avenue, Pandac, Balabag, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7558497647426, 122.524525523186]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-7029449b847b",
-            "sequence": 6,
-            "address": "F. Gorriceta Avenue, Saint Joseph, Pandac, Poblacion, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7597758113378, 122.527288198471]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-771fe24f9c8e",
-            "sequence": 7,
-            "address": "F. Gorriceta Avenue, CPU Centennial Village, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7635974188975, 122.530077695847]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-7a8198802940",
-            "sequence": 8,
-            "address": "F. Gorriceta Avenue, CPU Centennial Village, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7663955454878, 122.533113956451]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-7f152fb77975",
-            "sequence": 9,
-            "address": "F. Gorriceta Avenue, CPU Centennial Village, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7687883012587, 122.535753250122]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-83ab5fbfe6d9",
-            "sequence": 10,
-            "address": "Benigno S. Aquino Jr. Avenue, CPU Centennial Village, Aganan, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7693571173174, 122.536418437958]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-85f1729ce4b0",
-            "sequence": 11,
-            "address": "Benigno S. Aquino Jr. Avenue, Aganan, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7661909536605, 122.536836862564]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-88448a6e94b1",
-            "sequence": 12,
-            "address": "Benigno S. Aquino Jr. Avenue, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7631558889416, 122.537341117859]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-8f5e79353bc3",
-            "sequence": 13,
-            "address": "Benigno S. Aquino Jr. Avenue, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7607943494795, 122.537716627121]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-91a1986c1dbd",
-            "sequence": 14,
-            "address": "Benigno S. Aquino Jr. Avenue, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7595194673674, 122.537925839424]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-974e8e346d9d",
-            "sequence": 15,
-            "address": "Benigno S. Aquino Jr. Avenue, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7578641799152, 122.538188695908]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-992a528184c6",
-            "sequence": 16,
-            "address": "Benigno S. Aquino Jr. Avenue, Ungka II, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7554044756418, 122.538408637047]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-9e70fd756228",
-            "sequence": 17,
-            "address": "Benigno S. Aquino Jr. Avenue, Ungka II, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7547541733357, 122.538446187973]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-a16a90569e27",
-            "sequence": 18,
-            "address": "Ungka Flyover, Ungka II Flyover, Ungka Ⅱ, Ungka II, Ungka I, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7528667573664, 122.538532018662]
-          },
-          {
-            "id": "019cb3fa-3bf8-74f2-aa46-a75a62564eb8",
-            "sequence": 19,
-            "address": "Benigno S. Aquino Jr. Avenue, Ungka Ⅱ, Ungka II, Pavia, Iloilo, Western Visayas, 5001, Philippines",
-            "point": [10.7497731196925, 122.538714408875]
-          }
-        ]
+        "id": "019d9020-0e02-740c-b1ae-579f8717a935",
+        "routeNumber": "R21",
+        "routeName": "TAGBAK/BUNTATALA TO FESTIVE WALK",
+        "routeColor": "#fff100",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "}|yoSgopxhF~ErCbWbOVPzFhDxL`HlAt@z@h@zErCtAt@`UrMzCfBle@pXxCfB\\TxBnA~EhCjAl@xLjHx\\`RtPhJ`HrDzLhHl\\dRLHfAn@zOxIdGpD|BtA|DbC~X`Qj@^jMxHjI`FtAz@lUvNn^tUzWnP~NxI~JlG~RrLjFjDvOpJ`JfGpLnHzZnRnDtB|]|SpAp@`g@tYxF|CfDdBt@h@`i@hZnEfC~BlAjMnHbAp@dGdDfAr@lC~AlHjEtEdCxUlMtN`IrMlHlGjDrEjC|v@tb@rXjOhK`G~ErCnb@jV~`Apj@fDlBdh@jYnDtBjr@|`@tGxDzKnGhEnC~AfAt^lSjj@h\\jBfApNpIvQvK`L~Hl@\\vYrQrTpLbSlIrCdAdDjBdCrAjmAhl@vIrErRrI~D|Af^dNtUzI`^rMdE~AvGlCr[jLdEtAzCx@tAZxy@zSvDbAt`@rJvOlDpDp@|R`FvCv@fM~CxNzDzMrClCl@`QxHhn@`O`VxFlV`Gnc@nKnIlDpDbDtCbEx@jAxErMzB`HfJrYNd@`DvJdD~LpErL`TnUjQnPbB`BnJdIhl@pk@bHfG|JmIhGgFvVkRlIqGtDsC`CaBxEcDt[mTfIaEjIeF`@dBJf@rA~B|A|AlQxMVPjEdD~LdJz@n@pFrDvGdEjEhAdDbCdJ`HfUpRhF~DdBvA~AfAz\\vUf^vVrYnRrSpMbj@`_@|M|IpQxKpo@rf@`GlH|@vBtArD`BlFlBnG|JcDpA_@|CgAtZ{IzKqCtVyEzKoAvEi@pN_BbLu@pGe@rBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFdl@zJlWhE|\\|FnOzBlV~CxFb@bXrBjDJL?~BD`TPvED|WEvDGbDKl@bDxXdw@rQrc@dArBhIlPpGzKvFjIfCbDLLdFpF{@fB]pB?vB\\rBx@fB`B~AlBx@xBVzBIrBk@bBiApFpF`GvF~ErEfInHnZnWrI|HrBhDfO|XhL|PtJlNfGhInCpD~@nAxCdE`DjEzFxHlAdBfPxT~DtFdDlEb@l@rFnHbIrKhOtQr`@vd@f@rAAfAWl@oG~DuJbFuFrCsLzF}R~J{`@xN}JvDiOxF}Aj@mBb@o\\rFiGfA_TrDmKjBaBZuDr@mAcAm@c@yE{CqLkGmLyFiZmKmSgGmBc@}HgByH{AuVsDy@MgLiBi`@mFaWqHobAe\\yB}@m_Ac_@iYuLyBaAi]wOo[{OcY}IwIiCaBa@d@uB{Cq@oR{DoHmAeGmAcC]yHmAyFgA{EgAgBg@gD_A_FuAkFoB{HeDgGuC{EqCwA_AiBqAqJuGwCyBmA}@",
+          "back": "}hcmSistvhF??sJyGeTwN{NuIsBeAaEgBwPmHUeGSqCKaEM_C_AuSu@oKAU}@_RE_A]{FMkCM}BS{DcA{Uu@qP_FeXoQ_q@w@uCoDkMwB}H}@aDuBuHi@iBw@gCoBoGaBmFuAsD}@wBaGmHqo@sf@qQyK}M}Icj@a_@sSqMsYoRg^wV{\\wU_BgAeBwAiF_EgUqReJaHeDeCN}ElAsEr@wBvAoCvAmCnAgD~BgCjGwGX]xJiKhHwHfQ_OpGoF{FmFuHaHaJuHwKeJ{E_EiFxDaQlMaLzHyFbEsBtAs]nWeDxBoDtCmDvBwAsHuC_LeEyGwEsFiZqGaf@_IsOkE_XkFkBg@aj@sNqXaHsSmFqQuE{LaCyC}@i_@qI}MyCgj@kMiVsFkFoAsBg@cV_GiIsB_B_@mR}DmCm@{MsCyN{DgM_DwCw@}RaFqDq@wOmDu`@sJwDcAyy@{SuA[{Cy@eEuAs[kLwGmCeE_Ba^sMuU{Ig^eN_E}AsRsIwIsEkmAil@eCsAeDkB_QiKcDoBqSsM}K{FmIsEmDqBcNgFwQwKqNqIkBgAkj@i\\u^mS_BgAiEoC{KoGuGyDkr@}`@oDuBeh@kYgDmB_aAqj@ob@kV_FsCiKaGsXkO}v@ub@sEkCmGkDsMmHuNaIyUmMuEeCmHkEmC_BgAs@eGeDcAq@kMoH_CmAoEgCai@iZu@i@gDeByF}Cag@uYqAq@}]}SoDuB{ZoRqLoHaJgGwOqJkFkD_SsL_KmG_OyI{WoPo^uUmUwNuA{@kIaFkMyHk@_@_YaQ}DcC}BuAeGqD{OyIgAo@MIm\\eR{LiHaHsDuPiJy\\aRyLkHkAm@_FiCyBoA]UyCgBme@qX{CgBaUsMuAu@{EsC{@i@mAu@yLaH{FiDWQcWcOaRuK"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
       },
       {
-        "id": "019cafd8-cf52-724a-9d4b-e85693d6b9f7",
-        "routeNumber": "02",
-        "routeName": "Highway test",
+        "id": "019d9020-0e66-726b-9cdf-9f0e9e87c93a",
+        "routeNumber": "R7",
+        "routeName": "Compania to City Proper",
         "routeColor": "#e81123",
-        "points": [
-          {
-            "id": "019cafd8-e8ac-77da-a886-5f2972824735",
-            "sequence": 0,
-            "address": "Benigno S. Aquino Jr. Avenue, Dungon A, Desamparados, Jaro, Calubihan, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.7248858388693, 122.549561262131]
-          },
-          {
-            "id": "019cafd8-e8ad-779e-8d33-5b57feffeb91",
-            "sequence": 1,
-            "address": "Benigno S. Aquino Jr. Avenue, Buhang Taft-North, Bakhaw, Mandurriao, Calubihan, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.7204478662225, 122.551653385162]
-          },
-          {
-            "id": "019cafd8-e8ad-779e-8d33-5cb67ab28373",
-            "sequence": 2,
-            "address": "Benigno S. Aquino Jr. Avenue, Buhang Taft-North, Bakhaw, Mandurriao, Calubihan, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.7158938693922, 122.552726268768]
-          },
-          {
-            "id": "019cafd8-e8ad-779e-8d33-61ec1d349cfb",
-            "sequence": 3,
-            "address": "Monkey Grounds Coffee, PH52+FJ9, Benigno S. Aquino Jr. Avenue, San Rafael, Mandurriao, Calubihan, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.7092419592664, 122.551599740982]
-          },
-          {
-            "id": "019cafd8-e8ad-779e-8d33-64e75a648be2",
-            "sequence": 4,
-            "address": "Benigno S. Aquino Jr. Avenue, San Rafael, Mandurriao, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.7029694221045, 122.553230524063]
-          },
-          {
-            "id": "019cafd8-e8ad-779e-8d33-6a5b4598859d",
-            "sequence": 5,
-            "address": "Infante Avenue, Cochero, Molo, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.6973714684117, 122.554678916931]
-          }
-        ]
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "ctjkSqjdvhFzB`FjDxMf@fGp@nGxDp{@hBva@bAd\\IbC_@pBqAtDqErHqVfXmOrNk@h@qMbHgFhBqXlJyNnFyLrDs^lKsVdHk_@pKeUug@iOc[cP}WmHmLsEeH_EeG{BuDy@oAaP{XkLwRqOwVoI_Okv@irAcTs\\i]}o@c]ys@aIcO{JoQcTca@sAgCuCuFoGwLgMeZ_B{D}@yBcAmCe@iAaBwD_EwJaB_ExCiBdGoDjFgDzBwA|KmGz@k@pBaBdIyEjL}GxE}DvEeFzBqC|McHx@a@h[oPjImF|PwMnFuEvBgB`NgM}@i@wTyMqj@w]iCsBsAyAuAcC{@cCk@uCUqCmCek@c@mKiCai@mFyhAuE{bAGkBKkCg@_Ko@kLiAuT_@wHeA_T}Ag[s@yOmG{nAOyC}Con@SgDK{DeAeWQ{DKqCKoDwAeZKqDGoBwAmXMoCcFoeAAc@GaCg@mKa@yIeAuT_@gN|@}B~FuPbLcYr@iBhHcRdIcVjCeHnDoJnBeHvKgZzLyZjK?fK@lR@`W@xD@lF?fB@fCBmW}lAwDyQcRi}@s@kD_@gBgAuF_CoLaAmEsGoZyA_H{EeUwJod@kY_wAg@cCqBoIwNgr@oAcGMmAQiAtDeBxD?tA@jqAJhWBpr@HlGFp]E`JA~a@BjIt@f@Xl@Jn@Cj@SXWT]pOVpU@~OK|Ck~Aix@aAqBCkAg@lC_{@@g@l@aHhAcNxB}WX}CnAgMzCkYbDk[B[RuBgE{F}BkB}AxAeGxF_RhQwArA",
+          "back": "wgrkS}chxhFfOuNdGyF|AyA|BjBfEzFStBCZcDj[{CjYoAfMY|CS~BeB|SiAbNm@`HAf@mC~z@R~k@z@|f@UnGYY_@Sc@Ic@Ac@HUHQJ_@b@sHdC_b@CaJ@q]DmGG{jAMkqAKuAAyD?uDdBiAjCMf@ELMvACjCNv@vG`[dFbVxAjGj@vCbOzs@fIha@|\\d_Br@lEhFhVx@xEPv@zQn{@fVzjAjEvSmF?yDAaWAmRAgKAkK?uFjNeElKwKfZoBdH{HtSeIbViHbRs@hBcLbYsEtMk@~A}@|B^fNdAtT`@xIf@lKF`C@b@bFneALnCvAlXFnBJpDvAdZJnDJpCPzDdAdWJzDRfD|Cnn@NxClGznAr@xO|Af[dA~S^vHhAtTn@jLf@~JJjCFjBtEzbAlFxhAhC`i@b@lKlCdk@TpCj@tCz@bCtAbCrAxAhCrBpj@v]tVbOfj@b\\py@bi@vOjMhc@~Y`YhRhe@f^vQhXzPf]xYvp@zOtg@~GtTlCjHpMpRjk@pw@~@pAdFbL"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e5b-729d-8637-319daec4ec2c",
+        "routeNumber": "R6",
+        "routeName": "LANIT TO INFANTE VIA SM CITY",
+        "routeColor": "#e81123",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "}}qpSenaxhFxeAnVz@RdYnH|@R`c@vMp[jMz]vSrgCl~AtrBxqAhaAhk@h[hPzMbHpFjCvf@nSxCjA|HbD|EtBz{@l]~xC~fAvxEvhBdXrJpgAl`@zEdB|n@dU~p@~WjGlCrDxAgE|HeB|DcHzOuGfMqT`b@gQdf@qK`]kDrLuBlH]fAkFfSoAvE_@fBkKvf@qEnViBzJYvAeGfYuJ`b@uDfU|A?hYA~\\?jn@EjC?xV?ru@A~v@Anp@ApBE|AElQ@jU?rKFvb@FzD@jA@tWe@`Jc@rJ_CfKiDjGaDfFwDfFaFzIiMtN_UfCgDl]sg@j]ke@|KiPti@gw@z@oAzKmP~I}MlEkH^o@vLiP|Yq`@~SmZlBmCx@cAh\\qd@hDqFtF_IdQkVh`AktAx^sg@bV{^dOmTnE}CpTi[V_@f@eErTpLbSlIrCdAdDjBdCrAtG~CtdAhg@vIrErRrI~D|Af^dNtUzI`^rMdE~AvGlCr[jLdEtAzCx@tAZxy@zSvDbAt`@rJvOlDpDp@|R`FvCv@fM~CxNzDzMrClCl@`QxHhn@`O`VxFlV`Gnc@nKnIlDpDbDnEnGxErMzB`HfJrYNd@`DvJdD~LpErL`TnUjQnPbB`BnJdIhl@pk@bHfG|JmIhGgFvVkRlIqGtDsC`CaBxEcDt[mTfIaEhIeFn@lClAtBDH|A|AlQxMVPjEdD~LdJz@n@dHk@lDq@|@UbGaDpIwG~BgCjGwGX]xJiKhHwHfQ_OpGoFpByAhCmBlfAmr@`J{FzLqHxD_CrDuB~MmIn@e@xCeBxu@ac@pg@cZ~d@eYjAo@tLsGzBvBbNrLhBfBfNzMdLrKtWpUnSnR`cAj~@pXbXlj@rg@bA~@h@x@b@b@nKjLpAfA~QfQjDrDbGpGnPfOlB~C|CvGx@~BlCpJR~D?lB?dHg@rEiD~V_Hd_@{C|TsDxT_@`CkAtGiE`VqB`Lo@pDq@pDk@zCy@dE_`@uF_a@iFuZcCsY{AeNYcCDeLP}JNgQV{BLoGXLzCJbCpGe@rBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFnJ~At`@zGlWhE|\\|FnOzBlV~CxFb@bXrBjDJL?~BD`TPvED|WEvDGbDK~EOjEWtCSfSwApAI~XmDfRuChh@{IdEs@fDk@`BYpf@uIrCc@vEo@j]yG`Da@vHaBxD{@lZwFtGmAbDg@hTyDf^yG`MsB|OuCpDs@`IgAjDs@rB]pB_@vB_@fCe@pQoD`SuDfNyCtCa@jpAkVhIgA`De@`@EpQoCdOcCjEBvDX~@R`BfAx@bAzAvCp@jAzBb\\R`Cf@pGfAnQv@tJNx@p@pAd@zHXvFzA|T|@zQL~B`@pFbA~QpCpg@LzAxEfr@dAtQ\\pDJjEPnDbI~z@^|Dn@~F~AlOl@~GbAnK\\pDHr@pAvMhB`Qr@dFJl@lC`RxFh^`@~BfHtU|Lr[bIzQzJxUfA`ChHrOfEzIbDhHzB|E_DjB~CkBxCiBdGoDjFgDzBwA|KmGz@k@pBaBdIyEjL}GxE}DvEeFzBqC|McHx@a@h[oPjImF|PwMnFuEvBgB`NgM~TkVlW}W|BuCd@i@tMoM`NiO|VaYxAkBjCyCfHsJ|IaOhHgQpBwEpFoPt@gCd@wC?gDE_De@qIsBiLy@kF}F__@cBoKmAmL[sOHau@YoLMiFw@iNsC}fAs@gWYwOmAe^}@aIkBoISaAmHsXwCeHy@qAcCkEaA{BkBeEi\\ua@eGuIsD{D_BPE?aAd@{A~AcB`JwFbPiHnMcK|NiHhJoEfDoBfA_GxAmg@`CiRpAet@vDiCPaPv@uNr@",
+          "back": "ov|kScwcwhFM@sAHm~@`GyEZsB\\_Ev@gHzB_MbD{FxAcE~@_H`A{AT_BRiEh@gAPyR~CgR`DeNzB_Ev@gEz@eCd@qpAnUkC`@s@NeOhC_IzAeFt@yM|BaHtA}NrCqIvAqEt@aqAfUkDj@eg@lIiGfAsDz@s_@xGoGdAmCh@se@fIiB\\gDl@mDj@kn@pKgAqDeAwDo_@ww@y@sAqA{@gLmDtNwd@eD_Ae@rAmNva@wSlk@}@`G@|DZtC`BbRqAFoAFmKPgMNyEFgR[oESm@CkMm@{BOaFY_DSiBO{M_BcMaBaPsBuQuCyY_FuVoD}HyAiDo@g@Ka@Ise@oJ_Ce@yDw@`BcJpBaLhEaVjAuG^aCrDyTzC}T~Ge_@hD_Wf@sE?eH?mBS_EmCqJy@_C}CwGmB_DoPgOcGqGkDsD_RgQqAgAoKkLc@c@i@y@cA_Amj@sg@qXcXacAk~@oSoRuWqUeLsKqQcQcNsL{BwBuEiEoJsIk\\kZ}JqJgBgBuKsKsOqOaA_AkCvCoP`RyG`GuHvIsYrZ}ClDcArAaNlPeXv\\gDrCw[pXwdAt`AoUtUiFxDaQlMaLzHyFbEsBtAs]nWeDxBoDtCkDvByAsHqB}Hc@aBeEyGwEsFiZqGaf@_IsOkE_XkFkBg@aj@sNqXaHsSmFqQuE{LaCyC}@i_@qI}MyCgj@kMiVsFkFoAsBg@cV_GiIsB_B_@mR}DmCm@{MsCyN{DgM_DwCw@}RaFqDq@wOmDu`@sJwDcAyy@{SuA[{Cy@eEuAs[kLwGmCeE_Ba^sMuU{Ig^eN_E}AsRsIwIsEkmAil@eCsAeDkB_QiKcDoBqSsMe@|@o@hAqCzBoBdCgJtNoEvGgC|FeOlTcVz^y^rg@i`AjtAeQjVuF~HiDpFi\\pd@y@bAmBlC_TlZ}Yp`@wLhP_@n@mEjH_J|M{KlP{@nAui@fw@}KhPk]je@m]rg@gCfDuN~T{IhMgF`FgFvDkG`DgKhDsJ~BaJb@uWd@kAA{DAwb@GsKGkU?mQA}ADqBDop@@_w@@su@@yV?kC?kn@D_]?iY@}A?V{A|CkRtJab@dGgYXwAhB{JpEoVjKwf@^gBnAwEjFgS\\gAtBmHjDsLpKa]fQef@pTab@tGgMbH{OdB}DfE}HsDyAkGmC_q@_Xyu@kXCAmgAk`@eXsJwxEwhB_yC_gA{{@m]}EuB}HcDyCkAwf@oSqFkC{McHi[iPiaAik@urByqAsgCm~A{]wSq[kMac@wM}@SeYoH{@SyeAoV"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0de9-72fd-9bf9-67f89c5a540f",
+        "routeNumber": "R2",
+        "routeName": "Villa Plaza to City Proper via Calumpang",
+        "routeColor": "#00bcf2",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "}mikSy_ythFxNoAdQ{AzGy@vsAeO|Ly@vWoAjUgAvK[vAGbUaAv^wArr@eDdJc@~LU|Jc@hBIvn@}DjS{@b]_BpR}@?uH[{Qi@kY{@_m@Hs`@yAkw@[iWUuS}@gl@uBkyAe@c^[y^y@q]W{Q]a\\EsCy@st@g@}b@IqUg@_u@}@om@cBcX_Cc_@wBc\\yKcdBAuAoBy`@i@eLoBs^oAiYyAcScAeNmAySqEuw@wEuy@}Dox@Ks@mG{w@sA}H}CwQuE_PqTwu@uOwc@uF}LuZos@mCqFoFaLmRo_@sRkZcUa[{DcFyRaWia@af@{RoU_W{Xi^kb@eAwAcKgLkMcOcSoVyVeY}JgLuPiRuK{J}R_OuC_Cu_@cTwQwGkiAuXoL_DyVeGmB[gEy@qI?cThAUyAc@qC}F__@cBoKmAmL[sOHau@YoLMiFw@iNsC}fAs@gWYwOmAe^}@aIkBoISaAmHsXwCeHy@qAcCkEaA{BkBeEi\\ua@eGuIsD{Du@_EQgBPqCpEuVnCaRBOtFoa@r@oGvAiNnAwL\\}Cf@iEv@uEz@{D^yE~@oFfc@i|CV_Cv@sF`BmKhJgj@`Ee[PwBtDmYJgApCiSTmB~Gqh@zDgPn@uETkFFuCe@gOIwDQeJsAc\\MgGQkEmAu]{@{UiAw\\GoB_Ckw@QiC_@cCm@mCXWT]pOVpU@~OK|Ck~A{{@eAkAg@lC_{@@g@l@aHhAcNxB}WX}CnAgMzCkYbDk[B[RuBgE{F_CkB{AxAeGxF_RhQwArAyGtHqOfP_LvO{@|A~A|A",
+          "back": "ouskSapfxhFt|@t{@Af@mC~z@R~k@\\`S\\zRUnGYY_@Sc@Ic@Ac@HUHQJ_@b@sHdC_b@CaJ@q]DmGG{jAMkqAKuAAyD?uDdBiAjCSt@MvACjCNv@vG`[dFbVxAjGj@vCbOzs@fIha@vY~tAdBdIr@lEhFhVx@xEPv@zQn{@fVzjAjEvSnAhGhMpm@nKvg@nDvP`I|_@nHt\\Rz@vB~IC~HyDh[OvAyGlg@_DjRgDrVc@tDKnBK`B_@xFcB`JwFbPiHnMcK|NiHhJk@lACx@Fr@\\f@b@`@p@^j@T~@PrDKxPi@d_@iCdFc@|VwB|D@dDp@jDpB^vAlGzUR`AjBnI|@`IlAd^XvOr@fWrC|fAv@hNLhFXnLI`u@ZrOlAlLbBnK|F~^RtAd@tCbTiApI?fEx@lBZxVdGnL~CjiAtXvQvGt_@bTtC~B|R~NtKzJtPhR|JfLxVdYbSnVjMbObKfLdAvAh^jb@~VzXzRnUha@`f@xR`WzDbFbU`[rRjZlRn_@nF`LlCpFtZns@tF|LtOvc@pTvu@tE~O|CvQrA|HlGzw@Jr@|Dnx@vEty@pEtw@lAxSbAdNxAbSnAhYnBr^h@dLnBx`@@tAxKbdBvBb\\~Bb_@bBbX|@nm@f@~t@HpUf@|b@x@rt@DrC\\`\\VzQx@p]Zx^d@b^tBjyA|@fl@TtSZhWxAjw@Ir`@z@~l@h@jYZzQ?tHqR|@c]~AkSz@wn@|DiBH}Jb@_MTeJb@sr@dDw^vAcU`AwAFwKZkUfAwWnA}Lx@wsAdO{Gx@eQzAiNjA"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e70-754b-9ee3-e88da34b9860",
+        "routeNumber": "R8",
+        "routeName": "Parola to SM City via Infante",
+        "routeColor": "#ff8c00",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "kqskSejzxhFt@g@jCs@lA_@zGk@rA@|ItA`Cd@pNtB`b@dHgGvMuCjGsKbVyGvO}ApC}H~OgGjJoLvPa{@fwAaAhEw@n@eH|GePlMqMfIcPtLeEhD_IhFc^tVsArAb]ba@rDlE|\\ha@~IzJfFtGj]~_@zEtF~ErFjHbIxDdEjSpU`PtQtB~BlCvCJJjExEnFlGxFnGpCzCnAxAdEnE|BjB~AvBfBbCStBCZcDj[{CjYoAfMY|CyB|WiAbNm@`HAf@mC~z@R~k@z@|f@KhCIdCYY_@Sc@Ic@Ac@HUHQJ_@b@sHdC_b@CaJ@q]D_BAmDEFlB~CbfAdEddAr@pQVfGpAlf@xCzz@|Apb@~Crz@x}@DQvBaEd[iJfj@aBlKw@rFW~Bgc@h|C_AnF{@~@wAt@wBf@sEbARz@vB~IC~HyDh[OvAyGlg@_DjRgDrVc@tDKnBk@zIcB`JwFbPiHnMcK|NiHhJoEfDoBfA_GxAwCNub@pBiRpAet@vDiCPaPv@qj@nCsAHm~@`GyEZsB\\_Ev@gHzB_MbD{FxAcE~@_H`A{AT_BRiEh@gAPyR~CgR`DeNzB_Ev@gEz@eCd@qpAnUkC`@s@NeOhC_IzAeFt@yM|BaHtA}NrCqIvAqEt@aqAfUkDj@eg@lIiGfAsDz@s_@xGoGdAmCh@se@fIiB\\gDl@mDj@kn@pKeKpBwDl@oSvBuZxBsBPsAHyERoCHaC?sMJyKFiKQgLUgCG[AuL_@oTeBoM_BmMuBeOsBkIkAau@{MsPiC}u@mM_`@uF_a@iFuZcCsY{AeNYcCDeLP}JNgQV{BLoGXX~GtDY",
+          "back": "qdcmSkx_whFPArBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFdl@zJlWhE|\\|FnOzBlV~CxFb@\\jEPlBe@tIoAfJoAzBkIjPaCbGgAfEkDjVHrBX`DX~BdA~B~HbS~AxEzJnW|FnMxG|KpIfL`ApAdFrG`IvI|ElD~BrArCjA~DbAbEn@hERhC@dCUtFyBlM{GdEcCbH_Eh[_Q|ZyP`B~AlBx@xBVzBIrBk@bBiAbAuAl@eBRkBCmB_@iBpFwAx@SpJoCnBu@xE}BtB_ArJ{Dla@{QhD{ArCwArFkC|tAep@xDiBcA{BgNuZ_BoDo@sAyb@{}@gAaCyA_DxD{@lZwFtGmAbDg@bF}@dM{Bf^yG`MsB|OuCpDs@`IgAjDs@rB]pB_@vB_@fCe@pQoD`SuDfNyCtCa@jpAkVhIgA`De@`@EpQoCdOcCvQkCjAOhHiApA_@xJoCtAa@\\OjBk@xDmAnEcB|EiBpA_@xC{@nEs@xCWhDYrTeB~i@sCh@Ezj@eDbQeAjBKpf@kCnLq@~UqAvMu@`UmAdV{ClVu@d_@iCdFc@|VwBfBwBn@mC`@wCaA{BkBeEi\\ua@eGuIsD{Du@_EQgBPqCpEuVTyAxBgOBOtFoa@r@oGvAiNnAwL\\}Cf@iEv@uEz@{D^yE~@oFfc@i|CV_Cv@sF`BmKhJgj@`Ee[PwBtDmYJgApCiSTmB~Gqh@zDgPn@uETkFFuCe@gOIwDQeJsAc\\MgGQkEmAu]{@{UiAw\\GoB_Ckw@QiC_@cCm@mCXWT]pOVpU@~OK|Ck~A{{@eAkAg@tAic@v@uV@g@l@aHhAcNxB}WX}CnAgMzCkYbDk[B[RuBgE{F}BkBeEoEoAyAqC{CyFoGoFmGkEyEKKmCwCuB_CaPuQkSqUyDeEkHcI_FsF{EuFk]_`@gFuG_J{J}\\ia@sDmEc]ca@rAsAb^uV~HiFdEiDbPuLpMgItHcGnFiEdH}Gv@o@`AiE`{@gwAnLwPfGkJ|H_P|AqCxGwOrKcV|KcVab@eHqNuBaCe@}IuA"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e0e-7026-ab13-26e9738e4d20",
+        "routeNumber": "R22",
+        "routeName": "Ungka to La Paz via CPU- ISATU",
+        "routeColor": "#00b294",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "sgjoSe`dvhFlMW|Dy@b}@cAhOSrMCfM@zNDlMCbO]hLk@|PwAtNiB`N}AlLmA|NyA`NqA~L}@xMeApNiAtNuAzTkB`NaA~Ny@xNu@xLe@zFNdOs@bBQ|XeBhUqApE[nl@cDrFa@~Ks@hKs@rLYxEDtGFnTj@jOhAdOlAhQvB|FfA~Bb@rGpAtFAjBw@pDoBvAiGpC}IjCkIhHwKhFaGzAoA|\\cVfCkB|ZwVjL}KhO}Oh[q\\|NkPr\\c^xEuFlMgOrQuR`TsUdBuBtVwYhS{TnWa\\\\[`@e@pKcMvCsDfFsG|PeRdEuEbh@{l@|BmClC_DlDeEbAmApHyIhEeFdEwE|C{DdB{BdZa_@bLmOr@_AdAwA~MuQ`DaEnLgNlLcObBqBtRsUzZe^~IaLxC{DpTmYrHsIp@y@nFoHt@{@|GkId\\_a@h@q@lVqXtL_Nxr@ox@r_@sb@~UoV~Zs[|@aApWkVv@s@dHoG|JmIhGgFvVkRlIqGtDsC`CaBxEcDt[mT~FuCfAk@jIeFl@lCrA~B|A|AlQxMVPjEdD~LdJz@n@dHk@lDq@|@U\\SdFmCpIwG~BgCjGwGX]xJiKhHwHfQ_OpGoF{FmFuHaHaJuHwKeJ{E_EtCwCxP}PvdAu`Av[qXfDsCdXw\\`NmPbAsA|CmDrYsZtHwIxGaGzTyVnSwRdY_[j`@oa@jDgEdPgQz]{^j@k@xSsThGqGr@q@|BsBjBcBdA{@dGaF|}@cr@`QgN~GiGjQeLxHeFtTiRdLkHtMeJtWmQnIcGrS}NhD}BvK{If_@{XpDsCrJuHrKwH~EaDrScOhC}A\\SrXePpCcBjM{HpImEx[mRmFwHm]qf@kT{[iKiNw\\tUwJxG",
+          "back": "auxlSmwdxhF{J`HwVvP}IlFqVnOtMrO~MhP`KzLxZf^`EbE]RiBfA_@TsSbO_F`DsKvHsJtHqDrCg_@zXwKzIiD|BsS|NoIbGuWlQuMdJeLjHuThRyHdFkQdL_HhGaQfN}}@br@eG`FeAz@kBbB}BrBs@p@iGpGySrTk@j@{]z^ePfQkDfEk`@na@eY~ZoSvR{TxVyG`GuHvIsYrZ}ClDcArAaNlPeXv\\gDrCw[pXwdAt`AoUtUiFxDaQlMaLzHyFbEsBtAs]nWeDxBoDtCmDvBwAsHuC_LeEyGwEsFiZqGaf@_Iaa@fXkOjKoNvJqJbIsEvDmQlRbB`BnJdIdOzNb\\t[bHfG}IbIqWjV}@`A_[r[_VnVs_@rb@yr@nx@uL~MmVpXi@p@e\\~`@}GjIu@z@oFnHq@x@sHrIqTlYyCzD_J`L{Zd^uRrUcBpBmLbOoLfNaD`E_NtQeAvAs@~@cLlOeZ`_@eBzB}CzDeEvEiEdFqHxIcAlAmDdEmC~C}BlCch@zl@eEtE}PdRgFrGwCrDqKbMa@d@]ZoW`\\iSzTuVvYeBtBaTrUsQtRmMfOyEtFs\\b^}NjPi[p\\iO|OkL|K}ZvVgCjB}\\bV{AnAiF`GiHvK}GhTyDnA{B`@mDf@iAQ_GaAcKqAaI{@sHm@eOsAuO_AwTm@eGOeG@{Lj@aY|AyE`@cYdBo]xBwPx@oQbAiGXeGXeIl@eGg@iJ\\qLh@iQt@ePnAkHp@_Gv@oEb@yO`B{\\tC}K~@wNtA}CVyHt@mALaJv@uQxB{APcCZmC\\_Ed@oAHqJv@gLX}PEyN@gEAyC?eE@sB?}C?gSBgC@mB@eIRsHN}GFoIH_Wh@cB`@eB`@kGJ"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e30-7144-b868-3ca78f2a221a",
+        "routeNumber": "R25",
+        "routeName": "Molo to City Proper via Gen. Luna",
+        "routeColor": "#e81123",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "om{kSqqrvhFoGgNgQq_@cBwDqBsEmEoKuCmGgHqNm@mAkQa^qAmC}]ks@aNwVeAiBaAcC}DoJgAcE{BeJsAyJuBa[gDkd@M{AuBiWWeEeAiPkA{QmB}SGo@aBuCsU_qDj@aFw@}PK_C}@mOc@oMuAu]Cy@QaHyA_a@m@uMeB__@M_CcDes@g@kXQaEW{BI_@eCoG_@yFyIuz@qGus@_Fwn@{@kKfAcGcAsUqBoYyE}n@e@oGEa@i@{G_BaTWcD]kEI_AuEwm@q@cJ_@sE}@sLKsAEi@sFyu@ISU}CGw@u@yJ_BqIs@}GEiA]}IUsL\\gB`@eBjAeDpA}Cl@k@`Bg@dBWtAKlCYzb@S~FCxV@jE@jl@VtKPzHx@xw@H~@?`A?hB?rC@vCAvEAtd@NlX?jA?hC{@`EsCjD{BpAcAd@_@xn@_e@pByA`f@u]zCyBpA{@tDoBrf@oVpCqAjAq@v@a@nBaBT[p@}@l@{AxJmUbBgDfCyEJoCn@{AhDgHjBsDrGwLdFeIdC_Eh@{@Zm@z@}A~KwOpOgPxGuHvAsA~QiQdGyF|AyA|BjBfEzFStBAN",
+          "back": "ebqkS_shxhFStBCZcDj[{CjYoAfMY|CyB|WiAbNm@`HAf@mC~z@R~k@z@|f@UnGYY_@Sc@Ic@Ac@HUHQJ_@b@sHdC_b@CaJ@q]DmGG{jAMkqAKuAAyD?oB~@eAd@iAjCSt@MvACjCNv@vG`[dFbVxAjGj@vCbOzs@fIha@|\\d_Br@lEhFhVx@xEPv@zQn{@fVzjAjEvSnAhGhMpm@nKvg@nDvP`I|_@nHt\\Rz@vB~IC~HuAbLcBdNOvAyGlg@_DjRgDrVc@tDKnBk@zIcB`JiE|Lm@dBiHnMcK|NiHhJk@lACx@Fr@\\f@b@`@p@^j@T~@PbCIhRk@d_@iCdFc@nSeBlBQ|D@dDp@jDpBlHrXR`AjBnI|@`IlAd^XvOr@fWrC|fAv@hNLhFXnLI`u@ZrO@JjA`LbBnK|F~^x@jFrBhLd@pID~C?fDe@vCu@fCqFnPqBvEiHfQ}I`OgHrJkCxCyAjB_FrF}OlQaNhOuMnMe@h@}BtCmW|W_UjVaNfMwBfBoFtEWRePbMkIlFi[nPy@`@}MbHkQc[}JyTc@_AgK}TaDaHkFgL"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e85-7039-918d-b7f36b911ef9",
+        "routeNumber": "R52",
+        "routeName": "Leganes to Infante",
+        "routeColor": "#00b294",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "mkiqSadfyhF~@h@`Af@hOdI`ExBv@b@fB~@rCzAvL~HtG`Ela@hTzEfCvNvHbExBnCnAtIbE|SzKzNvHd_@`S~Az@dE|B~i@xYfEvBdKlFxSxKtLxFxCzAxDnBrUrLdWjLlHdDlLlFrQzDtOdDhOnBfUn@rSHfp@eC``@yA|Tq@jEMpK]`J?b[@~A?~f@FlEB|IF|GDdFBjVnAxW|C|H`AlOjB~PfCdR|D|E`BfIlChG~BbGdB`MtFnAn@`ClAXLpAn@lRjKpL|FrGjDnM~GhB`Afj@rYvOhItAn@|E~B|C`BbXrN`Bx@xx@la@nVjMjOpHfa@~SvAt@dL|FtAr@dHtDdXxMb^dSxf@zY`CvA`OxIfLzGpBjAz@l@nNnIrFdDzGrDlBdAtJtFvJvFdBbAlDbCvJbFdCxAdTfMpAp@fEdCvAx@zGzDhDzBvBnA`Bz@xJbF`Af@hHdEdMlHbWbOVPzFhD`LpGVNlAt@z@h@|ChB|@h@tAt@`UrMzCfBle@pXxCfB\\TxBnA~EhCjAl@xLjHtAt@bZjPtPhJ`HrDzLhHl\\dRLHfAn@zOxIdGpD|BtA|DbC~X`Qj@^t@b@tKtGjI`FFDlAt@lUvNpPtK|L~HzWlP~NzI~JlG~RrLfBjAbC~AvOpJ`JfGpLnHzZnRnDtB|]|SpAp@`g@tYxF|CfDdBt@h@`i@hZrAv@zBnAlAn@p@\\jMnHbAp@nBdAtC~AfAr@lC~AxErCrAv@tEdCxUlMrKbG`B|@rMlHlGjDrEhCvo@d^dFpCrXjOhK`G~ErCnb@jV~`Apj@fDjBdh@lYnDtBz^`TnRzKtGxDzKnGzBvAlAv@~AfAt^lSnPxJzXnPjBfA`DlBnIbFvQvK`L~Hl@\\zVrOzA~@rTpLxCnAhN|FrCdAlAr@vAv@dCrAhD`B`_@pQzX|MbNvGvIrEpB|@`OtGRHjDrA`XdKdE~AtAh@~RnH`^tMdE~AvGlCbOpFnKxDdEtAzCx@tAZbJ|Btn@|OvDbAnWlGdHdBvOlDpDp@|R`FvCv@fM~C`FrAvGfBzMrClCl@hChAvLnFnb@`KxJ~BjCn@bH`BnDz@`Cj@zA^pS`Fnc@lK|DbBpCjApDbDtCbEx@jAlCpHjA`DzB`HfJrYNd@`DvJp@dCrBxHpErLp@r@~KzLnE~EjQnPbB`BnJdIhl@pk@bHfG|JmIhGgFjImGjL}IlIqGrDsCbCaBxEcDt[mTfIaEjIeF^`BLj@rA~B|A|A`FtDjJbHVPjEdD~LdJz@n@`BhAnChBvGdEjEfAdDdCdJ`HfUpR`E~Cf@^dBvAjAv@RNz\\vUJHz]lVdAqAeApAhUhOhCdBrSpMpOhKpYvRxHdFbDvBpQxKpDnC~i@bb@`GlH|@vBtApD`BnFl@lB`A`D~Bw@zFkBpA_@|CgAxFaBvP}Ef@QZIzKqCdNkCnGmAzKoAvEi@hAMfLqAbLu@|DYrAKrBM~GSvN?jC?vC?pJEhNIZApBLzSnA??n@DdNx@pBLtJ|@vOdCtHlAhG`A~ZpElNdCpYhFnOhCt[pFlWhEfCb@tXxEdEl@hIlAhDb@jM`BvBXxFb@fJr@zL~@jDJL?~BDvMJhEDvEB??|WChBClACbDKhCItAEjEW~AKt@GrHi@lHg@d@EpAIrFs@jQyBfBY~N{Btf@mIr@MdEs@fDk@`BYlDm@d^mG|AYrCc@vEo@~Be@jYsF`Da@vHaBREdDu@lZwFtGmAbDg@^GzGmAlJcBlB_@|MeCzKsBtGgAjDk@|OuCpDs@hDe@vCa@jDs@rB]pB_@vB_@fCe@pQoD`OqC~Bc@fNyC`@GrBYfe@_Jbj@kK??bEi@dC]vAShAQ`@EpQoCdOcCpCa@dMiBjAOhHiApA_@tF}AbCq@tAa@\\OjBk@xDmAnEcB|EiBpA_@xC{@`@GlDk@xCWNAxCWn@GpDYpMcAvWuApAGhJe@jCOh@EtBM`DSbb@cCbQeAjBKz`@wBtDSnLs@~UoAvMu@`UmA`PqBbEi@|Us@NAzAKpDWpAK`Ga@bLw@dFc@|VwB??",
+          "back": "{sskScxdwhFPSn@mC`@wCaA{Bw@gBs@}AsGeI_GoH{CwDyFgHeGuIk@m@gCmCeBPSJm@X{A~AcB`JsAvDcDjJmGdL[h@cK|NiHhJgE`DGDoBfA??qBf@mCp@s[zAyJd@uQnAS@qb@zBuPz@gCPaPv@qb@tB_GXsAHcBJox@hFyAJq@DcBLcAFsB\\c@H{Cl@gHzBu@RiKnCIBqFtAmBb@uAZ_H`A}AT}ARiEh@gAP}N~B{B^gR`DeNzB_Ev@gEz@eCd@gBZkh@lJ}c@dIcBVg@Hs@NeOhC_IzAgBV}B\\yM|BaHtA}NrCqDl@_Dh@qEt@_[pFau@tMkDj@qUzDsPpCiGfAsDz@s_@xGoGdAaCd@KB}Dp@u_@tGiB\\gDl@mDj@kn@pK??iB^{GpA{AV{ATiFh@wI~@mALuF`@oKt@oF`@sBPsAHeBHsBHoCHaC?}DBuGFA?_IDwA@_EGiEIcBEcIOgCG[A_EMsDMaAC{CWiHk@iFa@qC]}HaA}Ew@oF}@yB[kKwAkIkAau@{M_AOyJ{AyB]}u@mMx@eEj@{C^wB`AkFpBaLhEaVjAuG^aCrDyT`ByLx@cG~Ge_@hAmIn@yEL}@`@yCVyBNyA?y@?_D?kA?sA?YS_EiBuGc@{AQg@g@wA}CwG??mB_DgGsFyDmDmBeBcGqGkDsDyCsCeMsLqAgAsB{B{GoHc@c@i@y@cA_Aoj@sg@oXcXacAk~@{EqEsL_LuWoUeLsKqQeQcNqL{BwBcA_AqCiCoJsIk\\kZ}JqJgBgBuKsKsOqOaA_A{HvI_K`LyG`GuHvIsYrZ}ClDcArAaNlPeXv\\gDrCw[pXeS~Qqp@tm@sTxT[ZiFxDsEhDqF~D{BbBaLzHyFbE??sBtAs\\vV_@VeDxBoDtCmDvBwAsHqB}Hc@aBuDaGOWwAcBkAuAm@s@EEcAUkCi@wBe@cJoB}D{@af@_I{LiDwAa@uAYiUqEkBg@se@_MmCs@oTsFaCm@oKoCqD_AqA]qQuEgDq@sGoAyC}@cW{FeGuA}MyCoTcFiRmEmAYoCm@wBg@oImBqCo@u@QuD}@sBg@cV_GiIsB_B_@mR}D??mCm@{MsCwGgBaFsAgM_DwCw@}RaFqDq@wOmDeHeBoWmGwDcAun@}OcJ}BuA[{Cy@eEuAoKyDcOqFwGmCeE_Ba^uMaRaHsBw@eE_BaXeKkDsASIiMwFiD{AwIsEcNwG{X}Mkd@sTeCsAeDkB_QiKcDoB{O_KuBsA}K{FmIsEyA{@sAu@cNgFwBoA_NgIoIcFaDmBkBgA{XoPoPyJu^mS_BgAmAw@{BwA{KoGuGyDoR{K{^aToDuBeh@kYwBmAo@_@_aAqj@ob@kV_FsCiKaGsXkOeFqCwo@e^sEiCmGkDsMmHaB}@gJgFk@[yUmMuEeC_B_AmEkCmC_BgAs@eGeDcAq@kMoHk@[sAq@_B}@oBiAch@uY]Su@i@oCwAWMyF}CUMkf@gYqAq@}]}SoDuB{ZoRqLoHaJgGwOqJcC_BgBkA_SsL_KmG_O{I{WmP}L_IqPuKmUwNmAu@GEkIaFuKuGu@c@k@_@_YaQ}DcC}BuAeGqD{OyIgAo@MIm\\eR{LiHaHsDuPiJcZkPuAu@yLkHkAm@_FiCyBoA]UyCgBme@qX{CgBaUsMuAu@}@i@}CiB{@i@mAu@WOaLqG{FiDWQcWcOeMmHiHeEaAg@yJcFaB{@wBoAiD{B{G{DwAy@gEeCqAq@eTgMeCyAcFiCsCyAmDcCeBcAwJwFuJuFiKyFsFeDoNoI{@m@qBkAgL{GaOyIaCwAyf@{Yc^eSeXyMeHuDuAs@eL}FwAu@ga@_TkOqHoVkMiw@o`@qCwAcXsN}CaB}E_CuAo@wOiIgj@sYiBaAoM_HsGkD??qL}FmRkKqAo@YMaCmAoAo@aMuFcGeBwAi@qDuAgImC}EaBeR}D_QgCmOkB}HaAyW}CuDSuP{@eFC}GE}IGmEC_g@G_B?c[AaJ?qHT_BFkEL}Tp@{Mf@eQp@gp@dCsPG_BAgGQcGQ{DKmDe@cGw@wAQgH{AmFiA_Dq@sLiC_LeF{HmDeScJ_CgA{OeIwDmBsIkEgD_B{CwAqBaAySyKaG}CcCoAgEwBsEcC}^}RmCwAeHyDoGiDuVwMcDeBwIqE}S{KmEuBgCmAoCoAcEyBkLiGkAm@{EgCeQgJgOaIuGaEwL_IsC{AgB_Aw@c@aEyBiOeIaAg@cAk@"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0ced-74ce-892e-b079f876832d",
+        "routeNumber": "R55",
+        "routeName": "Leganez to La Paz",
+        "routeColor": "#ff8c00",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "afmqSk|hyhFkFfJz[rP|d@vVlHzDh@ZpAj@jCjAbAb@zFdCtU~JvD|AnCfBpC~A`Af@hOdI`ExBv@b@fB~@rCzAvL~HtG`ElPvI~OpIzEfCjAl@jLhGx@b@hCtAnCnAtI`E|S|KzNvHhCtAzZjPdHxD~i@xYfEvBdKlFnNpHhDfBfClAjHjDtIjEjCrAfQ~ItFfCnObHzHlD~KdFrLhC~Cp@lFhAfHzAvAPbGv@lDd@zDJbGPfGP~A@rPFfp@eCdQq@zMg@|Tq@jEM~AGpHU`J?b[@~A?v[DfJ@lEB|IF|GDdFBtPz@tDRxW|C|H`AlOjB~PfCdR|D|E`BfIlCpDtAvAh@bGdB`MtFnAn@`ClAXLpAn@lRjKnG`D`D|ArGhDJFbMvGhB`Afj@rYvOhItAn@|E~B|C`BbXrNpCtAhw@p`@nVjMjOpHfa@~SvAt@dL|FtAr@dHtDdXxMb^dSxf@zY`CvA`OxIfLzGpBjAz@l@nNnIrFdDhKxFtJtFvJvFdBbAlDbCrCxAbFhCdCxAdTfMpAp@fEdCvAx@zGzDhDzBvBnA`Bz@xJbF`Af@hHdEdMlHbWbOVPzFhD`LpGVNlAt@z@h@|ChB|@h@tAt@`UrMzCfBle@pXxCfB\\TxBnA~EhCjAl@xLjHtAt@bZjPtPhJ`HrDzLhHl\\dRLHfAn@zOxIdGpD|BtA|DbC~X`Qj@^t@b@tKtGjI`FFDlAt@lUvNpPtK|L~HzWlP~NzI~JlG~RrLfBjAbC~AvOpJ`JfGpLnHzZnRlDtB~]|SpAp@`g@tYxF|CfDdBt@h@`i@hZrAv@zBnAlAn@p@\\jMnHbAp@dGbDfAt@lC~AlHjEtEdCxUlMrKbG`B|@rMlHlGjDrEhCvo@d^dFpCrXjOhK`G~ErCnb@jV~`Apj@fDlBlAp@ve@xWnDtBz^`TnRzKtGxDzKnGzBvAlAv@~AfAt^lSnPxJzXnPjBfA`DlBnIbFvQvK`L~Hl@\\rAx@bWxO|Ax@rQvJdSlIrCdAdDjBdCrA|KnFlWbMzX|MbNvGvIrE~DfBrLjFRHjDrA`XdKdE~AtUxI`^tMdE~AvGlCbOpFnKxDdEtAzCx@tAZbJ|Btn@|OvDbAnWlGdHdBvOlDpDp@|R`FvCv@fM~C`FrAvGfBzMrClCl@??`QxHpBd@lS|EfInB`LlCvJ~BhJxBrFrAxNlDlLrCzOvDdEbAbFtBjBv@pDbDf@r@fDzElCpHjA`DzB`HfJrYNd@`DvJp@dCrBxHpErLp@r@~KzLnE~EjQnPbB`BnJdIhl@pk@bHfG|JmIhGgFjImGjL}IlIqGrDsCbCaBxEcDt[mTfIaEjIeFl@lCrA~B@@zAzAjEbD`KtHVPjEdD~LdJz@n@dHk@DAfDo@??|@UhDiBxAw@jEiDdCmB`BgB\\_@xDaEpAuAX]X[~ImJzGiHLMfQ_ObEkDlAcA{FmFuHcHaJsHwKeJ{E_EZ[rTyThYyWnNqM|ZiYv[qXfDsCp@{@rV{Z`NmPbAsAt@{@fBqBz@}@~BcCvSqTvDkE|BkCxGcGzTwVnSwRxBcCzQcSnBwBj`@oa@jDgEdPgQv[u\\bAeAj@k@xSsTzC_DlBqBr@q@??|BsBCBnBgBdA{@dGaFdCmBhF{DrSyO|DyCzWeS~PgN`HiGjQeLlAy@jFkDfOmMlD{C??dLmHtMcJtWmQnIcGrS}NhD}BvK{Ij[wUzBeBpDqCrJuHrKwH~EaDrScOb@WdBeAZStXeP|Q_LpImEx[mR??",
+          "back": "}bvlSeqbxhFCCk]qf@mAgBwP}Vg@u@kKiNaWjQsDhCsA~@cTvNmAr@oGxDcHjEmMbItMrOfLhNv@~@tG~HjBzBxZf^`EbE]ReBdAc@VsSbO_F`DsKvHsJtHqDpC{BdBk[vUwKzIiD|BsS|NoIbGuWlQuMbJeLlH??mDzCgOlMkFjDmAx@kQdLaHhG_QfN{WdS}DxCsSxOiFzDeClBeG`FeAz@kBbBCByBnB??s@p@mBpB{C~CySrTk@j@cAdAw[t\\ePfQkDfEk`@na@oBvBuUfWiEbEeMrL{TvVyGbG}BjCwDjEwSpT_CbC{@|@gBpBu@z@cArAaNlPsVzZq@z@gDrCw[pX}ZhYoNpMiYxWsTxT[ZiFxDsEhDqF~D{BbBaLzHyFbE??sBtAs\\vV_@VeDxBoDtCmDvBwAsHqB}Hc@aBuDaGOWwAcBkAuAm@s@EEcAUkCi@wBe@cJoB}D{@af@_I{LiDwAa@uAYiUqEkBg@se@_MmCs@oTsFaCm@oKoCqD_AqA]qQuEgDq@sGoAyC}@cW{FeGuA}MyCoTcFiRmEmAYoCm@wBg@oImBqCo@u@QuD}@sBg@cV_GiIsB_B_@kO_DaB]mCm@e@KuLgCwGgBaFsAgM_DwCw@}RaFqDq@wOmDeHeBoWmGwDcAun@}OcJ}BuA[{Cy@eEuAoKyDcOqFwGmCeE_Ba^uMuUyIeE_BaXeKkDsASIsRsIwIsEcNwG{X}Mkd@sTeCsAeDkB_QiKcDoBqSsMwAu@eIeEmIsEmDqBcNgFwQwKoIcFaDmBkBgA{XoPoPyJu^mS_BgAmAw@{BwA{KoGuGyDoR{K{^aToDuBif@eX{@g@kBcA{@g@_aAqj@ob@kV_FsCiKaGsXkOeFqCam@k\\uAw@sEkCmGkDsMmHaB}@sKcGmCyAkQsJuEeCmHkEmC_BgAu@eGcDcAq@kMoHk@[sAq@_B}@oBiAch@uY]Su@i@gDeBg@YqEcCiF{Cw_@yTqAq@_DkB}XqPoDuB{ZoRqLoHaJgGwOqJcC_BgBkA_SsL_KmG_O{I{WmP}L_IqPuKmUwNmAu@GEkIaFuKuGu@c@k@_@_YaQ}DcC}BuAeGqD{OyIgAo@MIm\\eR{LiHaHsDuPiJcZkPuAu@yLkHkAm@_FiCyBoA]UyCgBme@qX{CgBaUsMuAu@}@i@}CiB{@i@mAu@WOaLqG{FiDWQcWcOeMmHiHeEaAg@yJcFaB{@wBoAiD{B{G{DwAy@gEeCqAq@eTgMeCyAcFiCsCyAmDcCeBcAwJwFuJuFiKyFsFeDoNoI{@m@qBkAgL{GaOyIaCwAyf@{Yc^eSeXyMeHuDuAs@eL}FwAu@c]mQcCqAkOqHoVkMsv@c`@gDcBcXsN}CaB}E_CuAo@wOiIgj@sYiBaAoM_HECmGeD_GuCqDiBmRkKqAo@YMaCmAoAo@aMuFcGeBwAi@qDuAgImC}EaBeR}D_QgCmOkB}HaAyW}CuDSuP{@eFC}GE}IGmEC_g@G_B?c[AaJ?qHT_BFkEL}Tp@{Mf@eQp@gp@dCsPG_BAgGQcGQ{DKmDe@cGw@wAQgH{AmFiA_Dq@sLiC_LeF{HmDmQeIwDeB{R_KwAs@uIkEoFiCcEoBqAq@wFyCoImEkGaDyBkAgEwBiDiBma@oTgB_AeHyDeCsA_[mPqE_CiHwD}S{KgGwCmAk@oCoAcEyBkLiGkAm@{EgC_PqImPwIuGaEwL_IsC{AgB_Aw@c@aEyBiOeIaAg@qC_BoCgBwD}AuU_K{FeCcAc@}EwBi@[aNmHi_@eS{[sPjFgJ"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0d2f-7209-b819-db8513847609",
+        "routeNumber": "R1",
+        "routeName": "\"Bo. Obrero",
+        "routeColor": "#68217a",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "qczkSgy~xhFjEhDjP|LtQpMcArAoJdMcEpFqOpSkJ~IeFjCiE~A{Dt@{Jh@cCBuF@gGIyDFu@pBe@nA[x@wBzCm@x@cAq@bAp@sAv@YPkB`@oAXgBXmCb@UDcEp@eOv@yBLa@BQLw@l@a@ZQN????_@x@Yn@??SlBIv@?b@SjWAxBAl@QbAWvASTu@~@UXoA\\oCr@sFvAuOvEyC|@{G|BoC|@}Aj@uDrA}DnB??iKtHMJq@lA_@r@[h@i@zBOh@[jDGr@]dG[nAkAtEUz@}AxFy@zCiAlC_CvFuCjDs@`AgEbG}AxBo@bAqOxSyO`TuEjGaLjOwAnBsJbLi@`AqCbFS\\wCpHELuAzEIZsC|K{A|H[bBcAzFe@tCEPW|AwAzLWzBk@nLEn@QlJItHCdEGzOAzEAxAElLAbBUxr@Exg@CjKOj\\OlWGrb@????AdCGp[A`BW|DWbBMv@AHy@|CEJ_AhCw@rBwMdZ{ArD????{AhBQR_DrA_a@QyMSuLDue@UqBBeBAuKEgFTcBHsBJcLpAuGt@gEl@_Gx@kHvA{Dv@wGbCcJfDEBeDpBoBjA[VmDpC{BhBsDfFcHzIuAnBqBnCqBpCqAhBsIrLqK~NyK~NyRxWpAJpa@xCnEXlDJn@FbFj@|h@pK|IfBfV|ETDtB^lALjACjCExEk@x@I~C_@DAdZ{InCy@vLoDpA]vEmA|r@{ObMkCfQsDnAYjNyCfVgF|Co@dAlJb@lCfCfRRzA??????????????????Yl@Kp@?t@??????????????????Pr@Vb@DHPLHFLJLDNFRFP@RBL@^ETCn@W????????l@k@????`Bg@dBWtAKlC[zQG~OI~FCxV@jE@jl@VjABhIL~APzEf@rq@FdE@~@?`A?|F@vCAvEAtd@NfT?dC?jA?hC{@HGTO`D{BjD{BpAcAd@_@xn@_e@^YpA_A`f@u]zCyBpA{@tDoBrf@oVpCqAjAq@hBdAlLzGfAl@d\\tQ~w@lc@|AX`BAnFg@HzELxGJvGVnN??ElAO`EYY_@Sc@Ic@Ac@HUHQJ_@b@Ob@Eh@Bf@Nd@X^f@Xl@Jn@Cj@Sl@lC^bCPhCX`J",
+          "back": "sxqkSee_xhFxBlt@D|A__Az@we@d@wFBwRBeVPw[Jqe@RkHByTJuD@uB@kBE{FD_@?oQBmMJoIDyLNu[X_IAmFFwBD{aAvAeJHqDBef@r@eMNkA@a`ARwCAuDAISU}CGw@u@yJ_BqIs@}GEiA]}IUsL\\gB`@eBjAeDpA}Cl@k@\\w@F_AI}@]u@o@k@k@U]gCmCaOq@wDaAsJs@iDQy@wP_u@y@mDyAaBcHaV_AoDUgCDyCLaCzAsDvMeZ|BiGx@}Cf@eDV}D@aBFq[@eCFsb@NmWPk\\@kKDyg@\\kcANw_@HuHPmJp@_NnBwPbAeG~A_JzA}HrC}K~AwF|C_InEcIrJcLvAoB`LkOtEkGj`@{h@n@cA|AyBzFeItCkDhEeKvCuK|BaJ\\eGb@_Fx@eDlBkDvKaI|DoBrG_CjL{DnTuGrMiD~AoBh@{CVw]\\eDx@iB|BgB`TiAbEq@jGcAzD{@lBiAdDuEvB{FxDGfGHtFAbCCzJi@zDu@hE_BdFkCjJ_JtUc[rLyOuQqMkP}LkEiD{EsDe@a@eL_JwHeG{E}DsRyNuKwIqH_G{BkB_K}HuJuHeEgDuEcD{KwI_YyTuMiKu]sX"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0d7c-778d-add2-34b2676d9a3c",
+        "routeNumber": "R11",
+        "routeName": "Ticud La Paz to City Proper",
+        "routeColor": "#009e49",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "kmcmSefuxhFjK{Jn_@s[|CoBrKyDvFW~KGbKYfHuA`B}@f`@gZnGgBbDe@pF{@rx@tDTtIJjG`Btc@HrCtBjj@z@lQJ`LWbZY|La@jRq@nPqAvc@_A|ZuBpm@_AjMyBdHeEpHgL|NtEtE~Xha@lMlR~QzSbPbVnJhNtOhUlBrC`a@lm@tEfI|H~LdCjEu\\tUwVvP}IlFqVnOsD`CqBxAuJfGsWhQkTpNk@^eKtGkb@bXeDvBeFdCcw@``@eDdCmXtPuVpNicAne@gHfDgOjHkBjAuj@tZwEjCgSnKoLzFwLzGgUrRkQnUzThPvB|AxCvBd]rWZXdT~QnSxQp\\jWv[u\\bAeAj@k@xSsThGqGr@q@|BsBjBcBdA{@dGaF|}@cr@`QgN~GiGjQeLxHeFtTiRdLkHtMeJtWmQnIcGrS}NhD}BvK{If_@{XpDsCrJuHrKwH~EaDrScOhC}A\\SrXeP|Q_LpImEx[mRdDrEtFxHvErGnSnXfB`CzRrWbFzGvD`FdAnEp@r@pj@bt@|A`AjBjAaa@tg@kDlE_J`MKJ|BvBVZnAhBz_A{PlOgCzB^lDa@l@I`Fq@x@Qr`@cHrT}D~NkC~Cm@b@MxbAoVjBe@jMy@bo@iCxKc@zCKrFOr]yAnCMr@GbKo@`OaAhKo@rOk@fMIjIFnGfAh@^b@f@d@t@Jv@N|@N|BNxBt@jL\\xEp@fKLtCrC~\\HbAN|BbAlNFx@vB`Yl@hIv@|Jf@xGFx@tCh`@ZzFl@~Hn@zIpA~PrAtQB\\pAxSNfCh@`K`@|H~@bLdFzl@nAvNv@zJBLtBa@|AWjBI`RU|PAf^AvNBrQF`HClw@C~XA`E?~EAlFHjILv@@vOP~^j@lRXzNHjK?fK@lR@`W@xD@lF?fB@fCBqE}S{P_x@wDyQcRi}@s@kD_@gBgAuF_CoLaAmEsGoZyA_H{EeUwJod@kY_wAg@cCqBoIwNgr@oAcGMmAQiAtDeBxD?tA@lVB|y@FzjALlGFlRCbJA`JA~a@BjIt@f@Xl@Jn@Cj@SXWT]pOVpU@~OK|Ck~A{{@eAkAg@lAq_@~@mZ@g@l@aHhAcNxB}WX}CnAgMzCkYbDk[B[RuBgE{F}BkBvDsDpP}Sb_@_l@|}@ezA}KwHcYuRyNjVmUn`@aWnc@oBnDgKzPgBzCqYlf@nFlGxFnGpCzCnAxAdEnE}AxAeGxFoChC",
+          "back": "esqkSwwhxhFiCbC_RhQwArAyGtHqOfP_LvO{@|A[l@i@z@eC~DeFdIsGvLkBrDiDfHo@zA_Cz@mChF{AnDsKpWy@nAMPuA~@iBfAaDvAuj@hXkBdAwE|Cse@~]uB~Ayn@~d@yC~Bc@ZiAz@}DtCaBn@iABaXI}\\FcGCqE?sKB_C?eZM}\\QsHhAuKQkl@WkEAyVA_GB{b@RmCo@{A_@wA_@kA]oAc@k@Uy@Gw@FKDg@Ri@h@Yl@Kp@?t@GTYfAiCrJ_@vAe@hBkDvEe@p@qDhHaApBcBdBmCfB??oEvD}Ch@kDh@aE`@oFj@gCNqOp@uBJsFXw@DgKh@m]|@qPt@qXbA{I\\iLd@wENgADeDLoBRubAxVe@L_Ch@g@Ju]bHwGpAcHnA{JfBmHbAu@JuHfAyDl@}@xAkNoRaCmDgQmUeBgFuAqBmG}IyAuBcK}MeRmUeD{AwDaFcF{G{RsWgBaCoSoXwEsGuFyHeDsEmFwHk]qf@mT{[iKiNgCkE}H_MuEgIaa@mm@mBsCuOiUoJiNcPcV_R{SmMmRqWk_@m@}@uEuEfL}NdEqHxBeH~@kMtBqm@~@}ZpAwc@p@oP`@kRX}LVcZKaL{@mQuBkj@IsCaBuc@KkGUuIsx@uDqFz@cDd@oGfBg`@fZaB|@gHtAcKX_LFwFVsKxD}CnBqHlG"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0d86-7318-8c6a-888681855433",
+        "routeNumber": "R12",
+        "routeName": "Mandurriao to City Proper via Festive Walk",
+        "routeColor": "#009e49",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "cfdmSglavhFzPzPbIhIpArApH~HhJxJRWnLqLdJuIlGuF`D{CfYgXfVcSfd@kZzh@uZdAo@nAs@vRgLnBaAtTeLne@oY|b@gVnE{BxSoLtd@aV`^eTpBmAlAo@ve@aW|aAyh@nKoFzQiIbKsC`IcB|H{AvRyDtE}@jCe@dB[dCc@mAcAm@c@yE{CqLkGmLyFiZmKmSgGmBc@}HgByH{AuVsDy@MgLiBi`@mFaWqHobAe\\yB}@m_Ac_@iYuLyBaAi]wOo[{OcY}IwIiCaBa@_Dg@eMqBmG{@aHsAkJeBgGkAiIiBeJ_C_KyCmKgEwG{CiF}CiC_B{PmL{AiAmIcGsJyGeTwN{NuIsBeAaEgBwPmHUeGSqCKaEM_C_AuSu@oKAU}@_RE_A]{FMkCM}BS{DcA{Uu@qP_FeXoQ_q@w@uCoDkMwB}H}@aDuBuHi@iBw@gCtDmAdEuApA_@|CgAtZ{IzKqCtVyEzKoAvEi@pN_BbLu@pGe@rBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFdl@zJlWhE|\\|FnOzBlV~CxFb@bXrBjDJL?~BD`TPvED|WEvDGbDKl@bDhBfFnU|o@rQrc@dArBhIlPpGzKvFjIfCbDrF~F{@fB]pB?vB\\rBx@fB`B~AlBx@xBVzBIrBk@bBiAbAuA`@kAJYRkBCmB_@iBwAeCaC}AwCi@}CLoCbAsF{FaHsJcPaY{EiLeEwJcOo_@sQwk@[cDjEWtCSfSwApAI~XmDfRuChh@{IdEs@fDk@`BYpf@uIrCc@vEo@j]yG`Da@vHaBxD{@lZwFtGmAbDg@hTyDf^yG`MsB|OuCpDs@`IgAjDs@rB]pB_@vB_@fCe@pQoD`SuDfNyCtCa@jpAkVhIgA`De@`@EpQoCdOcCvQkCjAOhHiAg@aHMyCk@sJ_@{Es@qJKuAy@wKYgDcBcSUkBeB}Dw@}PK_C}@mOc@oM}@yTW{GCy@QaHyA_a@m@uMeB__@M_CcDes@g@kXQaEW{BI_@aB_U_B_RiAsKa@oD}CmYOwAaBmVjBI`RU|PAf^AvNBrQF`HClw@C`_@A~EAlFHjILv@@vOP~^j@lRXzNHjK?fK@lR@`W@xD@lF?fB@fCBmW}lAwDyQcRi}@s@kD_@gBgAuF_CoLaAmEsGoZyA_H{EeUwJod@kY_wAg@cCqBoIwNgr@k@mCc@uBMmAQiAtDeBxD?tA@dbAHdN@zjALlGFp]E`JA~a@BjIt@f@Xl@Jn@Cj@Sl@lC^bCPhC~@b[",
+          "back": "cxqkSi~~whFnBnp@__Az@we@d@wFBwRBeVPw[Jqe@RkHB_UJoD@uB@kBE{GDoQBmMJoIDyLNu[X_IAKlI?|ABjJ?hDGlFChAUtRClDApCA`KFhEFdADfAlBn^fAdNfArNH`AFv@bBhU^jFgDBsIBuxAs@sVCsVGqk@O{E?{FVkBNkBNl@~Hn@zIpA~PrAtQB\\pAxSNfCh@`K`@|H~@bL|B`XfBxSnAvNv@zJBLpB`VzAjPZxC`G`k@Hz@bBxQDl@d@dJbBrVtArg@xBlf@XpGb@hLtAh[ZnH^vJ~@tVHdBrAfZzA|UTpDSnFXvCd@pFn@fJdB|Wh@|I{@rFq@tAy@`BqDbCIF_H~CgR`DeNzB_Ev@gEz@eCd@qpAnUkC`@s@NeOhC_IzAeFt@yM|BaHtA}NrCqIvAqEt@aqAfUkDj@eg@lIiGfAsDz@s_@xGoGdAmCh@se@fIiB\\gDl@mDj@kn@pKeKpBwDl@oSvBuZxBsBPsAHyERoCHaC?sMJyKFiKQgLUgCG[AuL_@oTeBoM_BmMuBeOsBkIkAau@{MsPiC}u@mM_`@uF_a@iFuZcCsY{AeNYcCDeLP}JNgQV{BLoGXkL`Aec@hEqWxEwRlEwWnIs@RwAj@sJnDwHfCqIjCqb@tN_\\pK}VpJcDtAev@pVeN`FeMjEecAv]qNhHcEvBce@pSkOzHeGnDcJdFqFpDmCjBkE~CyF~Dg[dX}d@hf@Yb@kBtBbFtDtA_BfAiA`b@ic@~YmV|NgLhCsBnB}AxByAjUsNhC`C~BvBvGdGxIrBdPvA|Er@dIjAnGfArN`Ct`@xGtATnP`C|Cj@hFt@~SxDvVfIdW~IbJzCbI`C~MvEzE|AtMjEp[~KPHbPtFbHbChi@bRfHrClNbFtAh]Dx@HbB\\pIj@pMvAd\\f@pKxBre@jA~VDlAfAnU^xHz@hUfAj_@VnJZ|IN~EdAt[\\rKdCzp@^pLNxE~C~`AZ`K`@dHp@rSThUTnK^fQ~@bMlAzOyA|Dq@tAuAzBo@z@gA|AuBxBzX|X"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0d71-73ab-9ff8-495129b60065",
+        "routeNumber": "R10",
+        "routeName": "Tagbak to Iloilo C/P",
+        "routeColor": "#68217a",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "kmmpSyy|xhFlRlKpL|FrGhDxP`J~z@|c@rHnD|C`BbXrNz{@fc@nVjMjOpHfa@~S|NrHzJhFdXxMb^dSxf@zY`CvA`OxIxOfJz@l@bVtNhKxFtJtFvJvFdBbAlDbCvJbFdCxAdTfMpAp@fEdCvAx@zGzDhDzBvBnAzM~G`Af@nVrNbWbOVPzFhDxL`HlAt@z@h@zErCtAt@`UrMzCfBle@pXxCfB\\TxBnA~EhCjAl@xLjHx\\`RtPhJ`HrDzLhHl\\dRLHfAn@zOxIdGpD|BtA|DbC~X`Qj@^jMxHjI`FtAz@lUvNn^tUzWnP~NxI~JlG~RrLjFjDvOpJ`JfGpLnHzZnRnDtB|]|SpAp@`g@tYxF|CfDdBt@h@`i@hZnEfC~BlAjMnHbAp@dGdDfAr@lC~AlHjEtEdCxUlMtN`IrMlHlGjDrEjC|v@tb@rXjOhK`G~ErCnb@jV~`Apj@fDlBdh@jYnDtBjr@|`@tGxDzKnGhEnC~AfAt^lSjj@h\\jBfApNpIvQvK`L~Hl@\\vYrQrTpLbSlIrCdAdDjBdCrAjmAhl@vIrErRrI~D|Af^dNtUzI`^rMdE~AvGlCr[jLdEtAzCx@tAZxy@zSvDbAt`@rJvOlDpDp@|R`FvCv@fM~CxNzDzMrClCl@`QxHhn@`O`VxFlV`Gnc@nKnIlDpDbDnEnGlCpHjA`DzB`HfJrYNd@`DvJdD~LpErL`TnUjQnPbB`BnJdIhl@pk@bHfG|JmIhGgFvVkRlIqGtDsC`CaBxEcDt[mTfIaEjIeF`@dBJf@rA~B|A|AlQxMVPjEdD~LdJz@n@dHk@DAfDo@|@UbGaDpIwG~BgCjGwGX]xJiKhHwHfQ_OpGoF{FmFuHaHaJuHwKeJ{E_EhBiBdRkRvdAu`Av[qXfDsCdXw\\`NmPbAsA|CmDrYsZtHwIxGaGzTyVnSwRdY_[j`@oa@|ArAzsBleBlGkD`B}@zRuKpCyAlTmLfFiCl@]~F}CtKwFlK_H`IcCd_@oS~@e@nZ{Pb_@mSnAq@dRuKlOuHri@aXbF}EhC}AnKcGn\\kPfFiCtc@gUdCwAzCcBnC_BrKgGhBcAvJmFnHoEtBkA`a@sUpFeAvB_@pB]nDiAz_A{PlOgCzB^lDa@l@I`Fq@x@Qr`@cHrT}D~NkC~Cm@b@MxbAoVjBe@jMy@bo@iCxKc@zCKrFOr]yAnCMr@GhHc@xAK`OaAhKo@rOk@fMIjIFnGfAh@^b@f@Xd@JNJv@N|@^vFt@jL\\xEp@fKLtCrC~\\HbAN|BbAlNFx@vB`Yl@hIv@|Jf@xGFx@tCh`@ZzFl@~Hn@zIpA~PrAtQB\\pAxSNfCh@`K`@|H~@bLdFzl@nAvNv@zJBJtB_@|AWjBI`RU|PAf^AvNBrQF`HClw@C`_@A~EAlFHjILv@@vOP~^j@lRXzNHjK?fK@lR@`W@xD@jF?hB@fCBmW}lAwDyQcRi}@s@kD_@gBgAuF_CoLhKG`GEfCqAj@A`BAlu@b@pZDyC{z@qAmf@|ND|@ApC@pnAdAKgGQkEmAu]{@{UiAw\\GoB_Ckw@MkB",
+          "back": "}yqkSsl_xhFG_@m@mCXWT]Lc@@e@C]I[MYYY_@Sc@Ic@Ac@HUHQJ_@b@Ob@Eh@Bf@Nd@X^f@Xl@Jn@Cj@Sl@lC^bCPhC~Bjw@_JH_t@p@we@d@wFBwRBeVPw[Jqe@RkHBoZLuB@kBE{GDoQBmMJoIDyLNu[X_IAmFFwBD{aAvAeJHqDBef@r@eMNkA@a`ARwCAuDAISU}CGw@u@yJ_BqIs@}GEiA]}IUsL\\gB`@eBjAeDpA}Cl@k@\\w@F_AI}@]u@o@k@k@Uy@Gw@FKDg@Ri@h@Yl@Kp@?t@GTYfAiCrJ_@vAe@hBkDvEe@p@qDhHaApBcBdBmCfBoEvD}Ch@kDh@aE`@oFj@gCNqOp@uBJsFXw@DgKh@m]|@qPt@qXbA{I\\iLd@wENgADeDLoBRyf@~L{ZxHe@L_Ch@g@Ju]bHwGpAcHnA{JfBmHbAu@JuHfAyDl@}@xAmCsD}I{LaCmDgQmUaa@tg@kDlE_J`MoGlHaDhDaa@rUuBjAoHnEwJlFiBbAsKfGoC~A{CbBeCvAuc@fUgFhCo\\jPoKbGiC|AeHdBwi@dXuQ`JgPxI}`@fUg]xRs^dSaGpFmK~GuKvF_G|Cm@\\gFhCmTlLqCxA{RtKaB|@mGjDyvBahBk`@na@eY~ZoSvR{TxVyG`GuHvIsYrZ}ClDcArAaNlPeXv\\gDrCw[pXwdAt`AoUtUiFxDaQlMaLzHyFbEsBtAs]nWeDxBoDtCmDvBwAsHuC_LeEyGwEsFiZqGaf@_IsOkE_XkFkBg@aj@sNqXaHsSmFqQuE{LaCyC}@i_@qI}MyCgj@kMiVsFkFoAsBg@cV_GiIsB_B_@mR}DmCm@{MsCyN{DgM_DwCw@}RaFqDq@wOmDu`@sJwDcAyy@{SuA[{Cy@eEuAs[kLwGmCeE_Ba^sMuU{Ig^eN_E}AsRsIwIsEkmAil@eCsAeDkB_QiKcDoBqSsM}K{FmIsEmDqBcNgFwQwKqNqIkBgAkj@i\\u^mS_BgAiEoC{KoGuGyDkr@}`@oDuBeh@kYgDmB_aAqj@ob@kV_FsCiKaGsXkO}v@ub@sEkCmGkDsMmHuNaIyUmMuEeCmHkEmC_BgAs@eGeDcAq@kMoH_CmAoEgCai@iZu@i@gDeByF}Cag@uYqAq@}]}SoDuB{ZoRqLoHaJgGwOqJkFkD_SsL_KmG_OyI{WoPo^uUmUwNuA{@kIaFkMyHk@_@_YaQ}DcC}BuAeGqD{OyIgAo@MIm\\eR{LiHaHsDuPiJy\\aRyLkHkAm@_FiCyBoA]UyCgBme@qX{CgBaUsMuAu@{EsC{@i@mAu@yLaH{FiDWQcWcOuGyD"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0d92-70b2-b7cc-b21c3951f1d3",
+        "routeNumber": "R13",
+        "routeName": "Hibao-an to City Proper via Tabucan",
+        "routeColor": "#009e49",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "wuonSanzthFkDdBwH`EkCtB`GtI`NtStFnItFtHnEtDjVz\\fJbLrS`TtXxSdQjLf^lO|SzHrDdBb@PjS|HtItClMhCbEXfEZxHCfBArOIrHIjGCnKCzRBrHOhDYpNiAvf@{H~v@wO~IgB|WoFhFeAzIgBvR}Df_By[z}B_e@f^kHrUwE~FmApAWjdAwSrGsA~FkApKoBl`Eay@lp@}MbRmDxZkEp[oEj~@oJbRmBzVuBrn@_EpRy@h]wApCG~kC{Ft[a@vc@g@hc@sCfPaBjuAyTxCSlJs@zuAb]|Lv@~H_BtFsCd[o_@pQmOvLkDpQsCp@Kf{Bo]h^UztAjJf_@`DjJr@bFQpBa@vNoFbVmK~MgGxSiJvA_Al]sPpO_N|EiJbBeGn@}Bt@cDhOkq@fAmDpGsP|HcK|KaHtKiDtKo@`GJhNnAnPdExlAnZtA\\`Dx@lBf@jb@nLzq@tOjw@dShqAl\\jEfAvhAx[~GjBnKx@|HMhJUxPoBfa@cEdG}@bBOfBKp}AwI~c@{BlCMlH_@@{EBsG@_BS{P{Ae`AWeXIeBw@gq@c@yXtBkh@Do@R}DXyE|@qPRsB\\yD~@cKbD_^~AaO|@uKLoBPoEDqAsAyR{Ewb@w@gHwCcQ{BiJeBcGwMwb@yByFyCaIuG}OyKeYsAuD[q@s@cBaFkMgPob@aCuIyCmJoMsa@}GmVaTst@oQqb@eUug@iOc[cP}WmHmLsEeH_EeG{BuDy@oAaP{XkLwRqOwVoI_Okv@irAcTs\\i]}o@c]ys@aIcO{JoQcTca@sAgCuCuFoGwLgMeZ_B{D}@yBcAmCe@iAaBwD_EwJaB_ExCiBdGoDjFgDzBwA|KmGz@k@pBaBdIyEjL}GxE}DvEeFzBqCkQc[}JyTc@_AgK}TaDaHiOi\\gQq_@cBwDqBsEmEoKuCmGgHqNm@mAkQa^qAmC}]ks@aNwVeAiBaAcC}DoJgAcE{BeJsAyJuBa[gDkd@M{AuBiWWeEeAiPkA{QmB}SGo@aBuCsU_qDj@aFw@}PK_C}@mOc@oMuAu]Cy@QaHyA_a@m@uMeB__@M_CcDes@g@kXQaEW{BI_@aB_U_B_RiAsKa@oD}CmYOwAaBmVjBInJMpFG|PAf^AvNBrQF`HClw@C`_@A~EAlFHjILv@@vOP~^j@lRXzNHjK?fK@lR@`W@xD@lF?fB@fCBaBwHkTecAwDyQcRi}@s@kD_@gBgAuF_CoLaAmEsGoZyA_H{EeUwJod@kY_wAg@cCqBoIwNgr@oAcGMmAQiAtDeBxD?tA@jmAJ~B?zjALlGFp]E`JA~a@BjIt@f@Xl@Jn@Cj@SXWT]pOVpU@~OK|Ck~Aei@o@uQUkAg@lC_{@@g@l@aHhAcNxB}WX}CnAgMzCkYbDk[B[RuBgE{F}BkB}AxAeGxF",
+          "back": "mtqkSqvhxhFbD{C|AyA|BjBfEzFStBCZcDj[{CjYoAfMY|CyB|WiAbNm@`HAf@mC~z@R~k@z@|f@UnGYY_@Sc@Ic@Ac@HUHQJ_@b@sHdC_b@CaJ@q]DmGG{jAMkqAKuAAyD?uDdBiAjCSt@MvACjCNv@vG`[dFbVxAjGj@vCbOzs@fIha@|\\d_Br@lEhFhVx@xEPv@zQn{@fVzjAjEvSmF?yDAaWCmR?gKAkK?{NImRY__@k@wOQw@AkIMmFI_F@a_@@mw@BaHBsQGwNCg^@}P@aRTkBH}AVuB`@R|B|AbRzAjPZxC`G`k@Hz@bBxQDl@d@dJbBrVtArg@xBlf@XpGb@hLtAh[ZnH^vJ~@tVHdBrAfZzA|UTpDxAfCrU~pDWpDd@zHXvFzA|T|@zQL~B`@pFbA~QpCpg@LzAxEfr@dAtQ\\pDJjEPnDbI~z@^|Dn@~F~AlOl@~GbAnK\\pDHr@pAvMhB`Qr@dFJl@lC`RxFh^`@~BfHtU|Lr[bIzQzJxUfA`ChHrOfEzIbDhHzB|E}ErCqm@fZ}y@~ViBv@_E|BgCr@qDLyDCebAyDqAQ_Bq@oBsAaC{BgB}BkByBwCqB{B}AyEmCi@W_QwJmAs@g@WyAw@eG}CqDkBgBy@aNoGaRkG}_@cK{JmBiP_DkD_@aFi@wFm@qAOwC[eGw@Wl@oG~DuJbFuFrCsLzF}R~J{`@xN}JvDiOxF}Aj@mBb@o\\rFiGfA_TrDmKjBaBZuDr@eCb@eBZkCd@uE|@wRxD}HzAaIbBcKrC{QhIoKnF}aAxh@we@`WmAn@qBlAa^dTud@`VySnLoEzB}b@fVoe@nYuTdLoB`AwRfLoAr@eAn@{h@tZgd@jZgVbSgYfXaDzCiIwDkVgN_FaCcFuCmX{OmDoAyA|Dq@tAuAzBo@z@gA|AuBxBih@vj@{d@bt@{IhP}u@~|@wEvFsHvJ{[z_@gRlVcFpFsDtEiC`DgFpGcD`EeJrKgEhFiMhQeKfOmNvRkIfKyElH_DvDaDvEwKvNiAbBsIdKwMtPgTxWoHhG}a@v\\iBvAeJ~GqC~BqExDuGrFuBdBmB`BsM|Kk@b@mAjA_@\\gFvEcInH_H|GgIhHuIpIwDtD{NxL_O`MwIlHaH|F}FzEyAlAqX~Rci@x`@oLvIoh@h^yEhDaNvJwHjFuAbAuCvBc\\dVuBtAwd@`]iDfCoAdA}CrBkZ|R{`@fZsTjPu@j@_WbQoJhGmD~C{QbNiMbIoz@hm@wDnCmIvGsTzNwL`ImHlFsLfI}HnFBF_JdGm`@`XkBpA{EbDwBxAqLbIma@~XkHpEic@lXem@j_@gT|MeDhBqG`DwH`EkCtBbBdC"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0dc3-7406-9381-19edd3686131",
+        "routeNumber": "R17",
+        "routeName": "Villa Baybay to City Proper",
+        "routeColor": "#ff8c00",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "gzzjSwg{thFFdD?tHJbIz@rk@RhMBbHTbw@TlNVbYdBdiA|BpcA?t[Bvm@FfFr@r^r@zStAzb@pBj}@d@fYJvKT~VDbHBlCThi@`Axi@HjQPv`@a@tUIlDk@`WIzDm@zNeAbXQrB{@zJgArKa@hEoClXmBrSmBhUuCtXm@nIwFfg@kBxScEfYmBpMKrA_XyCs@Go@Gc}AuRkHaAgWkBih@sFwS_Csi@wFiKcAea@wEiAK}KMat@f@dCur@n@uVnBufBBwL{Ceu@KwQYqi@rCoa@bL{m@~AaI`Fqi@rE_k@nDcb@VsEFq@VsQg@{\\s@oNG_D_Bi]kAmPcCmY_BwMyImm@oIiv@mCgTyEs_@oI_|@eGev@m@eIyAoSYgIQyBsD_x@_JmyA]yH]kFe@kNaAgQy@wLmGqfAeA}PEe@o@{Ja@kI}Be[iL_|@e@sDkOqhAsD_X{@mOmP_qA_AyMm@kFmC_EDqAsAyR{Ewb@w@gHwCcQ{BiJeBcGwMwb@yByFyCaIuG}OyKeYsAuD[q@s@cBaFkMgPob@aCuIyCmJoMsa@}GmVaTst@oQqb@eUug@iOc[cP}WmHmLsEeH_EeG{BuDy@oAaP{XkLwRqOwVoI_Okv@irAcTs\\i]}o@c]ys@aIcO{JoQcTca@sAgCuCuFoGwLgMeZ_B{D}@yBcAmCe@iAaBwD_EwJaB_ExCiBdGoDjFgDzBwA|KmGz@k@pBaBdIyEjL}GxE}DvEeFzBqC~Ay@_Bx@kQc[}JyTc@_AgK}TaDaHiOi\\gQq_@cBwDqBsEmEoKuCmGgHqNm@mAkQa^qAmC}]ks@aNwVeAiBaAcC}DoJgAcE{BeJsAyJuBa[gDkd@M{AuBiWWeEeAiPkA{QmB}SGo@aBuCsU_qDj@aFw@}PK_C}@mOc@oMuAu]Cy@QaHyA_a@m@uMeB__@M_CcDes@g@kXQaEW{BI_@eCoG_@yFyIuz@qGus@_Fwn@{@kKfAcGcAsUqBoYyE}n@e@oGEa@i@{G_BaTWcD]kEI_AuEwm@q@cJjB@~`Ab@`RHvHE|VPpx@J`]DzBBfGE|zAt@rXH`GBdBDvBBlEBhg@M|NLph@Zp^N|ND|@ApC@rnAdAMgGQkEmAu]i@}NQ}EiAw\\GoB_Ckw@QiC_@cCm@mCXWT]pOVpU@~OK|Ck~A{{@eAkAg@lC_{@@g@iHcHks@qr@z@}A~KwOpOgPxGuHvAsAfI{HvGmGdGyF|AyA|BjBfEzFStBCZcDj[{CjYoAfMY|C{B|W",
+          "back": "ctqkSqkexhFgAbNm@`HAf@mC~z@R~k@z@|f@UnGYY_@Sc@Ic@Ac@HUHQJ_@b@sHdCmKAqUAaJ@q]DmGG{jAMkqAKuAAyD?uDdBiAjCSt@MvAAf@AbBNv@vG`[dFbVxAjGj@vCbOzs@fIha@aGCsXI}zAu@gGDCyABxAFdADfAlBn^fAdNfArNH`AjB`W^jFgDBwD@{C@uxAs@sVCsVGqk@O{E?{FVkBNkBNl@~Hn@zIpA~PrAtQB\\pAxSNfCh@`K`@|HzA`Dx@bBz@jK~Evn@pGts@xItz@^xFq@pGDl@d@dJbBrVtArg@xBlf@XpGb@hLtAh[ZnH^vJ~@tVHdBrAfZzA|UTpDxAfCrU~pDWpDd@zHXvFzA|T|@zQL~B`@pFbA~QpCpg@LzAxEfr@dAtQ\\pDJjEPnDbI~z@^|Dn@~F~AlOl@~GbAnK\\pDHr@pAvMhB`Qr@dFJl@lC`RxFh^`@~BfHtU|Lr[bIzQzJxUfA`ChHrOfEzIbDhHzB|E`B~D~DvJ`BvDd@hAbAlC|@xB~AzDfMdZnGvLtCtFrAfCbTba@zJnQ`IbOb]xs@h]|o@bTr\\jv@hrAnI~NpOvVjLvR`PzXx@nAzBtD~DdGrEdHlHlLbP|WhOb[dUtg@nQpb@`Trt@|GlVnMra@xClJ`CtIfPnb@`FjMr@bBZp@rAtDxKdYtG|OxC`IxBxFvMvb@dBbGzBhJvCbQv@fHzEvb@rAxREpAQnEMnB}@tKdCTrExClP~pAz@lOrD~WjOphAd@rDhL~{@|Bd[`@jIn@zJDd@dA|PlGpfAx@vL`AfQd@jN\\jF\\xH~IlyA`A|SpB`c@PxBvsAeO|Ly@vWoAjUgAvK[vAGbUaAv^wArr@eDdJc@~LU|Jc@hBIvn@}DjS{@b]_BpR}@JbIPvK"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0db8-71d3-957c-d4b2dae74302",
+        "routeNumber": "R16",
+        "routeName": "BITO-ON JARO VIA BALABAGO LOOP",
+        "routeColor": "#68217a",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "wdioScajyhFxFlF~HpIrPjRrE`EfPvMb^fXhGtDrGpDnJjElA`@`B\\nFV~KUpSq@~Oe@xKq@fGRjCLjErArF~Bz`@bTnY~Mt{BheApv@zb@vT~PlFnH~KtOhDzBZX`g@`\\|AhAbq@fc@~^|VvWrQvXfQfBfA|GxEbH|ExP|KfHvEve@`XtA~@zBnAf@fHBjGg@rUg@|Ho@tGaBdIqAdFaB|E}G`NsMdUaJhOcCxDsDzEiDzCeE`D{IzG}TjPsTrP~AlC|TyPzTkP|I}GfEcDvDgD~DkFfC_EbJiOtMkUdHmNhBkFrAqFfBuIn@aHh@kIFqFByC?oG|A|Fd@zAp@pB^dAbEfNvFxQ~Kpb@dKlc@rD|OtFnTxEzRlJba@nBpGrMfe@pZhp@fKrS^|AfCnFpFrM`@r@bIjUfSrh@xItU`JvVdK|Xh@|BFf@b^hdAhE|JjB`GbBpFdAdDdDzHnApErQ`i@hHlShL|[bIrShGjQnLn\\fKxVz@|AhB`DrKjT|AbDfOp]rU~i@lMd[pG|NjElIdLpYtHdPvYpi@`CbF|NzXvTxb@jMlWzOpYrSx`@fUvd@~EzIfEzI}DlBoAr@qG|FsAtAoNrJaB~A{G~I}K|PaOhUeFbH}PjXgDjFmOtZ`QxH~EjAhg@tL`VxFlV`Gnc@nKnIlDpDbDnEnGxErMzB`HfJrYNd@`DvJdD~LpErL`TnUjQnPbB`BnJdIhl@pk@bHfG|JmIhGgFvVkRlIqGtDsC`CaBxEcDt[mTfIaEjIeFl@lCrA~B@@zAzAlQxMVPjEdD~LdJz@n@dHk@lDq@|@UbGaDpIwG~BgCjGwGX]xJiKhHwHfQ_OpGoF{FmFuHaHaJuHwKeJ{E_EiFxD}LbJ",
+          "back": "m|pmSwdjwhF}C|BaLzHyFbEsBtAs]nWeDxBoDtCkDvByAsHuC_LeEyGwEsFiZqGaf@_IsOkE_XkFkBg@aj@sNqXaHsSmFqQuE{LaCyC}@oW_GyFqAnAuB`B_E~G}Nt@}AzHaP`CsEvPq\\W{DiWwa@wPm\\s]ko@gE{I_F{IgUwd@sSy`@{OqYkMmWwTyb@}N{XaCcFwYqi@uHePeLqYkEmIqG}NmMe[sU_j@gOq]}AcDsKkTiBaD{@}AgKyVoLo\\iGkQcIsSiL}[iHmSsQai@oAqEeD{HeAeDcBqFkBaGiE}Jc^idAGg@i@}BeK}XaJwVyIuUgSsh@cIkUa@s@qFsMgCoF_@}AgKsSqZip@sMge@oBqGmJca@yE{RuFoTsD}OeKmc@_Lqb@wFyQcEgNqAwDe@{A}A}FKmJQcDyCeB{BoAuA_Awe@aXgHwEyP}KcH}E}GyEgBgAwXgQwWsQ__@}Vcq@gc@}AiAag@a\\[YiD{B_LuOmFoHwT_Qqv@{b@u{BieAoY_N{`@cTsF_CkEsAkCMgGSyKp@_Pd@qSp@_LToFWaB]mAa@oJkEsGqDiGuDc^gXgPwMsEaEsPkR_IqI{IgI"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e7b-75c5-b160-448fb7edc2cc",
+        "routeNumber": "R9",
+        "routeName": "Mohon to City Proper",
+        "routeColor": "#00b294",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "smtkSc_yshFRsAhFoWf@eCj`@kgBfAuERaBbBaIrB_MtHmd@lLos@dAoG\\}AnDeT`C{NtBqRl@kGxFoi@rFaj@TyBdEea@T{AfIeh@nCcNjG_ZxUomAlEyT|Iwd@f@sClB}Jt@kDdBcIzJae@rDaQlFc\\l@oDnBwV^yFRgClEoi@~DqW`I_a@xK}\\|HgQhDsIpIaNq@mHe@e_@AmTM_[SyTC_Do@amAM_QOk`ACmCIcH@{EBsG@_BS{P{Ae`AWeXIeBw@gq@c@yXtBkh@Do@R}DXyE|@qPRsB\\yD~@cKbD_^~AaO|@uKLoBPoEDqAsAyR{Ewb@w@gHwCcQ{BiJeBcGwMwb@yByFyCaIuG}OyKeYsAuD[q@s@cBaFkMgPob@aCuIyCmJoMsa@}GmVaTst@oQqb@eUug@iOc[cP}WmHmLsEeH_EeG{BuDy@oAaP{XkLwRqOwVoI_Okv@irAcTs\\i]}o@c]ys@aIcO{JoQcTca@sAgCuCuFoGwLgMeZ_B{D}@yBcAmCe@iAaBwD_EwJaB_ExCiBdGoDjFgDzBwA|KmGz@k@pBaBdIyEjL}GxE}DvEeFzBqC~Ay@_Bx@kQc[}JyTc@_AgK}TaDaHiOi\\gQq_@cBwDqBsEmEoKuCmGgHqNm@mAkQa^qAmC}]ks@aNwVeAiBaAcC}DoJgAcE{BeJsAyJuBa[gDkd@M{AuBiWWeEeAiPkA{QmB}SGo@aBuCsU_qDj@aFw@}PK_C}@mOc@oMuAu]Cy@QaHyA_a@m@uMeB__@M_CcDes@g@kXQaEW{BI_@eCoG_@yFyIuz@qGus@_Fwn@{@kKfAcGcAsUqBoYyE}n@e@oGEa@i@{G_BaTWcD]kEI_AuEwm@q@cJ_@sE}@sLKsAEi@sFyu@ISU}CGw@u@yJ_BqIs@}GEiA]}IUsL\\gB`@eBjAeDpA}Cl@k@`Bg@dBWtAKlCY~XMzHE~FCxV@jE@jl@VtKPzHx@xw@H~@?`A?|F@vCAvEAtd@NlX?jA?hC{@`EsCjD{BpAcAd@_@xn@_e@pByA`f@u]zCyBpA{@tDoBrf@oVpCqAjAq@v@a@nBaBT[p@}@l@{AxJmUbBgDfCyEJoCn@{AhDgHjBsDrGwLdFeIdC_Eh@{@Zm@z@}A~KwOpOgPxGuHvAsA~QiQdGyF|AyAjBzA",
+          "back": "cfqkS_xhxhF|B~CStBCZcDj[{CjYoAfMY|CyB|WiAbNm@`HAf@mC~z@R~k@z@|f@UnGYY_@Sc@Ic@Ac@HUHQJ_@b@Ob@Eh@Bf@Nd@X^f@Xl@Jn@Cj@Sl@lC^bCPhC~Bjw@__Az@sMLcWVwFBwRBeVPw[Jqe@RkHBoZLuB@kBE{GDoQBmMJoIDyLNuWT_CB_IAKlI?|ABjJ?hDGlFChAUtRClDApCA`KFhEFdADfAlBn^fAdNfArNH`AjB`W^jFxE?rA?tk@AzcAAnCpBzWZnFHhKG`GEfCqAj@A`BAlu@b@pZDFbBtF`{Au[g@wACgU?kF?}\\BkB?qBAfVzjAjEvSnAhGhMpm@m@Ll@MnKvg@nDvP`I|_@nHt\\Rz@vB~IC~HyDh[OvAyGlg@_DjRgDrVc@tDKnBk@zIcB`JwFbPiHnMcK|NiHhJoEfDoBfA_GxAqBJ{c@tBiRpAet@vDiCPaPv@qj@nCsAHm~@`GyEZsB\\_Ev@gHzB_MbD{FxAcE~@_H`A{AT_BRiEh@f@lHJbB|@xMzBb\\R`Cf@pGfAnQv@tJNx@p@pAd@zHXvFzA|Tp@hNJpBL~B`@pFbA~QpCpg@LzAxEfr@dAtQ\\pDJjEPnDbI~z@^|Dn@~F~AlOl@~GbAnK\\pDHr@pAvMhB`Qr@dFJl@lC`RxFh^`@~BfHtU|Lr[bIzQzJxUfA`ChHrOfEzIbDhHzB|E`B~D~DvJ`BvDd@hAbAlC|@xB~AzDfMdZnGvLtCtFrAfCbTba@zJnQ`IbOb]xs@h]|o@bTr\\jv@hrAnI~NpOvVjLvR`PzXx@nAzBtD~DdGrEdHlHlLbP|WhOb[dUtg@nQpb@`Trt@|GlVnMra@xClJ`CtIfPnb@`FjMr@bBZp@rAtDxKdYtG|OxC`IxBxFvMvb@dBbGzBhJvCbQv@fHzEvb@rAxREpAQnEMnB}@tK_B`OcD~]_AbK]xDSrB}@pPYxES|DEn@uBjh@b@xXv@fq@HdBVdXzAd`ARzPA~ACrGAzEHbHBlCNj`AL~Pn@`mAB~CRxTL~Z@lTd@d_@p@lHqI`NiDrI}HfQyK|\\aI~`@_EpWmEni@SfC_@xFoBvVm@nDmFb\\sD`Q{J`e@eBbIu@jDmB|Jg@rC}Ivd@mExTyUnmAkG~YoCbNgIdh@UzAeEda@UxBsF`j@yFni@m@jGuBpRaCzNoDdT]|AeAnGmLns@uHld@sB~LcB`IS`BgAtEk`@jgBg@dCiFnWSrA"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0ddb-777b-a5fd-108f4d60c9db",
+        "routeNumber": "R19",
+        "routeName": "Bito-on to Laz Paz via Coastal",
+        "routeColor": "#ec008c",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "apuoSgroyhFbF|BdK`EnNnErVnDf`@uAvSCtA^tC`AbN|IlXxQfZvRhNbI~GbDbHnCbF~An^lJvO~EtJhDv`@tNz^~LtEnBnFfChShNTRjBtAxIfI~HpIrPjRrE`EfPvMb^fXhGtDrGpDnJjElA`@`B\\nFV~KUpSq@~Oe@xKq@fGRjCLjErArF~Bz`@bTnY~Mt{BheApv@zb@vT~PlFnH~KtOhDzBZX`g@`\\|AhAbq@fc@~^|VvWrQvXfQfBfA|GxEbH|ExP|KfHvEve@`XtA~@zBnAxCdBzChBbB~@~C|Av@`@jVjMrSlK|IlDzOjGz\\`N`NtEfx@jY|cApZjj@bMxMvC`OzEvKpDxKpCbEdArRvF~^xI~`AzVtJfCrC@ji@u@xM]`NGbhByAvLBlEA~XEda@d@bBDpA@~LLp@@fu@xBfTj@pLH`]pAhTLzi@nCv^bA`ZbAzk@nBlnAzCzc@bAfu@lBz[x@bYr@|AJf]t@tg@nA`Be@zA^`BTtJNrTx@lPnDjF`CjDtDd@f@p@vBGn@}AnKcEvPwMdi@yCtNGrAGlAr@nBzEhBhAV`AVx[lFtw@~Nzj@tEvFzB~H`HbWzTbHrFvZnStB~AdDcEtEtE~Xha@lMlR~QzSbPbVnJhNtOhUlBrC`a@lm@tEfI|H~L|@zAhAnBw\\tUwVvP}IlFqVnOtMrO~MhPtG~HjBzBxZf^`EbE]RiC|AsSbO_F`DsKvHsJtHqDrCg_@zXwKzI|l@xNxg@fMpBb@`tAn]jIhAtkAzXxHd@nDiAz_A{PlOgCzB^lDa@l@I`Fq@x@Qr`@cHrT}DfF_AvGkA~Cm@b@MxbAoVjBe@jMy@bo@iCxKc@zCKrFOr]yAnCMr@GbKo@`OaAhKo@rOk@fMIjIFnGfAh@^b@f@d@t@Jv@N|@^vFt@jL\\xEp@fKLtCRbC~BzXHbAN|BbAlNFx@vB`Yl@hIv@|Jf@xGFx@tCh`@ZzFjBOjBOzFWzE?lKBb_@JrVFrVBtxAr@rICfDCxE?hn@AzcAAnCpBjQRnEFnFHhKG`GEfCqAj@A`BAnQJ",
+          "back": "sjvkSkgwwhFrb@VpZDiCgt@OsEqAmf@WgGs@qQeEedAwC@_B@wRBeVPw[Jqe@RkHBoZLuB@kBE{GDoQBmMJoIDyLNu[X_IAmFFwBD{aAvAeJHqDBef@r@eMNkA@a`ARwCAuDAISU}CGw@u@yJ_BqIs@}GEiA]}IUsL\\gB`@eBjAeDpA}Cl@k@\\w@F_AI}@]u@o@k@k@U]gCmCaOq@wDaAsJuDx@}Cn@se@`K_Ez@wMpCcMjC}r@zOiHjBgQhFkZ|IsLtAwEHmAMuB_@UEgV}E{s@yNcFk@o@GmDKoEYcd@eDk\\ne@qNjRsT`ZeAtAeBgFuAqBmG}IyAuBcK}MeRmUeD{AwDaFcF{G{RsWgBaCoSoXwEsGuFyHeDsEmFwHk]qf@mT{[iKiNgCkE}H_MuEgIaa@mm@mBsCuOiUoJiNcPcV_R{SmMmR_Yia@uEuEeDbEuB_BwZoScHsFcW{T_IaHwF{B{j@uEuw@_Oy[mFaAWiAW{EiBs@oBFmAFsAxCuNvMei@bEwP|AoKFo@q@wBe@g@kDuDkFaCmPoDsTy@uJOaBU{A_@aBd@ug@oAg]u@}AKcYs@{[y@gu@mB{c@cAmnA{C{k@oBaZcAw^cA{i@oCiTMa]qAqLIgTk@gu@yBq@A_MMqAAcBEea@e@_YDmE@wLCchBxAaNFyM\\ki@t@sCAuJgC_aA{V__@yIsRwFcEeAyKqCwKqDaO{EyMwCkj@cM}cAqZgx@kYaNuE{\\aN{OkG}ImDsSmKkVkMw@a@_D}AcB_A{CiByCeB{BoAuA_Awe@aXgHwEyP}KcH}E}GyEgBgAwXgQwWsQ__@}Vcq@gc@}AiAag@a\\[YiD{B_LuOmFoHwT_Qqv@{b@u{BieAoY_N{`@cTsF_CkEsAkCMgGSyKp@_Pd@qSp@_LToFWaB]mAa@oJkEsGqDiGuDc^gXgPwMsEaEsPkR_IqIyIgIkBuAUSiSiNoFgCuEoB{^_Mw`@uNuJiDwO_Fo^mJcF_BcHoC_HcDiNcIgZwRmXyQcN}IuCaAuA_@wSBg`@tAsVoDoNoEeKaE"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0dce-74cb-8b8d-6666514c26e6",
+        "routeNumber": "R18",
+        "routeName": "Tagbak to Lapuz via Coastal",
+        "routeColor": "#e81123",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "khmpSsv|xhFlMfHpL|FrGhDxP`J~z@|c@rHnD|C`BbXrNz{@fc@nVjMjOpHfa@~S|NrHzJhFdXxMb^dSxf@zY`CvA`OxIxOfJz@l@bVtNhKxFtJtFvJvFdBbAlDbCvJbFdCxAdTfMpAp@fEdCvAx@zGzDhDzBvBnAzM~G`Af@nVrNbWbOVPzFhDxL`HlAt@z@h@zErCtAt@`UrMzCfBle@pXxCfB\\TxBnA~EhCjAl@xLjHx\\`RtPhJ`HrDzLhHl\\dRLHfAn@zOxIdGpD|BtA|DbC~X`Qj@^jMxHjI`FtAz@lUvNn^tUzWnP~NxI~JlG~RrLjFjDvOpJ`JfGpLnHzZnRnDtB|]|SpAp@`g@tYxF|CfDdBt@h@`i@hZnEfC~BlAjMnHbAp@dGdDfAr@lC~APmA?A`@}CTqCfDej@T{EV{Dl@cKZwFd@qIpAcQdAmST}Ej@mIp@oFNkA~CcOrDqL`Mc_@lAwDjEqL~GyPrGePfAsC~BqGlBqFlCmGzCqFfCsC|KaJ`IeGbAw@bIiGxTsPtMcKjFoGnBcC~RqW`HmJzF_GzDcD~@i@hMwHnGsCzKeFfLeFdIoDnLoF`MgHhR}MrH{FjDkC~[aWdn@cf@he@c^|TyPzTkP|I}GfEcDvDgD~DkFfC_EbJiOtMkUdHmNhBkFrAqFfBuIn@aHh@kIFqFByC?oGKmJQcDzChBbB~@~C|Av@`@jVjMrSlKj@TpHvCzOjGz\\`N`NtEfx@jY|cApZjj@bMxMvC`OzEvKpDxKpCbEdArRvF~^xI~`AzVtJfCrC@ji@u@xM]`NGbhByAvLBlEA~XEda@d@bBDpA@~LLp@@fu@xBfTj@pLH`]pAhTLzi@nCv^bA`ZbAzk@nBlnAzCzc@bAfu@lBz[x@bYr@|AJf]t@tg@nA`Be@n@SpBkAhj@ag@bDwC|BuBTQrM{K|RcRn_@s[|CoBrKyDvFW~KGfGQzBGfHuA`B}@f`@gZnGgBbDe@pF{@rx@tDrDeEbBcCdBcCfEqG~EoF~KwMbx@u{@l]u`@jB_BpCaCbIeHri@{[hb@kWnBkAnvActA`JqH`kBq{Apg@yd@zSoQbn@|YJFrUnMx}Cr|ArD~@zLrGlaBrz@|JbGxCnChE`ExEfGbFnIvR~[v[rf@zDxKjCtJvFfWhEpStAnF~A`IzBxMoTtGkLzDsG~B}DnBwK`ImBjDy@dDc@~E]dG}B`JwCtKiEdKuCjD{FdI}AxBo@bAk`@zh@uEjGaLjOwAnBsJbLoEbI}C~H_BvFsC|K{A|H_B~IcAdGoBvPq@~MQlJItHvGrSXr@dM~\\bHlMtKhLfL~HnDrBdGlD`EbB~HjDrf@|Mdo@tM~U`Glg@lJxNbD`EbApBz@z@bAL`@V~@?jCo@pCyA|BCBiFfFmHdHiAnBm@fBFtBp@tCxH~R|Qve@vBpHjA~HvLjgAZdC\\~CdVqCxPoCl]_HnDo@zZgHjJoHdN_KjK}HvHiGfK{RbFkOvBb@hBfApQbKvYbOtAt@bClAVNkBrDiDfHo@zA_Cz@rBrArn@t`@hi@v_@R~k@b@nV",
+          "back": "c{qkS{|`xhFh@tZUnGYY_@Sc@Ic@Ac@HUHQJ_@b@sHdC_b@CaJ@_DyCaFoFkV}Ro@i@qeAeu@o@c@w@q@y@q@_Am@w}@sg@cA_Am]~GyPnCeVpC]_D[eCwLkgAkA_IwBqH}Qwe@yH_Sq@uCGuBl@gBhAoBhAgAbF}ElFkFxA}Bn@qC?kCW_AMa@{@cAqB{@aEcAyNcDmg@mJ_VaGeo@uMsf@}M_IkDaEcBeGmDoDsBgL_IuKiLcHmMeM_]Ys@wGsSHuHPmJp@_NnBwPbAeG~A_JzA}HrC}K~AwF|C_InEcIrJcLvAoB`LkOtEkGj`@{h@n@cA|AyBzFeItCkDhEeKvCuK|BaJ\\eGb@_Fx@eDlBkDvKaI|DoBrG_CjL{DnTuG{ByM_BaIuAoFiEqSwFgWkCuJ{DyKw[sf@wR_\\cFoIyEgGiEaEyCoC}JcGmaBsz@{LsGsD_Ay}Cs|AsUoMKGcn@}Y{SnQqg@xd@akBp{AaJpHovAbtAoBjAib@jWsi@z[cIdHqC`CkB~Am]t`@cx@t{@_LvM_FnFgEpGeBbCcBbCsDdEuDQ}r@cDqFz@cDd@oGfBg`@fZaB|@gHtAcKX_LFwFVsKxD}CnBo_@r[}RbRsMzKUP}BtBcDvCij@`g@qBjAo@RaBd@ug@oAg]u@}AKcYs@{[y@gu@mB{c@cAmnA{C{k@oBaZcAw^cA{i@oCiTMa]qAqLIgTk@gu@yBq@A_MMqAAcBEea@e@_YDmE@wLCchBxAaNFyM\\ki@t@sCAuJgC_aA{V__@yIsRwFcEeAyKqCwKqDaO{EyMwCkj@cM}cAqZgx@kYaNuE{\\aN{OkG}ImDsSmKkVkMw@a@_D}AcB_A{CiByCeBf@fHBjGKhE[hOg@|Ho@tGaBdIqAdFaB|E}G`NsMdUaJhOcCxDsDzEiDzCeE`D{IzG}TjPsTrPse@j^}m@|e@i\\hWyMbKkNfKwBpAwL~GiLlFcIlDiLdF{KfFyGjCsMhIiGxEgGjGwGbJkS`XeBrBkFpGiMzJoTpPcI`GqKdIeLhJyCfDeDbGsCvGmBdFwC`Is@pByLdYkBtGwExLqAzDgL`_@sDrMcDpO[bCe@pDm@zIa@fF{AnQ{AbUk@xISnCs@hHmEfr@i@vCsAlAkBv@cBBkBBkMoHk@[sAq@oEgCai@iZu@i@gDeByF}Cag@uYqAq@}]}SoDuB{ZoRqLoHaJgGwOqJkFkD_SsL_KmG_OyI{WoPo^uUmUwNuA{@kIaFkMyHk@_@_YaQ}DcC}BuAeGqD{OyIgAo@MIm\\eR{LiHaHsDuPiJy\\aRyLkHkAm@_FiCyBoA]UyCgBme@qX{CgBaUsMuAu@{EsC{@i@mAu@yLaH{FiDWQcWcOoVsNaAg@{M_HwBoAiD{B{G{DwAy@gEeCqAq@eTgMeCyAwJcFmDcCeBcAwJwFuJuFiKyFcVuN{@m@yOgJaOyIaCwAyf@{Yc^eSeXyM{JiF}NsHga@_TkOqHoVkM{{@gc@cXsN}CaBsHoD_{@}c@yPaJsGiDqL}FmMgH"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0df7-718d-bec4-bfe1ce6a4c7c",
+        "routeNumber": "R20",
+        "routeName": "Mohon to Jaro via Festive Walk/ISATU",
+        "routeColor": "#fff100",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "smtkSc_yshFRsAhFoWf@eCj`@kgBfAuERaBbBaIrB_MtHmd@lLos@dAoG\\}AnDeT`C{NtBqRl@kGxFoi@rFaj@TyBdEea@T{AfIeh@nCcNjG_ZxUomAlEyT|Iwd@f@sClB}Jt@kDdBcIzJae@rDaQlFc\\l@oDnBwV^yFRgClEoi@~DqW`I_a@xK}\\|HgQhDsIpIaNq@mHe@e_@AmTM_[SyTcG@aR@_T@gDpAcFfFeFjAsDVuVqEuOi@gRTmRb@yLZeP~Ag[rGue@rLyOfCuGCcFw@iTsH_G{AqGSo[|@wXY_H_A}G}A}KmE}GWcGz@sXlDqBVqDb@qBV_Eb@ae@lFuKr@yFDyEu@iJcA}LeBaEyAaTi[aHuIeMoPgD}DsMgPkH}Isg@gi@uGeHsPuQ{CmDoMsNgLaK}A{A_EkDuVgSyYcX_UsSmTcOwGkEs`@y\\eG}EoIiH_K_Hac@_`@q`@u\\}CoCeBgB_D{By^{Z}FqFsN}KoMoIm@_@{SkM_CwAsKwGiSyLqWwPoi@y^{AaA{LuGwFmBoNmBoPgBeSgD{GeAiD}@eDgA}EyCiMyJqBiBqZ}U}IaG{@Dg@RYJgMbN}G|HgD|@mCIef@eG{l@eNeCc@{a@_FBoAZmRjAal@r@_a@D}BFwCvBgfAf@}WF_DDuAJeIBcCJuJBy@b@yRDkC\\ySTmOh@y\\i@_Fa@cAaAaCsE_EwJ{H_D_CiJgHsFwDsCcCsIyGqHmFgAs@}LmI}C}BwBaBkNqK_e@}_@yZsZaHiG}_@{ZeCkBiIwDkVgN_FaCcFuCmX{OmDoAmA{O_AcM_@gQUoKUiUq@sSa@eH[aK_D_aAo@kSeC{p@]sKeAu[O_F[}IWoJgAk_@{@iU_@yHgAoUEmAkA_WyBse@g@qKwAe\\i@qM_@qIIcBEy@uAi]McDaA{\\MuDxKfFj@ZpClAd@PfDvB|J`GxA|@~Q~LlClB~DzCtFtDhUvObB~@bDhBlJdFdB`ApGlCtKpD`HxBxBh@lEhAvJdB|HxAtGxA`NzBxAKj@[Zi@Aq@e@k@iAw@mG{@aHsAkJeBgGkAiIiBeJ_C_KyCmKgEwG{CiF}CiC_B{PmL{AiAmIcGsJyGeTwN{NuIsBeAaEgBwPmHUeGSqCKaEM_C_AuSu@oKAU}@_RE_A]{FMkCM}BS{DcA{Uu@qP_FeXoQ_q@w@uCoDkMwB}H}@aDuBuHi@iBw@gCoBoGaBmFuAsD}@wBaGmHqo@sf@qQyK}M}Icj@a_@sSqMsYoRiVuP}FaE{\\wU_BgAeBwAiF_EgUqReJaHeDcCN_FlAsEr@wBvAoCvAmCnAgD~BgCjGwGX]xJiKhHwHfQ_OpGoF{FmFuHaHaJuHwKeJ{E_EnUuUvdAu`Av[qXfDsCdXw\\`NmPbAsA|CmDrYsZtHwIxGaGzTyVnSwRdY_[j`@oa@jDgEdPgQz]{^j@k@xSsThGqGr@q@|BsBjBcBdA{@dGaF|}@cr@tHeG",
+          "back": "st`mSibzwhFqKrI}}@br@eG`FeAz@kBbB}BrBs@p@iGpGySrTk@j@{]z^ePfQkDfEk`@na@eY~ZoSvR{TxVyG`GuHvIsYrZ}ClDcArAaNlPeXv\\gDrCw[pXwdAt`AoUtUiFxDaQlMaLzHyFbEsBtAs]nWeDxBoDtCmDvBn@lCrA~B|A|AlQxMVPjEdD~LdJz@n@pFrDvGdEjEhAdDbCdJ`HfUpRhF~DdBvA~AfAz\\vUf^vVrYnRrSpMbj@`_@|M|IpQxKpo@rf@`GlH|@vBtArD`BlFnBnGv@fCh@hBtBtH|@`DvB|HnDjMv@tCnQ~p@~EdXt@pPbAzURzDL|BLjC\\zFD~@|@~Q@Tt@nK~@tSL~BJ`ERpCTdGN`CFbAF~@LtD`Az\\LbDtAh]Dx@HbB^pIh@pMvAd\\f@pKxBre@jA~VDlAfAnU^xHz@hUfAj_@VnJZ|IN~EdAt[\\rKdCzp@n@jS~C~`AZ`K`@dHp@rSThUTnK^fQ~@bM|@rLNfByA|Dq@tAuAzBo@z@gA|AuBxBzX|XbIhIpArApH~HjHxH|@~@RWnLqLdJuIlGuFdCjBlQrNnMfK`HhGxZrZ~d@|_@jNpKvB`B|C|B|LlIfAr@pHlFrIxGrCbCrFvDhJfH~C~BvJzHrE~D`A`C`@bAh@~Ei@x\\UlO]xSEjCc@xRCx@KtJCbCKdIEtAG~Cg@|WwBffAGvCE|Bs@~`@kA`l@[lRCnAza@~EdCb@zl@dNdf@dGlCHfD}@|G}HfMcN`A_@z@E|I`GpZ|UpBhBhMxJ|ExCdDfAhD|@zGdAdSfDnPfBnNlBvFlBlAn@lJdFzA`Ani@x^pWvPhSxLrKvG~BvAzSjMl@^nMnIrN|K|FpFx^zZ~CzBdBfB|CnCp`@t\\`c@~_@~J~GnIhHdG|Er`@x\\vGjElTbO~TrSxYbXtVfS~DjD|AzAfL`KnMrNzClDhYzZrg@fi@jH|IrMfPfD|DdMnP`HtI`Th[`ExA|LdBhJbAxEt@xFEtKs@`e@mF~Dc@pBWpDc@pBWrXmDbG{@xCJbCJ|KlE|G|A~G~@vXXn[}@pGR~FzAhTrHbFv@tGBxOgCte@sLf[sGdP_BxL[lRc@fRUtOh@tVpErDWdFkAbFgFfDqA~SAdZCRxTL~Z@lTTlRNvKp@lHqI`NiDrI}HfQyK|\\aI~`@_EpWmEni@SfC_@xFoBvVm@nDmFb\\sD`Q{J`e@eBbIu@jDmB|Jg@rC}Ivd@mExTyUnmAkG~YoCbNgIdh@UzAeEda@UxBsF`j@yFni@m@jGuBpRaCzNoDdT]|AeAnGmLns@uHld@sB~LcB`IS`BgAtEk`@jgBg@dCiFnWSrAm@tC"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e1b-775b-94aa-1dcaf5f1c17c",
+        "routeNumber": "R23",
+        "routeName": "Mohon to Mandurriao Business District",
+        "routeColor": "#00b294",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "yotkS}wxshFdAeFRsAhFoWf@eCj`@kgBfAuERaBbBaIrB_MtHmd@lLos@dAoG\\}AnDeT`C{NtBqRl@kGxFoi@rFaj@TyBdEea@T{AfIeh@nCcNjG_ZxUomAlEyT|Iwd@f@sClB}Jt@kDdBcIzJae@rDaQlFc\\l@oDnBwV^yFRgClEoi@~DqW`I_a@xK}\\|HgQhDsIpIaNq@mHe@e_@AmTM_[SyTC_Do@amAM_Q?iBOa}@CmCIcH@{EBsG@_BS{P{Ae`AWeXIeBw@gq@c@yXtBkh@Do@R}DXyE|@qPRsB\\yD~@cKbD_^~AaO|@uKLoBPoEDqAsAyR{Ewb@w@gHwCcQ{BiJeBcGwMwb@yByFyCaIuG}OyKeYsAuD[q@s@cBaFkMgPob@aCuIyCmJoMsa@}GmVaTst@oQqb@eUug@iOc[cP}WmHmLsEeH_EeG{BuDy@oAaP{XkLwRqOwVoI_Okv@irAcTs\\i]}o@c]ys@aIcO{JoQcTca@sAgCuCuFoGwLgMeZ_B{D}@yBcAmCe@iAaBwD_EwJaB_ExCiBdGoDjFgDzBwA|KmGz@k@pBaBdIyEjL}GxE}DvEeFzBqCgAmBcOuW}JyTc@_AgK}TaDaHiOi\\gQq_@cBwDqBsEmEoKuCmGgHqNm@mAkQa^qAmC}]ks@aNwVeAiBaAcCuAeAw@[iASyAFq@Xc@PkAtAc@`AKnA\\pDJjEPnDhArLxFjm@^|Dn@~F~AlOl@~GbAnK\\pDHr@pAvMhB`Qr@dFJl@lC`RxFh^`@~BfHtU|Lr[bIzQzJxUfA`ChHrOfEzIbDhH@BxBxE}ErCqm@fZ}y@~ViBv@_E|BgCr@qDLyDCebAyDqAQ_Bq@oBsAaC{BgB}BkByBwCqB{B}AyEmCi@W_QwJmAs@g@WyAw@eG}CqDkBgBy@aNoGaRkG}_@cK{JmBiP_DkD_@aFi@wFm@qAOwC[eGw@Wl@oG~DuJbFuFrCsLzF}R~J{`@xN}JvDiOxF}Aj@mBb@o\\rFiGfA_TrDmKjBaBZuDr@mAcAm@c@yE{CqLkGmLyFiZmKmSgGmBc@}HgByH{AuVsDy@MgLiBi`@mFaWqHobAe\\yB}@m_Ac_@iYuLyBaAi]wOo[{OcY}IwIiCaBa@_Dg@eMqBmG{@aHsAkJeBgGkAiIiBeJ_C_KyCmKgEwG{CiF}CiC_B{PmL{AiAkAy@",
+          "back": "ghcmSwrtvhFUQsJyGeTwN{NuIsBeAaEgBwPmHUeGSqCKaEM_C_AuSu@oKAU}@_RE_A]{FMkCM}BS{DcA{Uu@qP_FeXoQ_q@w@uCoDkMwB}H}@aDuBuHi@iBw@gCzJcDpA_@|CgAtZ{IzKqCtVyEzKoAvEi@pN_BbLu@pGe@rBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFdl@zJlWhE|\\|FnOzBlV~CxFb@bXrBjDJL?~BD`TPvED|WEvDGbDKl@bDxXdw@rQrc@dArBhIlPpGzKvFjIfCbDrF~F{@fB]pB?vB\\rBx@fB`B~AlBx@xBVzBIrBk@bBiApFpF`GvF~ErEfInHnZnWrI|HrBhDfO|XhL|PtJlNfGhInCpD~@nAxCdE`DjEzFxHlAdBfPxT~DtFdDlEb@l@rFnHbIrKhOtQr`@vd@f@rAAfAdGv@vCZpANvFl@`Fh@jD^hP~CzJlB|_@bK`RjG`NnGfBx@pDjBdG|CxAv@f@VlAr@~PvJh@VxElCzB|AvCpBjBxBfB|B`CzBnBrA~Ap@pAPdbAxDxDBpDMfCs@~D}BhBw@|y@_Wpm@gZrAw@hC{A`B~D~DvJ`BvDd@hAbAlC|@xB~AzDfMdZnGvLtCtFrAfCbTba@zJnQ`IbOb]xs@h]|o@bTr\\jv@hrAnI~NpOvVjLvR`PzXx@nAzBtD~DdGrEdHlHlLbP|WhOb[dUtg@nQpb@`Trt@|GlVnMra@xClJ`CtIfPnb@`FjMr@bBZp@rAtDxKdYtG|OxC`IxBxFvMvb@dBbGzBhJvCbQv@fHzEvb@rAxREpAQnEMnB}@tK_B`OcD~]_AbK]xDSrB}@pPYxES|DEn@uBjh@b@xXv@fq@HdBVdXzAd`ARzPA~ACrGAzEHbHBlCNj`AL~Pn@`mAB~CRxTL~Z@lTd@d_@p@lHqI`NiDrI}HfQyK|\\aI~`@_EpWmEni@SfC_@xFoBvVm@nDmFb\\sD`Q{J`e@eBbIu@jDmB|Jg@rC}Ivd@mExTyUnmAkG~YoCbNgIdh@UzAeEda@UxBsF`j@yFni@m@jGuBpRaCzNoDdT]|AeAnGmLns@uHld@sB~LcB`IS`BgAtEk`@jgBg@dCiFnWSrAm@tC"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0d9f-715f-be1e-49f414547b53",
+        "routeNumber": "R14",
+        "routeName": "Hibao-an to Jaro via Festive Walk",
+        "routeColor": "#00b294",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "mxonSolzthFzDmBdDiBfT}Mdm@k_@hc@mXjHqEla@_YpLcIvByAzEcDjBqAl`@aX~IeGCG|HoFrLgIlHmFvLaIrT{NlIwGvDoCnz@im@hMcIzQcNlD_DnJiG~VcQt@k@rTkPz`@gZjZ}R|CsBnAeAhDgCvd@a]tBuAb\\eVtCwBtAcAvHkF`NwJxEiDnh@i^nLwIbi@y`@pX_SxAmA|F{E`H}FvImH~NaMzNyLvDuDtIqIfIiH~G}GbIoHfFwE^]lAkAj@c@rM}KlBaBtBeBtGsFpEyDpC_CdJ_HhBwA|a@w\\nHiGfTyWvMuPrIeKhAcBvKwN`DwE~CwDxEmHjIgKlNwRdKgOhMiQfEiFdJsKbDaEfFqGhCaDrDuEbFqFfRmVz[{_@rHwJvEwF|u@_}@`LkFjHeBfJoAfW{BjD_@he@kE`KuB~HmCtLsHbKmJRWnLqLdJuIlGuFcEkBeCkAkVgN_FaCcFuCmX{OmDoAmA{O_AcM_@gQUoKUiUq@sSa@eH[aK_D_aAo@kSeC{p@]sKeAu[O_F[}IWoJgAk_@{@iU_@yHgAoUEmAkA_WyBse@g@qKwAe\\i@qM_@qIIcBEy@uAi]McDaA{\\MuDxKfFj@ZpClAd@PfDvBrGxDhBfAxA|@~Q~LlClB~DzCtFtDhUvObB~@bDhBlJdFdB`ApGlCtKpD`HxBxBh@lEhAvJdB|HxAtGxA`NzBxAKj@[Zi@Aq@e@k@iAw@mG{@aHsAkJeBgGkAiIiBeJ_C_KyCmKgEwG{CiF}CiC_B{PmL{AiAgFsDeBoAsJyGeTwN{NuIsBeAaEgBwPmHUeGSqCKaEM_C_AuSu@oKAU}@_RE_A]{FMkCM}BS{DcA{Uu@qP_FeXoQ_q@w@uCoDkMwB}H}@aDuBuHi@iBw@gCzJcDpA_@|CgAtZ{IzKqCtVyEzKoAvEi@pN_BbLu@pGe@rBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFdl@zJlWhE|\\|FnOzBlV~CxFb@bXrBjDJL?~BD`TPvED|WEvDGbDKl@bDxXdw@rQrc@dArBhIlPpGzKvFjIfCbDrF~F{@fB]pB?vB\\rBx@fB`B~AlBx@xBVzBIrBk@bBiAbAuAl@eBRkBCmB_@iBwAeCaC}AwCi@}CLc@NkBr@sF{FaHsJcPaY{EiLeEwJcOo_@sQwk@[cDm@}HyERoCHaC?sMJyKFiKQgLUgCG[AuL_@oTeBoM_BmMuBeOsBkIkAau@{MsPiC}u@mMx@eEj@{C`BcJpBaLhEaVjAuG^aCrDyTzC}T~Ge_@hD_Wf@sE?eH?mBS_EmCqJy@_C}CwGmB_DoPgOcGqGkDsD_RgQqAgAoKkLc@c@i@y@cA_Amj@sg@qXcXacAk~@oSoRuWqUeLsKqQcQcNsL{BwBuEiEoJsIk\\kZ}JqJaBaBEEuKsKsOqOaA_A{TxVyG`GuHvIsYrZ}ClDcArAaNlPeXv\\gDrCw[pXwdAt`AoUtUiFxDaQlMaLzHyFbEsBtAs]nWeDxBoDtCkDvBl@lCrA~B|A|A",
+          "back": "qasmS_~gwhFlQxMVPjEdD~LdJz@n@pFrDvGdEjEhAdDbCdJ`HfUpRhF~DdBvA~AfAz\\vUf^vVrYnRrSpMbj@`_@|M|IpQxKpo@rf@`GlH|@vBtArD`BlFwHfCqIjCqb@tN_\\pK}VpJcDtAev@pVeN`FeMjEecAv]qNhHcEvBce@pSkOzHeGnDcJdFqFpDmCjBkE~CyF~Dg[dX}d@hf@Yb@kBtBbFtDtA_BfAiA`b@ic@~YmV|NgLhCsBnB}AxByAjUsNhC`CvK|JxIrBdPvA|Er@dIjAnGfArN`Ct`@xGtATnP`C|Cj@hFt@~SxDvVfIdW~IbJzCbI`C~MvEzE|AtMjEp[~KPHbPtFbHbChi@bRfHrClNbFtAh]Dx@HbB^pIh@pM`@bJt@`Qf@pKxBre@jA~VDlAfAnU^xHz@hUfAj_@VnJZ|IN~EdAt[\\rKdCzp@n@jS~C~`AZ`K`@dHp@rSThUTnK^fQ~@bMjAzOwA|Dq@tAuAzBo@z@gA|AuBxBih@vj@{d@bt@{IhP}u@~|@wEvFsHvJ{[z_@gRlVcFpFsDtEiC`DgFpGcD`EeJrKgEhFiMhQeKfOmNvRkIfKyElH_DvDaDvEwKvNiAbBsIdKwMtPgTxWoHhG}a@v\\iBvAeJ~GqC~BqExDuGrFuBdBmB`BsM|Kk@b@mAjA_@\\gFvEcInH_H|GgIhHuIpIwDtD{NxL_O`MwIlHaH|F}FzEyAlAqX~Rci@x`@oLvIoh@h^yEhDaNvJwHjFuAbAuCvBc\\dVuBtAwd@`]iDfCoAdA}CrBkZ|R{`@fZsTjPu@j@_WbQoJhGmD~C{QbNiMbIoz@hm@wDnCmIvGsTzNwL`ImHlFsLfI}HnFBF_JdGm`@`XkBpA{EbDwBxAqLbIma@~XkHpEic@lXem@j_@gT|MeDhBcD~A"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0dab-744d-a44d-18e24507dad3",
+        "routeNumber": "R15",
+        "routeName": "Molo to City Proper via Baluarte",
+        "routeColor": "#ec008c",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "sx~kSqlxvhFaNwVeAiBaAcCuAeAw@[iASyAFuAj@kAtAc@`AKnA\\pDJjEPnDbI~z@^|Dn@~F~AlOl@~GbAnK\\pDHr@pAvMhB`Qr@dFJl@lC`RxFh^`@~BfHtU|Lr[bIzQzJxUfA`ChHrOfEzIbDhHzB|ExCiBdGoDjFgDzBwA|KmGz@k@pBaBdIyEjL}GxE}DvEeFzBqC|McHx@a@rIqEtP}IjImF|PwMnFuEvBgB`NgM~TkVlW}W|BuCd@i@tMoM`NiO|VaYxAkBjCyCfHsJ|IaOhHgQpBwEpFoPt@gCd@wC?gDE_De@qIsBiLy@kF}F__@cBoKmAmL[sOHau@YoLMiFw@iNsC}fAs@gWYwOmAe^}@aIkBoISaAmHsXwCeHy@qAcCkEaA{BkBeEi\\ua@eGuIsD{Du@_EQgBPqCpEuVnCaRBOtFoa@r@oGvAiNnAwL\\}Cf@iEmAeHi@gDer@ieDiAkFmW}lAwDyQcRi}@s@kD_@gBgAuF_CoLaAmEsGoZyA_H{EeUwJod@kY_wAg@cCqBoIwNgr@oAcGMmAQiAtDeBxD?tA@jqAJzjALlGFp]E`JAlO@pQ@jIt@f@Xl@Jn@Cj@SXWT]Lc@@e@C]I[MYYY_@Sc@Ic@Ac@HUHQJ_@b@Ob@Eh@Bf@Nd@X^f@Xl@Jn@Cj@SXWT]pOVpU@~OK|Ck~A{{@eAkAg@lC_{@@g@u|@u{@z@}A~KwOpOgPxGuHvAsA~QiQdGyF|AyA|BjBfEzFStBCZqBvR",
+          "back": "kfqkSq{gxhFu@nH{CjY{@vISnBY|CyB|WiAbNWxCCPQtBAf@eC|w@G`BNfc@?f@BnFHzELxGJvGVnN??ElAEz@IdCYY_@Sc@Ic@Ac@HUHQJ_@b@Ob@Eh@Bf@Nd@X^f@Xl@Jn@Cj@SXWT]pOVpU@~OKL{FnCovA{{@eAkAg@R~k@z@|f@UnGYY_@Sc@Ic@Ac@HUHQJ_@b@sHdC_b@CaJ@q]DmGG{jAMkqAKuAAyD?uDdBiAjCSt@MvACjCNv@tElT`ArEdFbVxAjGj@vCbOzs@fIha@|\\d_Br@lEhFhVx@xEPv@zQn{@fVzjAjEvSnAhGhMpm@nKvg@nDvP`I|_@nHt\\Rz@vB~IC~HyDh[OvAyGlg@_DjRgDrVc@tDKnBk@zIcB`JwFbPiHnMcK|NiHhJk@lACx@Fr@\\f@b@`@p@^j@T~@PlVu@d_@iCdFc@|VwB|D@dDp@jDpBlHrXR`AjBnI|@`IlAd^XvOr@fWj@bTfBxq@v@hNLhFXnLI`u@ZrOlAlLbBnK|F~^x@jFrBhLd@pID~C?fDe@vCu@fCqFnPqBvEiHfQ}I`OgHrJkCxCyAjB}V`YaNhOuMnMe@h@}BtCmW|W_UjVaNfMwBfBoFtE}PvMkIlFi[nPy@`@}MbHkQc[yCxAe@V{MvG_UxJa@PoAd@u@\\_QzGyAl@{SjIhHrOfEzIbDhHzB|ExCiBdGoDjFgDzBwAxAy@bIsEz@k@pBaBdIyEjL}GxE}DvEeFzBqCkQc[}JyTc@_AgK}TaDaHiOi\\gQq_@cBwDqBsEmEoKuCmGgHqNm@mAkQa^qAmCoXej@"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e24-706d-bf50-54ec56b04133",
+        "routeNumber": "R24",
+        "routeName": "La Paz to Festive Walk via Nabitasan",
+        "routeColor": "#e81123",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "oqylS{taxhFzZf^`EbE]RiC|AsSbO_F`DsKvHsJtHqDrCg_@zXwKzI~Cv@|g@`Mxg@fMpBb@`tAn]jIhAtkAzXxHd@nDiAbz@xpAvRtY~CfEbSvTln@d_@|VxNdf@pX`LxEdVhH\\HvAZp`@tYvPlNhFrFvNpMnEtGdPdYzVv`@tDxEnDpFxVhd@fEvHhEfM~@nI?jImAdIay@fjDuCxLuBfE}A`CaDtBgDdAoDx@}BbAcIzCqEhB{BpB}@`BqCfHaAjCg@vAqTdl@c@rAm@nBy@bE?JGfEt@`H`Yz|@_LhBqAVaBZayAbXoHtAd@tBfA|DsDz@s_@xGoGdAmCh@se@fIiB\\gDl@mDj@kn@pKeKpBwDl@oSvBuZxBsBPsAHyERoCHaC?sMJyKFiKQgLUgCG[AuL_@oTeBoM_BmMuBeOsBkIkAau@{MsPiC}u@mM_`@uF_a@iFuZcCsY{AeNYcCDeLP}JNgQV{BLoGXL`DJ|BpGe@rBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFdl@zJlWhE|\\|FnOzBlV~CxFb@bXrBjDJL?~BD`TPvED|WEvDGbDKl@bDxXdw@rQrc@dArBhIlPpGzKvFjIfCbDrF~F{@fB]pB?vB\\rBFNp@vA`B~AlBx@xBVzBIrBk@bBiApFpF`GvF~ErEfInHnZnWrI|HrBhDfO|XhL|PtJlNfGhInCpD~@nAxCdE`DjEzFxHlAdBfPxT~DtFdDlEb@l@rFnHbIrKhOtQr`@vd@f@rAAfAWl@oG~DuJbFuFrCsLzF}R~J{`@xN}JvDiOxF}Aj@mBb@o\\rFiGfA_TrDmKjBaBZuDr@mAcAm@c@yE{CCAmLiGmLyFiZmKmSgGmBc@}HgByH{AuVsDy@MgLiBi`@mFaWqHobAe\\yB}@m_Ac_@iYuLyBaAi]wOo[{OcY}IwIiCaBa@_Dg@eMqBmG{@aHsAkJeBgGkAiIiBeJ_C_KyCmKgEwG{CiF}CiC_B{PmL{AiAeAu@",
+          "back": "gacmSimtvhFuF_EsJyGeTwN{NuIsBeAaEgBwPmHeDwAeEiBkCcAmJsDa[mKyAk@yFqByDqA}EeBiL_EmN}E}`@cNwXcJ{JaDmE_AkF[yEYmEByBPsBLkKhB}Cv@_P|CsOdDqIfAuAUu`@yGsNaCoGgAeIkA}Es@ePwAyIsBwK}JiCaCzJqEle@oSvEwBfNkGxk@oRpYuJjm@iS`a@iO|DyAbScId\\qLxCaAx\\eLdBk@`JgC|HyBzJcDpA_@|CgAtZ{IzKqCtVyEzKoAvEi@pN_BbLu@pGe@rBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFdl@zJlWhE|\\|FnOzBlV~CxFb@bXrBjDJL?~BD`TPvED|WEvDGbDK~EOjEWtCSfSwApAI~XmDfRuChh@{IdEs@fDk@`BYpf@uIrCc@vEo@j]yG`Da@vHaBxD{@lZwFtGmAbDg@hTyDf^yG`MsB|OuCpDs@`IgAjDs@rB]pB_@vB_@fCe@pQoD`SuDfNyCtCa@jpAkVhIgA[eC[{BgEz@eCd@qpAnUkC`@s@NeOhCkEyCaFiAcBCgIf@{`@rHsa@pIaWex@_AuCu@aHFsEx@cEl@oBb@sApTel@f@wA`AkCpCgH|@aBzBqBpEiBbI{C|BcAnDy@fDeA`DuB|AaCtBgEtCyL`y@gjDlAeI?kI_AoIiEgMgEwHyVid@oDqFuDyE{Vw`@ePeYoEuGwNqMiFsFwPmNq`@uYwA[]IeViHaLyEef@qX}VyNmn@e_@cSwT_DgEwRuYep@acA}HwLz_A{PlOgCzB^lDa@l@I`Fq@x@Qh\\}FhCe@rT}D~NkC~Cm@b@MxbAoVjBe@jMy@bo@iCxKc@zCKrFOr]yAnCMr@GbKo@`OaAhKo@rOk@bJaCrJeBrAc@f@U\\WTWb@m@d@_ATq@Vy@tAaK`AgH\\gB`@eBNc@z@aCpA}Cl@k@\\w@F_AI}@]u@o@k@k@U]gCiAgGcAyFq@wDaAsJuDx@}Cn@se@`KwSlEcMjC}r@zOiHjBgQhFkZ|IsLtAwEHmAMuB_@UEgV}E{s@yNcFk@o@GmDKoEYcd@eDk\\ne@qNjR{TjZ}@jAeBgFuAqBmG}IyAuBcK}MeRmUeD{AwDaFcF{G{RsWgBaCoSoXwEsGuFyHeDsEmFwHk]qf@mT{[iKiNw\\tUwVvP}IlFqVnOtMrO~MhPtG~H"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e51-775e-bbff-ea1755a711b5",
+        "routeNumber": "R5",
+        "routeName": "Festive Walk to City Proper via B. Aquino Ave.",
+        "routeColor": "#fff100",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "sicmSystvhF}IiGeTwN{NuIsBeAaEgBwPmHUeGSqCKaEM_C_AuSu@oKAU}@_RE_A]{FMkCM}BS{DcA{Uu@qP_FeXoQ_q@w@uCoDkMwB}H}@aDuBuHi@iBw@gCzJcDpA_@|CgAtZ{IzKqCtVyEzKoAvEi@pN_BbLu@pGe@rBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFdl@zJlWhE|\\|FnOzBlV~CxFb@bXrBjDJL?~BD`TPvED|WEvDGbDK~EOjEWtCSfSwApAI~XmDfRuChh@{IdEs@fDk@`BYpf@uIrCc@vEo@j]yG`Da@vHaBxD{@lZwFtGmAbDg@hTyDf^yG`MsB|OuCpDs@`IgAjDs@rB]pB_@vB_@fCe@pQoD`SuDfNyCtCa@jpAkVhIgA`De@`@EpQoCdOcCvQkCjAOhHiAg@aHMyCk@sJ_@{Es@qJKuAy@wKYgDcBcSUkBeB}Dw@}PK_C}@mOc@oMuAu]Cy@QaHyA_a@m@uMeB__@M_CcDes@g@kXQaEW{BI_@eCoG_@yFyIuz@qGus@_Fwn@{@kKfAcGcAsUqBoYyE}n@e@oGEa@i@{G_BaTWcD]kEI_AuEwm@q@cJ_@sE}@sLKsAEi@sFyu@ISU}CGw@u@yJ_BqIs@}GEiA]}IUsL\\gB`@eBjAeDpA}Cl@k@`Bg@dBWtAKlCYzb@S~FCxV@jE@jl@VtKPzHx@xw@H~@?`A?|F@vCAvEAtd@NlX?jA?hC{@`EsCjD{BpAcAd@_@xn@_e@pByA`f@u]zCyBpA{@tDoBrf@oVpCqAjAq@v@a@nBaBT[p@}@l@{AxJmUbBgDfCyEJoCn@{AhDgHjBsDrGwLdFeIdC_Eh@{@Zm@z@}A{@|At|@t{@Af@iBxk@",
+          "back": "g{qkSmdcxhFa@hMR~k@z@|f@KhCIdCYY_@Sc@Ic@Ac@HUHQJ_@b@sHdC_b@CaJ@q]DmGG{jAMkqAKuAAyD?cBv@qAl@iAjCSt@MvACjCNv@vG`[dFbVxAjGj@vCbOzs@fIha@|\\d_BqWYeBxA{cA@in@@yE?TdDlArRd@rF`Bj\\Bl@LnBvAfUTjDN~AlBzSHxBTlCpFfr@t@lJ_F@a_@@mw@BaHBsQGwNCg^@}P@aRTkBH}AVuB`@pB`VzAjPZxC`G`k@Hz@bBxQDl@d@dJbBrVtArg@xBlf@XpGb@hLtAh[ZnH^vJ~@tVHdBrAfZzA|UTpDSnFXvCd@pFn@fJdB|Wh@|I{@rFq@tAy@`B{DjC_H~CgR`DeNzB_Ev@gEz@eCd@qpAnUkC`@s@NeOhC_IzAeFt@yM|BaHtA}NrCqIvAqEt@aqAfUkDj@eg@lIiGfAsDz@s_@xGoGdAmCh@se@fIiB\\gDl@mDj@kn@pKeKpBwDl@oSvBuZxBsBPsAHyERf@xHl@bDxXdw@rQrc@dArBhIlPpGzKvFjIfCbDrF~F{@fB]pB?vB\\rBx@fB`B~AlBx@xBVzBIrBk@bBiApFpF`GvF~ErEfInHnZnWrI|HrBhDfO|XhL|PtJlNfGhInCpD~@nAxCdE`DjEzFxHlAdBfPxT~DtFdDlEb@l@rFnHbIrKhOtQr`@vd@f@rAAfAWl@oG~DuJbFuFrCsLzF}R~J{`@xN}JvDiOxF}Aj@mBb@o\\rFiGfA_TrDmKjBaBZuDr@mAcAm@c@yE{CqLkGmLyFiZmKmSgGmBc@}HgByH{AuVsDy@MgLiBi`@mFaWqHobAe\\yB}@m_Ac_@iYuLyBaAi]wOo[{OcY}IwIiCaBa@_Dg@eMqBmG{@aHsAkJeBgGkAiIiBeJ_C_KyCmKgEwG{CiF}CiC_B{PmL{AiAeAu@"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e3a-7512-96df-a86076e3fc94",
+        "routeNumber": "R3",
+        "routeName": "UNGKA To City Proper via CPU Loop",
+        "routeColor": "#00b294",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "kpjoSozcvhF|Zu@l@gBba@Y~R[hc@YpDCdMEfEAbGDjHKhQa@`Kc@~Fg@|Ee@~Da@lCWvBWJC`BOdPaB~OgBjKcAjMqAfNoAzKs@x@GvMeA|NeA~XgCdEUzGc@zQu@pHa@`Jg@lBM~FyAdOs@bBQ|XeBhUqApE[nl@cDrFa@~Ks@hKs@rLYxEDtGFnTj@jOhAdOlAhQvB|FfA~Bb@rGpAtFAjBw@pDoBh@}Bl@kC|GiThHwKhFaGzAoA|\\cVfCkB|ZwVjL}KhO}Oh[q\\|NkPr\\c^xEuFlMgOrQuR`TsUdBuBtVwYhS{TnWa\\\\[`@e@pKcMvCsDfFsG|PeRdEuEbh@{l@|BmClC_DlDeEbAmApHyIhEeFdEwE|C{DdB{BdZa_@bLmOr@_AdAwA~MuQ`DaEnLgNlLcObBqBtRsUzZe^~IaLxC{DpTmYrHsIp@y@nFoHt@{@|GkId\\_a@h@q@lVqXtL_Nxr@ox@r_@sb@~UoV~Zs[|@aApWkV|IcI|JmIhGgFvVkRlIqGtDsC`CaBxEcDt[mTfIaEhIeFn@lCrA~B|A|AlQxMVPjEdD~LdJz@n@dHk@lDq@|@UbGaDjEiDdCmB~BgCjGwGX]xJiKhHwHfQ_OpGoFpByAhCmBlfAmr@`J{FzLqHxD_CrDuB~MmIn@e@xCeBxu@ac@pg@cZ~d@eYjAo@tLsGhEeC|g@yY~NaIhSwKdUuLlGkD`B}@zRuKpCyAlTmLfFiCl@]~F}CtKwFlK_H`IcCd_@oS~@e@nZ{Pb_@mSnAq@dRuKlOuHri@aXbF}EhC}AnKcGn\\kPfFiCtc@gUdCwAzCcBnC_BrKgGhBcAvJmFnHoEtBkA`a@sUpFeAhF}@nDiAz_A{PlOgCzB^lDa@l@I`Fq@x@Qr`@cHrT}D~NkC~Cm@b@MxbAoVjBe@jMy@bo@iCxKc@zCKrFOr]yAnCMr@GbKo@`OaAhKo@rOk@bJaCrJeBrAc@f@U\\WTWb@m@d@_ATq@Vy@tAaK`AgH\\gB`@eBjAeDpA}Cl@k@`Bg@dBWtAKlCYzb@S~FCxV@jE@jl@VtKPzHx@bN@th@F~@?`A?|F@vCAvEAtA@~a@LlX?jA?hC{@`EsCjD{BpAcAd@_@xn@_e@pByA`f@u]zCyBpA{@tDoBrf@oVpCqAjAq@v@a@TQxAoAT[p@}@l@{AxJmUbBgDfCyEJoCn@{AhDgHjBsDrGwLdFeIdC_Eh@{@Zm@z@}A~KwOpOgPxGuHvAsA~QiQdGyF|AyAvDsDpP}Sb_@_l@|}@ezA|GgKh]sh@fIyO|I}P|BwDbEkKn@}An@_BFOxGgPv@kBjAqCvI{SrBkGlAmGl@_GL_FE_DSmHeA_IUiAgDmK{CwHmQec@{JgVsK_UmCoFoD_G{BgD}ByCgCyBwC{BuDgBcDw@yDm@mDg@{YyCmIq@y@MgACeIDuLkBcTcDeN_Cab@eHqNuBaCe@}IuA",
+          "back": "k}rkSkozxhF|ItA`Cd@pNtB`b@dHdN~BbTbDtLjBbHxBlBXpIfA`T`ChL~@fCd@pCx@jC~ApBtAxBlBhClCpCfEhCxDxDxGfLvUnJtUjPhb@tDtKdBhG`@hB`AdHJlBL`C@nDO~E[dEi@|Cu@zCqL~ZcAlCmInS}@xBo@~AwFhNsA`BeAvAmBdBmAj@UJaExBwL|FmFhC_ZnN_QdIwErDiFzDyNjVmUn`@aWnc@oBnDgKzPy\\hk@nFlGxFnGpCzCnAxA`CfCbAfA}AxAeGxF_RhQwArAyGtHqOfP_LvO{@|A[l@i@z@eC~DeFdIsGvLkBrDiDfHo@zA_Cz@mChF{AnDsKpWy@nAMPuA~@iBfAaDvAuj@hXkBdAwE|Cse@~]uB~Ayn@~d@yC~BmBvA}DtCaBn@iABaXI}\\FcGCqE?sKB_C?eZM}\\QsHhAuKQkl@WkEAyVA_GB{b@PmCm@{A_@wA_@kA]oAc@k@Uy@Gw@FKDg@Ri@h@Yl@Kp@?t@GTYfAiCrJ_@vAe@hBkDvEe@p@qDhHaApBcBdBmCfBaAx@mC|B}Ch@kDh@aE`@oFj@gCNqOp@uBJsFXw@DgKh@m]|@qPt@qXbA{I\\iLd@wENgADeDLoBRubAxVe@L_Ch@g@Ju]bHwGpAcHnA{JfBmHbAu@JuHfAyDl@}@xAkNoRaCmDgQmUaa@tg@kDlE_J`MoGlHaDhDaa@rUuBjAoHnEwJlFiBbAsKfGoC~A{CbBeCvAuc@fUgFhCo\\jPoKbGiC|AeHdBwi@dXuQ`JgPxI}`@fUg]xRs^dSaGpFmK~GuKvF_G|Cm@\\gFhCmTlLqCxA{RtKaB|@mGjDeUtLiSvK_O`I}g@xYiEdCuLrGkAn@_e@dYqg@bZyu@`c@yCdBo@d@_NlIsDtByD~B{LpHaJzFmfAlr@iClBqBxAiCaCqBkBuHaHaJuHwKeJ{E_EiFxDaQlMaLzHyFbEsBtAs]nWeDxBoDtCmDvBwAsHuC_LeEyGwEsFiZqGaf@_I_DtBa\\pTkOjKoNvJeQzNmQlRbB`BnJdIhl@pk@bHfGeHnGw@r@qWjV}@`A_[r[_VnVs_@rb@yr@nx@uL~MmVpXi@p@e\\~`@}GjIu@z@oFnHq@x@sHrIqTlYyCzD_J`L{Zd^uRrUcBpBmLbOoLfNaD`E_NtQeAvAs@~@cLlOeZ`_@eBzB}CzDeEvEiEdFqHxIcAlAmDdEmC~C}BlCch@zl@eEtE}PdRgFrGwCrDqKbMa@d@]ZoW`\\iSzTuVvYeBtBaTrUsQtRmMfOyEtFs\\b^}NjPi[p\\iO|OkL|K}ZvVgCjB}\\bV{AnAiF`GiHvK}GhTyDnA{B`@mDf@iAQ_GaAcKqAaI{@sHm@eOsAuO_AwTm@eGOeG@{Lj@aY|AyE`@cYdBo]xBwPx@oQbAiGXeGXeIl@eGg@iJ\\qLh@iQt@ePnAkHp@_Gv@oEb@yO`B{\\tC}K~@wNtA}CVyHt@mALaJv@uQxB{APcCZmC\\_Ed@oAHqJv@gLX}PEyN@gEAyC?eE@sB?}C?gSBgC@mB@eIRsHN}GFoIH_Wh@cB`@eB`@qKPsIR"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
+      },
+      {
+        "id": "019d9020-0e47-76ac-9451-a4739e710a4d",
+        "routeNumber": "R4",
+        "routeName": "UNGKA TO CITY PROPER",
+        "routeColor": "#e81123",
+        "routeDetails": "Seeded, needed to be filled",
+        "polylines": {
+          "to": "g|joSyycvhFxf@kAl@gBba@Y~R[hc@YpDCdMEfEAbGDjHKhQa@`Kc@~Fg@|Ee@~Da@lCWvBWJC`BOdPaB~OgBjKcAjMqAfNoAzKs@x@GvMeA|NeA~XgCdEUzGc@zQu@pHa@`Jg@lBM~FyAdOs@bBQ|XeBhUqApE[nl@cDrFa@~Ks@hKs@rLYxEDtGFnTj@jOhAdOlAhQvB|FfA~Bb@rGpA~OxCnEfA`InB~HlBtWrFfE`Adb@tJlJxBjSvEfUtEdV~EhJ~AhJbAhVhA~ITjHBbEBdDDrFDfSEfLYbH[pEUdPiAtTmBj[}EpLkC~D}@dYwGlSaGlQkHjWcMbMuGjDyBrBsAbZaSlOuK~PyOdJwJpIaLzOkShDqEzBoCZe@fIsLzCaEvQaVb@c@rGsJpMeQr_@eg@dBaC~NgSlDgE`BwBxBcD`c@uk@nNuRfC{Cl_@of@fYa`@tWc^lJaMjNiRrAiBzJaMjDkEzFkHtMoPvGeIxBkCtA_BfAiA`b@ic@~YmV|NgLhCsBnB}AxByAjUsNhC`CvK|JxIrBdPvA|Er@dIjAnGfArN`Ct`@xGtATnP`CdO}B|L{CxCw@~DcAbCa@tBOhCAzEMfCAxCTdE~@vLvDbiAl`@jKpDdFfBrDnAxIvCbNtErDnApC`AdFfBhFhBdHdCtClAtDzAxKfFj@ZpClAd@PfDvB|J`GxA|@~Q~LlClB~DzCtFtDhUvObB~@bDhBlJdFdB`ApGlCtKpD`HxBxBh@lEhAvJdB|HxAtGxA`NzBxAKj@[Zi@Aq@e@k@iAw@mG{@aHsAkJeBgGkAiIiBeJ_C_KyCmKgEwG{CiF}CiC_B{PmL{AiAmIcGsJyGeTwN{NuIsBeAaEgBsKuEcDwAUeGSqCKaEM_C_AuSu@oKAU}@_RE_A]{FMkCM}BS{DcA{Uu@qP_FeXoQ_q@w@uCoDkMwB}H}@aDuBuHi@iBw@gCzJcDpA_@|CgAtZ{IzKqCtVyEzKoAvEi@pN_BbLu@pGe@rBM~GSzW?zYOZAlW|An@DvQfAtJ|@va@tG~ZpElNdCpYhFdl@zJlWhE|\\|FnOzBlV~CxFb@bXrBjDJL?~BD`TPvED|WEvDGbDK~EOjEWtCSfSwApAI~XmDfRuChh@{IdEs@fDk@`BYpf@uIrCc@vEo@j]yG`Da@vHaBxD{@lZwFtGmAbDg@hTyDf^yG`MsB|OuCpDs@`IgAjDs@rB]pB_@vB_@fCe@pQoD`SuDfNyCtCa@jpAkVhIgA`De@`@EpQoCdOcCvQkCjAOhHiApA_@xJoCtAa@\\OjBk@xDmAnEcB|EiBpA_@xC{@nEs@xCWhDYrTeB~i@sCh@Ezj@eDbQeAjBKpf@kCnLq@~UqAvMu@`UmAdV{ClVu@d_@iCdFc@|VwB|D@dDp@jDpBwCeH{@qAaCkEaA{BkBeEi\\ua@eGuIsD{Du@_EQgBPqCpEuVnCaRBOtFoa@r@oGvAiNnAwL\\}Cf@iEmAeHi@gDer@ieDiAkFmW}lAwDyQcRi}@s@kD_@gBgAuF_CoLhKG`GEfCqAj@A`BAvXP",
+          "back": "mnvkSmgwwhFlf@XpZDyC{z@qAmf@WgGs@qQeEedAwFBwRBeVPw[Jqe@RkHBoZLuB@kBE{GDoQBmMJoIDyLNu[X_IAKlI?|ABjJ?hDGlFChAUtRCjDArCA`KFhEFdADfAlBn^fAdNfArNH`AjB`W^jFTdDlArRd@rF`Bj\\Bl@LnBvAfUTjDN~AlBzSHxBTlCpFfr@t@lJPzGj@hJlGj~@f@jHlA~]pA`Yr@tR^fHDdB^fNdAtT`@xIf@lKF`C@b@bFneALnCvAlXFnBJpDvAdZJnDJpCPzDdAdWHzDgCPaPv@qj@nCsAHm~@`GyEZsB\\_Ev@gHzB_MbD{FxAcE~@_H`A{AT_BRiEh@gAPyR~CgR`DeNzB_Ev@gEz@eCd@qpAnUkC`@s@NeOhC_IzAeFt@yM|BaHtA}NrCqIvAqEt@aqAfUkDj@eg@lIiGfAsDz@s_@xGoGdAmCh@se@fIiB\\gDl@mDj@kn@pKeKpBwDl@oSvBuZxBsBPsAHyERoCHaC?sMJyKFiKQgLUgCG[AuL_@oTeBoM_BmMuBeOsBkIkAau@{MsPiC}u@mM_`@uF_a@iFuZcCsY{AeNYcCDeLP}JNgQV{BLoGXkL`Aec@hEqWxEwRlEwWnIs@RIDmAd@sJnDnBnGv@fCh@hBtBtH|@`DvB|HnDjMv@tCnQ~p@~EdXt@pPbAzURzDL|BLjC\\zFD~@|@~Q@Tt@nK~@tSL~BJ`ERpCTdGeDwAeEiBkCcAmJsDa[mKyAk@yFqByDqA}EeBiL_EmN}E}`@cNwXcJ{JaDmE_AkF[yEYmEByBPsBLkKhB}Cv@_P|CsOdDqIfAuAUu`@yGsNaCoGgAeIkA}Es@ePwAyIsBwK}JiCaCzJqEle@oS_CuFce@pSmJzE}C~AeGnDcJdFqFpDmCjBkE~CyF~Dg[dX}d@hf@Yb@kBtB_BpB_d@lk@uJ`MwQzTkJdMci@vp@iExFqBlC{HfK{Un\\}AtBsJ|Lat@f`A}OrToAdBiIrKkHtJmIfL_q@t}@mNfRuCfEyOnSsVdXiOhNeNfK_^vTgCjBgL|GqJdFoJ`FoTpIwj@lOkCr@uQnD{TfDsRnBsXfBaHVwPZsUXeDCoYm@qUwAqIcAkIgAeI{A}K{BcU_FoCq@c{@ySg[yGkX}FiE}@iBc@iHqAaB]iAQ_GaAcKqAaI{@sHm@eOsAuO_AwTm@eGOeG@{Lj@aY|AyE`@cYdBo]xBwPx@oQbAiGXeGXeIl@eGg@iJ\\qLh@iQt@ePnAkHp@_Gv@oEb@yO`B{\\tC}K~@wNtA}CVyHt@mALaJv@uQxB{APcCZmC\\_Ed@oAHqJv@gLX}PEyN@gEAyC?eE@sB?}C?gSBgC@mB@eIRsHN}GFoIH_Wh@cB`@eB`@qKPsCF"
+        },
+        "availability": {
+          "from": "00:00",
+          "to": "23:59"
+        },
+        "vehicle": {
+          "id": "00000000-0000-7000-8000-000000000001",
+          "name": "Modernized"
+        }
       }
     ],
     "regions": [
       {
-        "id": "019cb3f9-c070-7453-8db5-5bddd964bc1d",
-        "regionName": "Station 2",
+        "id": "019d90ad-1d9c-751c-91db-578a5411e511",
+        "regionName": "Mandurriao Area",
         "regionColor": "#ec008c",
         "regionShape": "Polygon",
         "points": [
           {
-            "id": "019cb3f9-c071-76be-ba2a-cb8f9183cf77",
+            "id": "019d90ad-1dba-7321-a8f8-20118dc33e00",
             "sequence": 0,
-            "point": [10.7461787682929, 122.556931972504]
+            "point": [10.727689845032, 122.54662156105]
           },
           {
-            "id": "019cb3f9-c071-76be-ba2a-cc4e0ce6e7fc",
+            "id": "019d90ad-1dba-7321-a8f8-27138a88e161",
             "sequence": 1,
-            "point": [10.7418148941217, 122.56246805191]
+            "point": [10.7274157703879, 122.547007799149]
           },
           {
-            "id": "019cb3f9-c071-76be-ba2a-d1f9f0b9ff84",
+            "id": "019d90ad-1dba-7321-a8f8-299c49d5f55d",
             "sequence": 2,
-            "point": [10.7439441352917, 122.563916444778]
+            "point": [10.7248015074543, 122.545323371887]
           },
           {
-            "id": "019cb3f9-c071-76be-ba2a-d47d46de0a0a",
+            "id": "019d90ad-1dba-7321-a8f8-2e890395e24e",
             "sequence": 3,
-            "point": [10.743121954837, 122.564688920975]
+            "point": [10.7244325572371, 122.545741796494]
           },
           {
-            "id": "019cb3f9-c072-740d-ad34-a552a578a5de",
+            "id": "019d90ad-1dba-7321-a8f8-330168bb6378",
             "sequence": 4,
-            "point": [10.7429954653376, 122.564967870712]
+            "point": [10.7229672933612, 122.544625997543]
           },
           {
-            "id": "019cb3f9-c072-740d-ad34-ab729a1a4b67",
+            "id": "019d90ad-1dba-7321-a8f8-34a83428275f",
             "sequence": 5,
-            "point": [10.7462420123825, 122.567092180252]
+            "point": [10.720511115696, 122.542673349381]
           },
           {
-            "id": "019cb3f9-c072-740d-ad34-af1a035a7d46",
+            "id": "019d90ad-1dba-7321-a8f8-3a846c647924",
             "sequence": 6,
-            "point": [10.74696931846, 122.567542791367]
+            "point": [10.720532198851, 122.54120349884]
           },
           {
-            "id": "019cb3f9-c072-740d-ad34-b1827542cf06",
+            "id": "019d90ad-1dba-7321-a8f8-3fd8ae9e7e42",
             "sequence": 7,
-            "point": [10.7489825768688, 122.566384077072]
+            "point": [10.7180970847471, 122.541182041168]
           },
           {
-            "id": "019cb3f9-c072-740d-ad34-b499b30bc121",
+            "id": "019d90ad-1dba-7321-a8f8-40f36bcd4c19",
             "sequence": 8,
-            "point": [10.7507428493949, 122.564989328384]
+            "point": [10.7180654597597, 122.540903091431]
           },
           {
-            "id": "019cb3f9-c072-740d-ad34-b9beece1da9c",
+            "id": "019d90ad-1dba-7321-a8f8-4593c198356c",
             "sequence": 9,
-            "point": [10.7521974381054, 122.560697793961]
+            "point": [10.7205954483069, 122.540913820267]
           },
           {
-            "id": "019cb3f9-c072-740d-ad34-bfaed2a58588",
+            "id": "019d90ad-1dba-7321-a8f8-4be3e2556174",
             "sequence": 10,
-            "point": [10.7501314984238, 122.558391094208]
+            "point": [10.7223980522437, 122.538628578186]
           },
           {
-            "id": "019cb3f9-c072-740d-ad34-c0030f88e816",
+            "id": "019d90ad-1dbb-73d9-a27e-2465125de993",
             "sequence": 11,
-            "point": [10.7486979809453, 122.557414770126]
+            "point": [10.7270995301054, 122.542405128479]
           },
           {
-            "id": "019cb3f9-c072-740d-ad34-c4ea1a481dc6",
+            "id": "019d90ad-1dbb-73d9-a27e-29e319b6d07d",
             "sequence": 12,
-            "point": [10.7496677141024, 122.555311918259]
-          },
-          {
-            "id": "019cb3f9-c072-740d-ad34-cb32670520e6",
-            "sequence": 13,
-            "point": [10.748086625832, 122.554271221161]
+            "point": [10.7251493743898, 122.545001506805]
           }
         ],
         "stations": [
           {
-            "id": "019cb3f9-c07e-7464-9b3b-f83757fefa56",
-            "address": "Carmen J Ledesma Village, M. V. Hechanova, Jaro, Quintin Salas, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.7457993034774, 122.557801008225]
+            "id": "019d90ad-1dd6-774e-bc0d-c938b42f9443",
+            "address": "Dungon C - Santa Rosa Road, Dungon A, Jaro, Santa Rosa, Iloilo City, Western Visayas, 5000, Philippines",
+            "availableFrom": "00:00",
+            "availableTo": "23:59",
+            "point": [10.7274157703879, 122.546718120575]
           },
           {
-            "id": "019cb3f9-c07e-7464-9b3b-f53485375fce",
-            "address": "Cypress Avenue, Gran Plains, M. V. Hechanova, Jaro, Quintin Salas, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.7447136098431, 122.55917429924]
-          },
-          {
-            "id": "019cb3f9-c07e-7464-9b3b-f090d81f0e7a",
-            "address": "Yellow Bell Street, Gran Plains, M. V. Hechanova, Jaro, Quintin Salas, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.7456411929968, 122.56641626358]
-          },
-          {
-            "id": "019cb3f9-c07e-7464-9b3b-ee7a46b9409d",
-            "address": "Toyota Iloilo, MacArthur Drive, M. V. Hechanova, Jaro, Quintin Salas, Iloilo City, Western Visayas, 5000, Philippines",
-            "point": [10.743543586119, 122.565171718597]
+            "id": "019d90ad-1dd6-774e-bc0d-cfb86aaf23c9",
+            "address": "Western Visayas Medical Center, Q. Abeto Street, Iloilo Business Park, Jeferson Ville Subdivision, Mandurriao, Pale Benidicto Rizal, Iloilo City, Western Visayas, 5000, Philippines",
+            "availableFrom": "00:00",
+            "availableTo": "23:59",
+            "point": [10.7182552096343, 122.541085481644]
           }
+        ]
+      }
+    ],
+    "closure": [],
+    "stops": [
+      {
+        "id": "019d8f9e-f2bb-75b2-b5c7-b7aebc954c76",
+        "name": "Not allowed bruh",
+        "restrictionType": "specific",
+        "points": [
+          {
+            "id": "019d902a-864a-747c-89c9-294e1fbb3ba0",
+            "point": [10.7314583461982, 122.542077898979],
+            "sequence": 1
+          },
+          {
+            "id": "019d902a-864a-747c-89c9-2ddf34674e40",
+            "point": [10.7304266248488, 122.543361335993],
+            "sequence": 2
+          }
+        ],
+        "routeIds": [
+          "019d9020-0de9-72fd-9bf9-67f89c5a540f",
+          "019d9020-0e02-740c-b1ae-579f8717a935",
+          "019d9020-0e5b-729d-8637-319daec4ec2c",
+          "019d9020-0e66-726b-9cdf-9f0e9e87c93a"
+        ],
+        "vehicleTypeIds": [
+          "00000000-0000-7000-8000-000000000001"
         ]
       }
     ]
