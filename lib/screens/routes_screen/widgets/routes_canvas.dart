@@ -5,8 +5,8 @@ import 'package:vector_map_tiles/vector_map_tiles.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 
-class MapCanvas extends StatelessWidget {
-  const MapCanvas({
+class RoutesCanvas extends StatelessWidget {
+  const RoutesCanvas({
     super.key,
     required this.mapController,
     required this.vectorStyle,

@@ -1,11 +1,11 @@
 import 'package:jippy_mobile/models/jeepney_route.dart';
 import 'package:jippy_mobile/models/road_closure.dart';
 
-enum MapPanelMode { routes, overlap, routeDetails, closureDetails }
+enum RoutesPanelMode { routes, overlap, routeDetails, closureDetails }
 
-class MapUiState {
-  const MapUiState({
-    this.panelMode = MapPanelMode.routes,
+class RoutesUiState {
+  const RoutesUiState({
+    this.panelMode = RoutesPanelMode.routes,
     this.isFocusedMode = false,
     this.isCompareMode = false,
     this.showStations = true,
@@ -16,7 +16,7 @@ class MapUiState {
     this.returnToOverlappingRoutesAfterDetails = false,
   });
 
-  final MapPanelMode panelMode;
+  final RoutesPanelMode panelMode;
   final bool isFocusedMode;
   final bool isCompareMode;
   final bool showStations;
@@ -26,8 +26,8 @@ class MapUiState {
   final List<JeepneyRoute> overlappingRoutes;
   final bool returnToOverlappingRoutesAfterDetails;
 
-  MapUiState copyWith({
-    MapPanelMode? panelMode,
+  RoutesUiState copyWith({
+    RoutesPanelMode? panelMode,
     bool? isFocusedMode,
     bool? isCompareMode,
     bool? showStations,
@@ -39,7 +39,7 @@ class MapUiState {
     List<JeepneyRoute>? overlappingRoutes,
     bool? returnToOverlappingRoutesAfterDetails,
   }) {
-    return MapUiState(
+    return RoutesUiState(
       panelMode: panelMode ?? this.panelMode,
       isFocusedMode: isFocusedMode ?? this.isFocusedMode,
       isCompareMode: isCompareMode ?? this.isCompareMode,

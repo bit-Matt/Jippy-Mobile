@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/map_colors.dart';
 import 'blank_map_screen.dart';
-import 'map_screen.dart';
+import 'routes_screen/routes_screen.dart';
 import 'settings_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -24,7 +24,7 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final pages = <Widget>[
       const BlankMapScreen(),
-      const MapScreen(),
+      const RoutesScreen(),
       const SettingsScreen(),
     ];
 

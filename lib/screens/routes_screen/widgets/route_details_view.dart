@@ -1,33 +1,29 @@
 import 'package:flutter/material.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
-import 'package:jippy_mobile/models/road_closure.dart';
-import 'package:jippy_mobile/screens/map/widgets/details_back_button.dart';
+import 'package:jippy_mobile/models/jeepney_route.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/details_back_button.dart';
 
-class ClosureDetailsView extends StatelessWidget {
-  const ClosureDetailsView({
+class RouteDetailsView extends StatelessWidget {
+  const RouteDetailsView({
     super.key,
     required this.scrollController,
-    required this.closure,
+    required this.route,
     required this.onBackPressed,
   });
 
   final ScrollController scrollController;
-  final RoadClosure? closure;
+  final JeepneyRoute? route;
   final VoidCallback onBackPressed;
 
   @override
   Widget build(BuildContext context) {
-    final title = (closure != null && closure!.closureName.trim().isNotEmpty)
-        ? closure!.closureName.trim()
-        : '(untitled)';
-    final detailText =
-        (closure != null && closure!.closureDescription.trim().isNotEmpty)
-        ? closure!.closureDescription.trim()
-        : 'No description available.';
+    final detailText = (route != null && route!.routeDetails.trim().isNotEmpty)
+        ? route!.routeDetails.trim()
+        : 'No route details available for this route yet.';
 
     return ListView(
-      key: const ValueKey<String>('closure-details-view'),
+      key: const ValueKey<String>('route-details-view'),
       controller: scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
@@ -37,7 +33,7 @@ class ClosureDetailsView extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(left: 8),
                 child: Text(
-                  title,
+                  route?.routeName ?? 'Route details',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

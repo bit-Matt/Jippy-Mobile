@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/models/jeepney_route.dart';
-import 'package:jippy_mobile/screens/map/widgets/details_back_button.dart';
-import 'package:jippy_mobile/screens/map/widgets/route_list_item.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/details_back_button.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/route_list_item.dart';
 
 class OverlappingRoutesView extends StatelessWidget {
   const OverlappingRoutesView({

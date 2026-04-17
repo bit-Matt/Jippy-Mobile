@@ -8,32 +8,32 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
-import 'package:jippy_mobile/screens/map/widgets/closure_details_view.dart';
-import 'package:jippy_mobile/screens/map/widgets/bottom_drawer.dart';
-import 'package:jippy_mobile/screens/map/map_state.dart';
-import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
-import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
-import 'package:jippy_mobile/screens/map/widgets/map_canvas.dart';
-import 'package:jippy_mobile/screens/map/widgets/map_action_buttons.dart';
-import 'package:jippy_mobile/screens/map/widgets/overlapping_routes_view.dart';
-import 'package:jippy_mobile/screens/map/widgets/route_details_view.dart';
-import 'package:jippy_mobile/screens/map/widgets/routes_header.dart';
-import 'package:jippy_mobile/screens/map/widgets/routes_list_view.dart';
-import 'package:jippy_mobile/screens/map/widgets/routes_loading_state.dart';
-import 'package:jippy_mobile/screens/map/widgets/search_bar_overlay.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/closure_details_view.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/bottom_drawer.dart';
+import 'package:jippy_mobile/screens/routes_screen/routes_state.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/loading_overlay.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/routes_canvas.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/routes_action_buttons.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/overlapping_routes_view.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/route_details_view.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/routes_header.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/routes_list_view.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/routes_loading_state.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/search_bar_overlay.dart';
 
-import '../core/theme/map_colors.dart';
-import '../data/map_data_loader.dart';
-import '../data/valhalla_route_client.dart';
-import '../models/jeepney_route.dart';
-import '../models/road_closure.dart';
-import '../models/routes_and_stations_data.dart';
-import '../utils/polyline_1e6.dart';
-import '../utils/route_color_parser.dart';
-import '../utils/route_polyline_hit.dart';
-import '../utils/route_sort.dart';
+import 'package:jippy_mobile/core/theme/map_colors.dart';
+import 'package:jippy_mobile/data/map_data_loader.dart';
+import 'package:jippy_mobile/data/valhalla_route_client.dart';
+import 'package:jippy_mobile/models/jeepney_route.dart';
+import 'package:jippy_mobile/models/road_closure.dart';
+import 'package:jippy_mobile/models/routes_and_stations_data.dart';
+import 'package:jippy_mobile/utils/polyline_1e6.dart';
+import 'package:jippy_mobile/utils/route_color_parser.dart';
+import 'package:jippy_mobile/utils/route_polyline_hit.dart';
+import 'package:jippy_mobile/utils/route_sort.dart';
 
-/// Default center for the map: Iloilo City, Philippines.
+/// Default center for the routes map: Iloilo City, Philippines.
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
 
 enum _RouteDirection { goingTo, goingBack }
@@ -73,19 +73,19 @@ const double _overlapTapRadiusLogicalPixels = 38;
 const double _overlapThresholdMetersMin = 28;
 const double _overlapThresholdMetersMax = 220;
 
-/// After a map tap for overlap, ensure at least this zoom when nudging the camera.
+/// After a routes map tap for overlap, ensure at least this zoom when nudging the camera.
 const double _overlapTapMinZoom = 15;
 
-/// Full-screen map with OpenStreetMap tiles, user location dot, and structure for
+/// Full-screen routes map with OpenStreetMap tiles, user location dot, and structure for
 /// static route polylines and A* path segments.
-class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+class RoutesScreen extends StatefulWidget {
+  const RoutesScreen({super.key});
 
   @override
-  State<MapScreen> createState() => _MapScreenState();
+  State<RoutesScreen> createState() => _RoutesScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
+class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   Position? _userPosition;
   StreamSubscription<Position>? _positionSubscription;
@@ -93,8 +93,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   bool _permissionChecked = false;
 
   /// Loaded routes and stations from API (or asset fallback).
-  RoutesAndStationsData? _mapData;
-  bool _isUsingFallbackMapData = false;
+  RoutesAndStationsData? _routesData;
+  bool _isUsingFallbackRoutesData = false;
 
   /// Loaded vector style. When null, we fall back to raster OSM tiles.
   Style? _vectorStyle;
@@ -103,9 +103,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   bool _loadingRoutes = true;
 
   /// Unified state for panel mode + route selection UI.
-  MapUiState _uiState = const MapUiState();
+  RoutesUiState _uiState = const RoutesUiState();
 
-  /// Map-tap overlap mode visualization state (map-only overlay).
+  /// Routes-map tap overlap mode visualization state (routes-map-only overlay).
   LatLng? _overlapTapCenter;
   double? _overlapTapRadiusMeters;
 
@@ -127,7 +127,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   String? _lastPolylineDiagnosticsSignature;
 
   void _setPanelMode(
-    MapPanelMode mode, {
+    RoutesPanelMode mode, {
     JeepneyRoute? selectedRoute,
     bool clearSelectedRoute = false,
     RoadClosure? selectedClosure,
@@ -159,14 +159,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _closureHitNotifier.addListener(_onClosureLayerHit);
     _loadVectorStyle();
     _initLocation();
-    _loadMapData();
+    _loadRoutesData();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadVectorStyle();
-      _loadMapData();
+      _loadRoutesData();
     }
   }
 
@@ -193,7 +193,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   /// Loads routes from API; on failure falls back to asset data.
-  Future<void> _loadMapData() async {
+  Future<void> _loadRoutesData() async {
     if (!mounted) return;
     setState(() {
       _loadingRoutes = true;
@@ -210,8 +210,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       if (mounted) {
         final incomingRouteIds = data.routes.map((r) => r.id).toSet();
         setState(() {
-          _mapData = data;
-          _isUsingFallbackMapData = usedFallbackData;
+          _routesData = data;
+          _isUsingFallbackRoutesData = usedFallbackData;
           _hitGeometryGeneration++;
 
           // Selection semantics:
@@ -235,17 +235,17 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         });
         _completeRouteLoadingAfterRender();
         _fitAllRoutesOnInitialLoad(data.routes);
-        _fetchValhallaRoutesForMapData(data);
+        _fetchValhallaRoutesForData(data);
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-          _mapData = const RoutesAndStationsData(
+          _routesData = const RoutesAndStationsData(
             routes: [],
             stations: [],
             closures: [],
           );
-          _isUsingFallbackMapData = false;
+          _isUsingFallbackRoutesData = false;
           _uiState = _uiState.copyWith(selectedRouteIds: <String>{});
           _hitGeometryGeneration++;
         });
@@ -272,7 +272,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Fetches road-aligned geometry from Valhalla for each route direction; updates state on success.
   /// If the Valhalla status check fails, skips requests so routes stay as straight segments.
-  Future<void> _fetchValhallaRoutesForMapData(
+  Future<void> _fetchValhallaRoutesForData(
     RoutesAndStationsData data,
   ) async {
     final available = await checkValhallaStatus().catchError((_) => false);
@@ -372,14 +372,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           Positioned.fill(
             child: Stack(
               children: [
-                MapCanvas(
+                RoutesCanvas(
                   mapController: _mapController,
                   vectorStyle: vectorStyle,
                   initialCenter: _iloiloCenter,
                   initialZoom: _initialZoom,
                   onMapTap: _onMapTapForOverlappingRoutes,
                   routePolylines: _routePolylines,
-                  showOverlapRadius: _uiState.panelMode == MapPanelMode.overlap,
+                  showOverlapRadius:
+                      _uiState.panelMode == RoutesPanelMode.overlap,
                   overlapTapCenter: _overlapTapCenter,
                   overlapTapRadiusMeters: _overlapTapRadiusMeters,
                   closurePolygons: _closurePolygons,
@@ -398,14 +399,17 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             ),
           ),
           if (_showSearchBar) const SearchBarOverlay(),
-          MapActionButtons(
+          RoutesActionButtons(
             userPosition: _userPosition,
             mapController: _mapController,
           ),
           MapBottomDrawer(
-            showingClosureDetails: _uiState.panelMode == MapPanelMode.closureDetails,
-            showingRouteDetails: _uiState.panelMode == MapPanelMode.routeDetails,
-            showingOverlappingRoutes: _uiState.panelMode == MapPanelMode.overlap,
+            showingClosureDetails:
+                _uiState.panelMode == RoutesPanelMode.closureDetails,
+            showingRouteDetails:
+                _uiState.panelMode == RoutesPanelMode.routeDetails,
+            showingOverlappingRoutes:
+                _uiState.panelMode == RoutesPanelMode.overlap,
             closureDetailsViewBuilder: (scrollController) => ClosureDetailsView(
               scrollController: scrollController,
               closure: _uiState.selectedClosure,
@@ -457,14 +461,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             MapLocationMessage(
               message: _locationPermission == null
                   ? 'Location service is disabled.'
-                  : 'Location permission denied. Enable it to see your position on the map.',
+                  : 'Location permission denied. Enable it to see your position on the routes map.',
             ),
         ],
       ),
     );
   }
 
-  /// Shared resolution for drawing, camera fit, and map-tap hit testing.
+  /// Shared resolution for drawing, camera fit, and routes-map tap hit testing.
   ({List<LatLng> points, bool usedDecoded, bool usedValhalla})
   _resolveDirectionGeometry(JeepneyRoute route, _RouteDirection direction) {
     if (_resolvedDirectionGeometryCacheAtGeneration != _hitGeometryGeneration) {
@@ -558,7 +562,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   List<RouteHitPolyline> _buildHitTestPolylines() {
-    final routes = _mapData?.routes ?? const <JeepneyRoute>[];
+    final routes = _routesData?.routes ?? const <JeepneyRoute>[];
     final out = <RouteHitPolyline>[];
     for (final route in routes) {
       for (final direction in _RouteDirection.values) {
@@ -598,7 +602,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         final points = g.points;
         final usedDecoded = g.usedDecoded;
         final usedValhalla = g.usedValhalla;
-        final shouldUseOfflineTranslucency = _isUsingFallbackMapData;
+        final shouldUseOfflineTranslucency = _isUsingFallbackRoutesData;
         if (_debugPolylineDiagnostics) {
           final dirLabel = direction == _RouteDirection.goingTo ? 'to' : 'back';
           diagParts.add(
@@ -638,14 +642,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   List<JeepneyRoute> get _visibleRoutes {
-    final routes = _mapData?.routes ?? const <JeepneyRoute>[];
+    final routes = _routesData?.routes ?? const <JeepneyRoute>[];
     if (!_uiState.isFocusedMode) return routes;
     if (_uiState.selectedRouteIds.isEmpty) return const <JeepneyRoute>[];
     return routes.where((r) => _uiState.selectedRouteIds.contains(r.id)).toList();
   }
 
   List<Polygon<Object>> get _closurePolygons {
-    final closures = _mapData?.closures ?? const [];
+    final closures = _routesData?.closures ?? const [];
     final polygons = <Polygon<Object>>[];
 
     for (final closure in closures) {
@@ -668,7 +672,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return polygons;
   }
 
-  /// Centroid of ordered closure vertices (map label anchor).
+  /// Centroid of ordered closure vertices (routes-map label anchor).
   LatLng _closureLabelPoint(RoadClosure closure) {
     final ordered = closure.orderedPoints;
     var latSum = 0.0;
@@ -683,7 +687,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Floating "Road Closure" chips above each polygon (tap opens in-drawer details).
   List<Marker> get _closureLabelMarkers {
-    final closures = _mapData?.closures ?? const <RoadClosure>[];
+    final closures = _routesData?.closures ?? const <RoadClosure>[];
     final markers = <Marker>[];
     for (final closure in closures) {
       if (!closure.canRenderPolygon) continue;
@@ -739,7 +743,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         : null;
     if (hitId == null) return;
 
-    final closures = _mapData?.closures ?? const <RoadClosure>[];
+    final closures = _routesData?.closures ?? const <RoadClosure>[];
     RoadClosure? selected;
     for (final closure in closures) {
       if (closure.id == hitId) {
@@ -755,7 +759,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {
       _setPanelMode(
-        MapPanelMode.closureDetails,
+        RoutesPanelMode.closureDetails,
         selectedClosure: closure,
         clearSelectedRoute: true,
         overlappingRoutes: const <JeepneyRoute>[],
@@ -766,7 +770,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   void _closeClosureDetails() {
     setState(() {
-      _setPanelMode(MapPanelMode.routes, clearSelectedClosure: true);
+      _setPanelMode(RoutesPanelMode.routes, clearSelectedClosure: true);
     });
   }
 
@@ -791,7 +795,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       }
       routesToFit = _uiState.isFocusedMode
           ? _visibleRoutes
-          : (_mapData?.routes ?? const <JeepneyRoute>[]);
+          : (_routesData?.routes ?? const <JeepneyRoute>[]);
     });
 
     if (routesToFit.isEmpty) {
@@ -816,7 +820,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       }
       routesToFit = _uiState.isFocusedMode
           ? _visibleRoutes
-          : (_mapData?.routes ?? const <JeepneyRoute>[]);
+          : (_routesData?.routes ?? const <JeepneyRoute>[]);
     });
 
     if (routesToFit.isEmpty) {
@@ -827,7 +831,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   void _showAllRoutes() {
-    final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
+    final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
     final allIds = allRoutes.map((r) => r.id).toSet();
     setState(() {
       _uiState = _uiState.copyWith(
@@ -841,7 +845,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _openRouteDetails(JeepneyRoute route) {
     setState(() {
       _setPanelMode(
-        MapPanelMode.routeDetails,
+        RoutesPanelMode.routeDetails,
         selectedRoute: route,
         clearSelectedClosure: true,
         overlappingRoutes: const <JeepneyRoute>[],
@@ -853,13 +857,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _closeRouteDetails() {
     final resumeOverlap = _uiState.returnToOverlappingRoutesAfterDetails &&
         _uiState.overlappingRoutes.isNotEmpty;
-    final allIds = (_mapData?.routes ?? const <JeepneyRoute>[])
+    final allIds = (_routesData?.routes ?? const <JeepneyRoute>[])
         .map((r) => r.id)
         .toSet();
     setState(() {
       if (resumeOverlap) {
         _setPanelMode(
-          MapPanelMode.overlap,
+          RoutesPanelMode.overlap,
           clearSelectedRoute: true,
           returnToOverlappingRoutesAfterDetails: false,
         );
@@ -869,7 +873,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         );
       } else {
         _setPanelMode(
-          MapPanelMode.routes,
+          RoutesPanelMode.routes,
           clearSelectedRoute: true,
           returnToOverlappingRoutesAfterDetails: false,
         );
@@ -880,7 +884,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Fits map camera to route geometry (decoded/Valhalla polylines when present).
+  /// Fits routes-map camera to route geometry (decoded/Valhalla polylines when present).
   void _fitRoutesBounds(List<JeepneyRoute> routes) {
     final points = <LatLng>[];
     for (final route in routes) {
@@ -929,13 +933,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       return;
     }
 
-    final allRoutes = _mapData?.routes ?? const <JeepneyRoute>[];
+    final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
     final matched = allRoutes.where((r) => matchIds.contains(r.id)).toList()
       ..sort(compareRouteNumbersAsc);
 
     setState(() {
       _setPanelMode(
-        MapPanelMode.overlap,
+        RoutesPanelMode.overlap,
         overlappingRoutes: matched,
         clearSelectedClosure: true,
         clearSelectedRoute: true,
@@ -949,7 +953,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _closeOverlappingRoutes() {
     setState(() {
       _setPanelMode(
-        MapPanelMode.routes,
+        RoutesPanelMode.routes,
         overlappingRoutes: const <JeepneyRoute>[],
         returnToOverlappingRoutesAfterDetails: false,
       );
@@ -959,9 +963,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   void _openRouteFromOverlap(JeepneyRoute route) {
     setState(() {
-      // When picking from overlap list, isolate the selected route on map.
+      // When picking from overlap list, isolate the selected route on routes map.
       _setPanelMode(
-        MapPanelMode.routeDetails,
+        RoutesPanelMode.routeDetails,
         selectedRoute: route,
         clearSelectedClosure: true,
         returnToOverlappingRoutesAfterDetails: true,
@@ -977,7 +981,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Tricycle station markers (white circle, purple border, tricycle icon).
   List<Marker> get _stationMarkers {
-    final stations = _mapData?.stations ?? [];
+    final stations = _routesData?.stations ?? [];
     return stations
         .map(
           (s) => Marker(
@@ -1013,7 +1017,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   List<JeepneyRoute> get _sortedRoutes {
     final routes = List<JeepneyRoute>.from(
-      _mapData?.routes ?? const <JeepneyRoute>[],
+      _routesData?.routes ?? const <JeepneyRoute>[],
     )..sort(compareRouteNumbersAsc);
     return routes;
   }

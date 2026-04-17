@@ -1,29 +1,33 @@
 import 'package:flutter/material.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
-import 'package:jippy_mobile/models/jeepney_route.dart';
-import 'package:jippy_mobile/screens/map/widgets/details_back_button.dart';
+import 'package:jippy_mobile/models/road_closure.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/details_back_button.dart';
 
-class RouteDetailsView extends StatelessWidget {
-  const RouteDetailsView({
+class ClosureDetailsView extends StatelessWidget {
+  const ClosureDetailsView({
     super.key,
     required this.scrollController,
-    required this.route,
+    required this.closure,
     required this.onBackPressed,
   });
 
   final ScrollController scrollController;
-  final JeepneyRoute? route;
+  final RoadClosure? closure;
   final VoidCallback onBackPressed;
 
   @override
   Widget build(BuildContext context) {
-    final detailText = (route != null && route!.routeDetails.trim().isNotEmpty)
-        ? route!.routeDetails.trim()
-        : 'No route details available for this route yet.';
+    final title = (closure != null && closure!.closureName.trim().isNotEmpty)
+        ? closure!.closureName.trim()
+        : '(untitled)';
+    final detailText =
+        (closure != null && closure!.closureDescription.trim().isNotEmpty)
+        ? closure!.closureDescription.trim()
+        : 'No description available.';
 
     return ListView(
-      key: const ValueKey<String>('route-details-view'),
+      key: const ValueKey<String>('closure-details-view'),
       controller: scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
@@ -33,7 +37,7 @@ class RouteDetailsView extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(left: 8),
                 child: Text(
-                  route?.routeName ?? 'Route details',
+                  title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
