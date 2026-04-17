@@ -12,6 +12,7 @@ import 'package:jippy_mobile/screens/map/widgets/closure_details_view.dart';
 import 'package:jippy_mobile/screens/map/widgets/bottom_drawer.dart';
 import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
 import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
+import 'package:jippy_mobile/screens/map/widgets/map_canvas.dart';
 import 'package:jippy_mobile/screens/map/widgets/map_action_buttons.dart';
 import 'package:jippy_mobile/screens/map/widgets/overlapping_routes_view.dart';
 import 'package:jippy_mobile/screens/map/widgets/route_details_view.dart';
@@ -371,104 +372,26 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           Positioned.fill(
             child: Stack(
               children: [
-                FlutterMap(
+                MapCanvas(
                   mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _iloiloCenter,
-                    initialZoom: _initialZoom,
-                    backgroundColor: MapColors.background,
-                    onTap: _onMapTapForOverlappingRoutes,
-                  ),
-                  children: [
-                    if (vectorStyle != null)
-                      VectorTileLayer(
-                        tileProviders: vectorStyle.providers,
-                        theme: vectorStyle.theme,
-                        sprites: vectorStyle.sprites,
-                      )
-                    else
-                      TileLayer(
-                        urlTemplate: _osmTileUrl,
-                        userAgentPackageName: _userAgentPackageName,
-                        tileProvider: NetworkTileProvider(
-                          headers: {
-                            'User-Agent':
-                                'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
-                          },
-                        ),
-                      ),
-                    // Polylines for static jeepney routes and A* path.
-                    PolylineLayer<Object>(polylines: _routePolylines),
-                    if (_showingOverlappingRoutes &&
-                        _overlapTapCenter != null &&
-                        _overlapTapRadiusMeters != null)
-                      CircleLayer(
-                        circles: [
-                          CircleMarker<Object>(
-                            point: _overlapTapCenter!,
-                            useRadiusInMeter: true,
-                            radius: _overlapTapRadiusMeters!,
-                            color: MapColors.primary.withValues(alpha: 0.14),
-                            borderColor: MapColors.primary.withValues(alpha: 0.5),
-                            borderStrokeWidth: 2,
-                          ),
-                        ],
-                      ),
-                    if (_closurePolygons.isNotEmpty)
-                      PolygonLayer<Object>(
-                        polygons: _closurePolygons,
-                        hitNotifier: _closureHitNotifier,
-                      ),
-                    if (_closureLabelMarkers.isNotEmpty)
-                      MarkerLayer(markers: _closureLabelMarkers),
-                    if (_showStations &&
-                        _mapData != null &&
-                        _mapData!.stations.isNotEmpty)
-                      MarkerLayer(markers: _stationMarkers),
-                    if (_userPosition != null)
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: LatLng(
-                              _userPosition!.latitude,
-                              _userPosition!.longitude,
-                            ),
-                            width: 40,
-                            height: 40,
-                            alignment: Alignment.center,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: MapColors.userLocationColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 2.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black26,
-                                    blurRadius: 6,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.my_location,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    RichAttributionWidget(
-                      animationConfig: const ScaleRAWA(),
-                      showFlutterMapAttribution: false,
-                      attributions: [
-                        const TextSourceAttribution('OpenStreetMap contributors'),
-                      ],
-                    ),
-                  ],
+                  vectorStyle: vectorStyle,
+                  initialCenter: _iloiloCenter,
+                  initialZoom: _initialZoom,
+                  onMapTap: _onMapTapForOverlappingRoutes,
+                  routePolylines: _routePolylines,
+                  showOverlapRadius: _showingOverlappingRoutes,
+                  overlapTapCenter: _overlapTapCenter,
+                  overlapTapRadiusMeters: _overlapTapRadiusMeters,
+                  closurePolygons: _closurePolygons,
+                  closureHitNotifier: _closureHitNotifier,
+                  closureLabelMarkers: _closureLabelMarkers,
+                  stationMarkers: _stationMarkers,
+                  showStations: _showStations,
+                  userPosition: _userPosition == null
+                      ? null
+                      : LatLng(_userPosition!.latitude, _userPosition!.longitude),
+                  osmTileUrl: _osmTileUrl,
+                  userAgentPackageName: _userAgentPackageName,
                 ),
                 if (_loadingRoutes) const LoadingOverlay(),
               ],
