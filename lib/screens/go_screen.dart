@@ -83,15 +83,6 @@ class _GoScreenState extends State<GoScreen> {
     return 'Estimated arrival: $formattedTime';
   }
 
-  String _routeArrivalText(int minutes) {
-    final arrival = DateTime.now().add(Duration(minutes: minutes));
-    final time = TimeOfDay.fromDateTime(arrival);
-    final formattedTime = MaterialLocalizations.of(
-      context,
-    ).formatTimeOfDay(time, alwaysUse24HourFormat: false);
-    return 'Arrives $formattedTime';
-  }
-
   List<Polyline<Object>> _buildRoutePolylines() {
     final polylines = <Polyline<Object>>[];
     for (int i = 0; i < _routeOptions.length; i++) {
@@ -306,16 +297,16 @@ class _GoScreenState extends State<GoScreen> {
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
                   children: [
-                    const Text(
-                      'Go',
-                      style: TextStyle(
+                    Text(
+                      'Follow these steps to reach ${selectedRoute.destinationName}',
+                      style: const TextStyle(
                         color: MapColors.text,
-                        fontSize: 34,
+                        fontSize: 24,
                         fontWeight: FontWeight.w800,
-                        height: 1,
+                        height: 1.06,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Text(
                       'Suggested Routes',
                       style: TextStyle(
@@ -328,16 +319,6 @@ class _GoScreenState extends State<GoScreen> {
                     const SizedBox(height: 8),
                     _buildSuggestedRoutesStrip(),
                     const SizedBox(height: 18),
-                    Text(
-                      'Follow these steps to reach ${selectedRoute.destinationName}',
-                      style: const TextStyle(
-                        color: MapColors.text,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        height: 1.06,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     Text(
                       _etaText(context),
                       style: TextStyle(
@@ -389,7 +370,6 @@ class _GoScreenState extends State<GoScreen> {
     final routeTypeLabel = option.badge;
     final cardColor = _cardSurfaceColor;
     final estimatedRiders = _estimatedRidersByRoute[index];
-    final arrivalText = _routeArrivalText(option.minutes);
     final tagColor = option.badgeBackgroundColor;
 
     return Material(
@@ -469,19 +449,6 @@ class _GoScreenState extends State<GoScreen> {
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         height: 1.05,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      arrivalText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isSelected
-                            ? MapColors.text.withValues(alpha: 0.84)
-                            : MapColors.text.withValues(alpha: 0.7),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 3),
