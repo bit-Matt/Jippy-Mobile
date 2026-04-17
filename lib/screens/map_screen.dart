@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
 import 'package:jippy_mobile/screens/map/widgets/closure_details_view.dart';
+import 'package:jippy_mobile/screens/map/widgets/bottom_drawer.dart';
 import 'package:jippy_mobile/screens/map/widgets/loading_overlay.dart';
 import 'package:jippy_mobile/screens/map/widgets/location_message.dart';
 import 'package:jippy_mobile/screens/map/widgets/map_action_buttons.dart';
@@ -478,7 +479,52 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
             userPosition: _userPosition,
             mapController: _mapController,
           ),
-          _buildBottomDrawer(context),
+          MapBottomDrawer(
+            showingClosureDetails: _showingClosureDetails,
+            showingRouteDetails: _showingRouteDetails,
+            showingOverlappingRoutes: _showingOverlappingRoutes,
+            closureDetailsViewBuilder: (scrollController) => ClosureDetailsView(
+              scrollController: scrollController,
+              closure: _selectedClosureForDetails,
+              onBackPressed: _closeClosureDetails,
+            ),
+            routeDetailsViewBuilder: (scrollController) => RouteDetailsView(
+              scrollController: scrollController,
+              route: _selectedRouteForDetails,
+              onBackPressed: _closeRouteDetails,
+            ),
+            overlappingRoutesViewBuilder: (scrollController) =>
+                OverlappingRoutesView(
+                  scrollController: scrollController,
+                  routes: _overlappingRoutes,
+                  selectedRouteIds: _selectedRouteIdsReadOnly,
+                  onBackPressed: _closeOverlappingRoutes,
+                  onRouteTap: _openRouteFromOverlap,
+                ),
+            routesListViewBuilder: (scrollController) => RoutesListView(
+              scrollController: scrollController,
+              header: RoutesHeader(
+                isFocusedMode: _isFocusedMode,
+                isCompareMode: _isCompareMode,
+                showStations: _showStations,
+                onShowAllRoutes: _showAllRoutes,
+                onCompareModeChanged: _setMultiSelectMode,
+                onShowStationsChanged: (selected) {
+                  setState(() => _showStations = selected);
+                },
+              ),
+              body: RoutesListBody(
+                routes: _sortedRoutes,
+                isLoading: _loadingRoutes,
+                isFocusedMode: _isFocusedMode,
+                isCompareMode: _isCompareMode,
+                selectedRouteIds: _selectedRouteIdsReadOnly,
+                onRouteTap: _onRouteTap,
+                onRouteDetailsTap: _openRouteDetails,
+                loadingState: const RoutesLoadingState(),
+              ),
+            ),
+          ),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
@@ -1032,89 +1078,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
         )
         .toList();
-  }
-
-  /// Draggable bottom panel with grab handle, route chips, and mobile bottom nav.
-  Widget _buildBottomDrawer(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.38,
-      minChildSize: 0.34,
-      maxChildSize: 0.74,
-      builder: (BuildContext context, ScrollController scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: MapColors.background,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Center(
-                child: Container(
-                  width: 78,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: MapColors.text.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  child: _showingClosureDetails
-                      ? ClosureDetailsView(
-                          scrollController: scrollController,
-                          closure: _selectedClosureForDetails,
-                          onBackPressed: _closeClosureDetails,
-                        )
-                      : _showingRouteDetails
-                      ? RouteDetailsView(
-                          scrollController: scrollController,
-                          route: _selectedRouteForDetails,
-                          onBackPressed: _closeRouteDetails,
-                        )
-                      : _showingOverlappingRoutes
-                      ? OverlappingRoutesView(
-                          scrollController: scrollController,
-                          routes: _overlappingRoutes,
-                          selectedRouteIds: _selectedRouteIdsReadOnly,
-                          onBackPressed: _closeOverlappingRoutes,
-                          onRouteTap: _openRouteFromOverlap,
-                        )
-                      : RoutesListView(
-                          scrollController: scrollController,
-                          header: RoutesHeader(
-                            isFocusedMode: _isFocusedMode,
-                            isCompareMode: _isCompareMode,
-                            showStations: _showStations,
-                            onShowAllRoutes: _showAllRoutes,
-                            onCompareModeChanged: _setMultiSelectMode,
-                            onShowStationsChanged: (selected) {
-                              setState(() => _showStations = selected);
-                            },
-                          ),
-                          body: RoutesListBody(
-                            routes: _sortedRoutes,
-                            isLoading: _loadingRoutes,
-                            isFocusedMode: _isFocusedMode,
-                            isCompareMode: _isCompareMode,
-                            selectedRouteIds: _selectedRouteIdsReadOnly,
-                            onRouteTap: _onRouteTap,
-                            onRouteDetailsTap: _openRouteDetails,
-                            loadingState: const RoutesLoadingState(),
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   List<JeepneyRoute> get _sortedRoutes {
