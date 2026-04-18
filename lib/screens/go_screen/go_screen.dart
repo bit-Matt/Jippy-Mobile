@@ -11,7 +11,9 @@ import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_map_canvas.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
+import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
+import 'package:jippy_mobile/services/location_service.dart';
 
 /// Default center for the Go routes map: Iloilo City, Philippines.
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
@@ -25,7 +27,6 @@ const String _vectorStyleUrl =
 
 const String _userAgentPackageName = 'com.example.jippy_mobile';
 
-const int _positionStreamDistanceFilterMeters = 8;
 const double _sheetInitialSize = 0.30;
 
 const Color _cardSurfaceColor = Colors.white;
@@ -51,6 +52,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   final GeocodingService _geocoding = GeocodingService();
+  final LocationService _locationService = LocationService.instance;
   final Connectivity _connectivity = Connectivity();
   final TextEditingController _destinationController = TextEditingController();
   final FocusNode _destinationFocus = FocusNode();
@@ -75,6 +77,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   Position? _userPosition;
   LocationPermission? _locationPermission;
+  bool _permissionChecked = false;
+  bool _hasCenteredToUserOnce = false;
 
   bool _online = true;
   late final List<_GoRouteOption> _routeOptions = _buildMockRouteOptions();
@@ -90,9 +94,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _loadVectorStyle();
     _initLocation();
     _initConnectivity();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fitSelectedRoute();
-    });
   }
 
   Future<void> _initConnectivity() async {
@@ -134,30 +135,36 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _initLocation() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    final cachedPosition = _locationService.lastKnown;
+    if (cachedPosition != null && mounted) {
+      setState(() => _userPosition = cachedPosition);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _centerToUserOnce(cachedPosition);
+      });
+    }
+
+    final serviceEnabled = await _locationService.isServiceEnabled();
     if (!serviceEnabled) {
-      setState(() => _locationPermission = null);
+      setState(() {
+        _permissionChecked = true;
+        _locationPermission = null;
+      });
       return;
     }
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
+    final permission = await _locationService.requestPermission();
 
-    setState(() => _locationPermission = permission);
+    setState(() {
+      _permissionChecked = true;
+      _locationPermission = permission;
+    });
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
       return;
     }
 
-    final stream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.medium,
-        distanceFilter: _positionStreamDistanceFilterMeters,
-      ),
-    );
+    final stream = _locationService.stream;
     _positionSubscription = stream.listen(
       (Position position) {
         if (!mounted) return;
@@ -171,6 +178,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             _originLabel = 'Your location';
           }
         });
+        _centerToUserOnce(position);
         final journeyNowComplete = _origin != null && _destination != null;
         if (journeyWasIncomplete && journeyNowComplete) {
           _requestRoutePreviewIfComplete();
@@ -179,6 +187,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       onError: (_) {
         if (mounted) setState(() => _userPosition = null);
       },
+    );
+  }
+
+  void _centerToUserOnce(Position position) {
+    if (!mounted || _hasCenteredToUserOnce || _destination != null) return;
+    _hasCenteredToUserOnce = true;
+    _mapController.move(
+      LatLng(position.latitude, position.longitude),
+      _initialZoom,
     );
   }
 
@@ -395,35 +412,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   void _onRouteSelected(int index) {
     if (_selectedRouteIndex == index) return;
     setState(() => _selectedRouteIndex = index);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fitSelectedRoute();
-    });
-  }
-
-  void _fitSelectedRoute() {
-    if (!mounted) return;
-
-    final selected = _routeOptions[_selectedRouteIndex];
-    if (selected.polylinePoints.length < 2) return;
-
-    final bounds = LatLngBounds.fromPoints(selected.polylinePoints);
-    final sheetSize = _sheetController.isAttached
-        ? _sheetController.size
-        : _sheetInitialSize;
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final bottomPadding =
-        (screenHeight * sheetSize).clamp(180.0, 520.0).toDouble() + 28;
-
-    try {
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: EdgeInsets.fromLTRB(28, 112, 28, bottomPadding),
-        ),
-      );
-    } catch (_) {
-      _mapController.move(bounds.center, _mapController.camera.zoom);
-    }
   }
 
   String _etaText(BuildContext context) {
@@ -434,92 +422,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       context,
     ).formatTimeOfDay(time, alwaysUse24HourFormat: false);
     return 'Estimated arrival: $formattedTime';
-  }
-
-  List<Polyline<Object>> _buildRoutePolylines() {
-    final polylines = <Polyline<Object>>[];
-    for (int i = 0; i < _routeOptions.length; i++) {
-      final option = _routeOptions[i];
-      final isSelected = i == _selectedRouteIndex;
-      polylines.add(
-        Polyline<Object>(
-          points: option.polylinePoints,
-          color: isSelected
-              ? option.pathColor
-              : MapColors.text.withValues(alpha: 0.16),
-          strokeWidth: isSelected ? 5.2 : 3.2,
-        ),
-      );
-    }
-    return polylines;
-  }
-
-  List<Marker> _buildRouteEndpointMarkers() {
-    final selected = _routeOptions[_selectedRouteIndex];
-    return [
-      Marker(
-        point: selected.polylinePoints.first,
-        width: 54,
-        height: 54,
-        child: _endpointMarker(
-          icon: Icons.trip_origin,
-          color: MapColors.text,
-          label: 'Start',
-        ),
-      ),
-      Marker(
-        point: selected.polylinePoints.last,
-        width: 54,
-        height: 54,
-        child: _endpointMarker(icon: Icons.flag, color: selected.pathColor, label: 'End'),
-      ),
-    ];
-  }
-
-  Widget _endpointMarker({
-    required IconData icon,
-    required Color color,
-    required String label,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: MapColors.background,
-            shape: BoxShape.circle,
-            border: Border.all(color: color, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: MapColors.text.withValues(alpha: 0.16),
-                blurRadius: 6,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Icon(icon, color: color, size: 16),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: _cardSurfaceColor,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withValues(alpha: 0.22)),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   @override
@@ -578,8 +480,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               userPosition: userLatLng,
               origin: _origin,
               destination: _destination,
-              routePolylines: _buildRoutePolylines(),
-              routeEndpointMarkers: _buildRouteEndpointMarkers(),
               osmTileUrl: _osmTileUrl,
               userAgentPackageName: _userAgentPackageName,
             ),
@@ -614,6 +514,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           ),
           if (_searchMode == GoSearchBarMode.collapsed && _destination != null)
             _buildDraggableSheet(_routeOptions[_selectedRouteIndex]),
+          if (_permissionChecked &&
+              (_locationPermission == LocationPermission.denied ||
+                  _locationPermission == LocationPermission.deniedForever ||
+                  _locationPermission == null))
+            MapLocationMessage(
+              message: _locationPermission == null
+                  ? 'Location service is disabled.'
+                  : 'Location permission denied. Enable it to see your position on the Go map.',
+            ),
         ],
       ),
     );

@@ -18,8 +18,6 @@ class GoMapCanvas extends StatelessWidget {
     required this.userPosition,
     required this.origin,
     required this.destination,
-    required this.routePolylines,
-    required this.routeEndpointMarkers,
     required this.osmTileUrl,
     required this.userAgentPackageName,
   });
@@ -32,8 +30,6 @@ class GoMapCanvas extends StatelessWidget {
   final LatLng? userPosition;
   final LatLng? origin;
   final LatLng? destination;
-  final List<Polyline<Object>> routePolylines;
-  final List<Marker> routeEndpointMarkers;
   final String osmTileUrl;
   final String userAgentPackageName;
 
@@ -62,10 +58,6 @@ class GoMapCanvas extends StatelessWidget {
         ),
       );
     }
-    if (routeEndpointMarkers.isNotEmpty) {
-      markers.addAll(routeEndpointMarkers);
-    }
-
     return FlutterMap(
       mapController: mapController,
       options: MapOptions(
@@ -92,7 +84,6 @@ class GoMapCanvas extends StatelessWidget {
               },
             ),
           ),
-        if (routePolylines.isNotEmpty) PolylineLayer<Object>(polylines: routePolylines),
         if (markers.isNotEmpty) MarkerLayer(markers: markers),
         if (userPosition != null)
           MarkerLayer(
@@ -149,29 +140,36 @@ class GoRecenterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasUserPosition = userPosition != null;
     return Positioned(
       right: 16,
       top: MediaQuery.sizeOf(context).height * 0.34,
       child: Material(
-        color: MapColors.background,
+        color: hasUserPosition
+            ? MapColors.background
+            : MapColors.background.withValues(alpha: 0.86),
         borderRadius: BorderRadius.circular(14),
-        elevation: 2,
+        elevation: hasUserPosition ? 2 : 0,
         child: InkWell(
-          onTap: () {
+          onTap: hasUserPosition
+              ? () {
             final position = userPosition;
             if (position == null) return;
             mapController.move(
               LatLng(position.latitude, position.longitude),
               mapController.camera.zoom,
             );
-          },
+          }
+              : null,
           borderRadius: BorderRadius.circular(14),
           child: SizedBox(
             width: 48,
             height: 48,
             child: Icon(
               Icons.gps_fixed,
-              color: MapColors.primary,
+              color: hasUserPosition
+                  ? MapColors.primary
+                  : MapColors.text.withValues(alpha: 0.35),
               size: 24,
             ),
           ),
