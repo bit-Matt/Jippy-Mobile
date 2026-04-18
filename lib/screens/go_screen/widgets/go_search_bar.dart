@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
+import 'package:jippy_mobile/screens/go_screen/widgets/go_map_pin_instruction_banner.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 
 /// Go screen search: collapsed destination prompt or expanded origin + destination rows.
@@ -13,6 +14,9 @@ class GoSearchBar extends StatelessWidget {
     required this.onCollapseExpanded,
     required this.originLabel,
     required this.onOriginRowTap,
+    required this.showRevertOriginToGps,
+    required this.onRevertOriginToGps,
+    required this.onDestinationMapPinTap,
     required this.destinationController,
     required this.destinationFocusNode,
     required this.onDestinationTextChanged,
@@ -22,6 +26,8 @@ class GoSearchBar extends StatelessWidget {
     required this.showOutOfAreaDisclaimer,
     required this.isSearchingNominatim,
     required this.routePreviewLoading,
+    required this.mapPinAwaitingTap,
+    required this.onCancelMapPinMode,
   });
 
   final GoSearchBarMode mode;
@@ -29,6 +35,9 @@ class GoSearchBar extends StatelessWidget {
   final VoidCallback onCollapseExpanded;
   final String originLabel;
   final VoidCallback onOriginRowTap;
+  final bool showRevertOriginToGps;
+  final VoidCallback onRevertOriginToGps;
+  final VoidCallback onDestinationMapPinTap;
   final TextEditingController destinationController;
   final FocusNode destinationFocusNode;
   final ValueChanged<String> onDestinationTextChanged;
@@ -38,6 +47,8 @@ class GoSearchBar extends StatelessWidget {
   final bool showOutOfAreaDisclaimer;
   final bool isSearchingNominatim;
   final bool routePreviewLoading;
+  final GoPinTarget? mapPinAwaitingTap;
+  final VoidCallback onCancelMapPinMode;
 
   @override
   Widget build(BuildContext context) {
@@ -48,22 +59,38 @@ class GoSearchBar extends StatelessWidget {
       right: 0,
       child: Padding(
         padding: EdgeInsets.only(top: topPadding, left: 16, right: 16),
-        child: mode == GoSearchBarMode.collapsed
-            ? _CollapsedBar(onTap: onCollapsedTap)
-            : _ExpandedPanel(
-                onCollapse: onCollapseExpanded,
-                originLabel: originLabel,
-                onOriginRowTap: onOriginRowTap,
-                destinationController: destinationController,
-                destinationFocusNode: destinationFocusNode,
-                onDestinationTextChanged: onDestinationTextChanged,
-                suggestions: suggestions,
-                onSuggestionTap: onSuggestionTap,
-                searchError: searchError,
-                showOutOfAreaDisclaimer: showOutOfAreaDisclaimer,
-                isSearchingNominatim: isSearchingNominatim,
-                routePreviewLoading: routePreviewLoading,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            mode == GoSearchBarMode.collapsed
+                ? _CollapsedBar(onTap: onCollapsedTap)
+                : _ExpandedPanel(
+                    onCollapse: onCollapseExpanded,
+                    originLabel: originLabel,
+                    onOriginRowTap: onOriginRowTap,
+                    showRevertOriginToGps: showRevertOriginToGps,
+                    onRevertOriginToGps: onRevertOriginToGps,
+                    onDestinationMapPinTap: onDestinationMapPinTap,
+                    destinationController: destinationController,
+                    destinationFocusNode: destinationFocusNode,
+                    onDestinationTextChanged: onDestinationTextChanged,
+                    suggestions: suggestions,
+                    onSuggestionTap: onSuggestionTap,
+                    searchError: searchError,
+                    showOutOfAreaDisclaimer: showOutOfAreaDisclaimer,
+                    isSearchingNominatim: isSearchingNominatim,
+                    routePreviewLoading: routePreviewLoading,
+                  ),
+            if (mapPinAwaitingTap != null) ...[
+              const SizedBox(height: 8),
+              GoMapPinInstructionBanner(
+                forOrigin: mapPinAwaitingTap == GoPinTarget.origin,
+                onCancel: onCancelMapPinMode,
               ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -126,6 +153,9 @@ class _ExpandedPanel extends StatelessWidget {
     required this.onCollapse,
     required this.originLabel,
     required this.onOriginRowTap,
+    required this.showRevertOriginToGps,
+    required this.onRevertOriginToGps,
+    required this.onDestinationMapPinTap,
     required this.destinationController,
     required this.destinationFocusNode,
     required this.onDestinationTextChanged,
@@ -140,6 +170,9 @@ class _ExpandedPanel extends StatelessWidget {
   final VoidCallback onCollapse;
   final String originLabel;
   final VoidCallback onOriginRowTap;
+  final bool showRevertOriginToGps;
+  final VoidCallback onRevertOriginToGps;
+  final VoidCallback onDestinationMapPinTap;
   final TextEditingController destinationController;
   final FocusNode destinationFocusNode;
   final ValueChanged<String> onDestinationTextChanged;
@@ -220,6 +253,29 @@ class _ExpandedPanel extends StatelessWidget {
                 ),
               ),
             ),
+            if (showRevertOriginToGps) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onRevertOriginToGps,
+                  icon: Icon(
+                    Icons.my_location,
+                    size: 18,
+                    color: MapColors.primary.withValues(alpha: 0.9),
+                  ),
+                  label: const Text('Use my current location'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    foregroundColor: MapColors.primary,
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const Divider(height: 20),
             Row(
               children: [
@@ -238,9 +294,20 @@ class _ExpandedPanel extends StatelessWidget {
                     ),
                   ),
                 ),
+                IconButton(
+                  tooltip: 'Place destination on map',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  icon: Icon(
+                    Icons.edit_location_alt_outlined,
+                    size: 22,
+                    color: MapColors.text.withValues(alpha: 0.55),
+                  ),
+                  onPressed: onDestinationMapPinTap,
+                ),
                 if (isSearchingNominatim)
                   const Padding(
-                    padding: EdgeInsets.only(left: 8),
+                    padding: EdgeInsets.only(left: 2),
                     child: SizedBox(
                       width: 20,
                       height: 20,

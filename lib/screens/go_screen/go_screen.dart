@@ -11,7 +11,6 @@ import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_map_canvas.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
-import 'package:jippy_mobile/screens/go_screen/widgets/pin_on_map_overlay.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 
 /// Default center for the Go routes map: Iloilo City, Philippines.
@@ -188,6 +187,36 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return !_geocoding.isWithinIloiloServiceArea(d);
   }
 
+  bool get _gpsOriginAvailable {
+    if (_userPosition == null) return false;
+    final p = _locationPermission;
+    return p == LocationPermission.whileInUse || p == LocationPermission.always;
+  }
+
+  void _revertOriginToGps() {
+    final pos = _userPosition;
+    if (pos == null || !_gpsOriginAvailable) return;
+    setState(() {
+      _originLockedToMap = false;
+      _origin = LatLng(pos.latitude, pos.longitude);
+      _originLabel = 'Your location';
+      _routePreviewSignature = null;
+    });
+    _requestRoutePreviewIfComplete();
+  }
+
+  void _openDestinationPinOnMap() {
+    _expandSearch();
+    setState(() => _pinTarget = GoPinTarget.destination);
+  }
+
+  void _handleMapTap(TapPosition _, LatLng point) {
+    final role = _pinTarget;
+    if (role == null) return;
+    setState(() => _pinTarget = null);
+    unawaited(_applyReverseLabel(point, isOrigin: role == GoPinTarget.origin));
+  }
+
   void _expandSearch() {
     setState(() => _searchMode = GoSearchBarMode.expanded);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -199,6 +228,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     setState(() {
       _searchMode = GoSearchBarMode.collapsed;
       _suggestions = const [];
+      _pinTarget = null;
     });
     _destinationFocus.unfocus();
   }
@@ -299,15 +329,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _onMapTap(TapPosition _, LatLng point) {
-    if (_pinTarget != null) return;
-    setState(() {
-      _destination = point;
-      _searchMode = GoSearchBarMode.expanded;
-    });
-    _applyReverseLabel(point, isOrigin: false);
-  }
-
   void _onPickSuggestion(NominatimSearchHit hit) {
     setState(() {
       _destination = hit.point;
@@ -318,15 +339,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _requestRoutePreviewIfComplete();
   }
 
-  Future<void> _confirmPin() async {
-    final role = _pinTarget;
-    if (role == null) return;
-    final center = _mapController.camera.center;
-    setState(() => _pinTarget = null);
-    await _applyReverseLabel(center, isOrigin: role == GoPinTarget.origin);
-  }
-
-  void _cancelPin() {
+  void _cancelMapPinMode() {
     setState(() => _pinTarget = null);
   }
 
@@ -419,7 +432,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               vectorStyle: _vectorStyle,
               initialCenter: _iloiloCenter,
               initialZoom: _initialZoom,
-              onMapTap: _onMapTap,
+              onMapTap: _handleMapTap,
               userPosition: userLatLng,
               origin: _origin,
               destination: _destination,
@@ -440,6 +453,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               _expandSearch();
               setState(() => _pinTarget = GoPinTarget.origin);
             },
+            showRevertOriginToGps: _originLockedToMap && _gpsOriginAvailable,
+            onRevertOriginToGps: _revertOriginToGps,
+            onDestinationMapPinTap: _openDestinationPinOnMap,
             destinationController: _destinationController,
             destinationFocusNode: _destinationFocus,
             onDestinationTextChanged: _onDestinationQueryChanged,
@@ -449,15 +465,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             showOutOfAreaDisclaimer: _destinationOutOfArea,
             isSearchingNominatim: _nominatimBusy,
             routePreviewLoading: _routePreviewLoading,
+            mapPinAwaitingTap: _pinTarget,
+            onCancelMapPinMode: _cancelMapPinMode,
           ),
-          if (_pinTarget != null)
-            PinOnMapOverlay(
-              title: _pinTarget == GoPinTarget.origin
-                  ? 'Set origin'
-                  : 'Set destination',
-              onCancel: _cancelPin,
-              onConfirm: _confirmPin,
-            ),
         ],
       ),
     );
