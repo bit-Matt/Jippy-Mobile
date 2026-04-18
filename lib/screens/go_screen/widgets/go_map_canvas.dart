@@ -15,6 +15,7 @@ class GoMapCanvas extends StatelessWidget {
     required this.initialCenter,
     required this.initialZoom,
     required this.onMapTap,
+    required this.routePolylines,
     required this.userPosition,
     required this.origin,
     required this.destination,
@@ -27,6 +28,7 @@ class GoMapCanvas extends StatelessWidget {
   final LatLng initialCenter;
   final double initialZoom;
   final TapCallback onMapTap;
+  final List<Polyline<Object>> routePolylines;
   final LatLng? userPosition;
   final LatLng? origin;
   final LatLng? destination;
@@ -84,6 +86,8 @@ class GoMapCanvas extends StatelessWidget {
               },
             ),
           ),
+        if (routePolylines.isNotEmpty)
+          PolylineLayer<Object>(polylines: routePolylines),
         if (markers.isNotEmpty) MarkerLayer(markers: markers),
         if (userPosition != null)
           MarkerLayer(
@@ -153,13 +157,13 @@ class GoRecenterButton extends StatelessWidget {
         child: InkWell(
           onTap: hasUserPosition
               ? () {
-            final position = userPosition;
-            if (position == null) return;
-            mapController.move(
-              LatLng(position.latitude, position.longitude),
-              mapController.camera.zoom,
-            );
-          }
+                  final position = userPosition;
+                  if (position == null) return;
+                  mapController.move(
+                    LatLng(position.latitude, position.longitude),
+                    mapController.camera.zoom,
+                  );
+                }
               : null,
           borderRadius: BorderRadius.circular(14),
           child: SizedBox(

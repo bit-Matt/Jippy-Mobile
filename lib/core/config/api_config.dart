@@ -8,6 +8,9 @@ const String routesApiUrl = '$apiBaseUrl/api/public/all';
 /// Public API URL for feedback submission.
 const String feedbackApiUrl = '$apiBaseUrl/api/public/feedback';
 
+/// Public API URL for step-by-step navigation suggestions.
+const String navigateApiUrl = '$apiBaseUrl/api/public/navigate';
+
 /// Valhalla proxy status endpoint.
 const String valhallaStatusApiUrl =
     '$apiBaseUrl/api/public/osm/valhalla/status';

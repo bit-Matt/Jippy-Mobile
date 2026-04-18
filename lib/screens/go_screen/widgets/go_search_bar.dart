@@ -5,21 +5,23 @@ import 'package:jippy_mobile/screens/go_screen/go_state.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_map_pin_instruction_banner.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 
-/// Go screen search: collapsed destination prompt or expanded origin + destination rows.
+/// Go screen search: collapsed explore prompt or expanded routing header.
 class GoSearchBar extends StatelessWidget {
   const GoSearchBar({
     super.key,
     required this.mode,
     required this.onCollapsedTap,
     required this.onCollapseExpanded,
-    required this.originLabel,
-    required this.onOriginRowTap,
-    required this.showRevertOriginToGps,
-    required this.onRevertOriginToGps,
-    required this.onDestinationMapPinTap,
-    required this.destinationController,
-    required this.destinationFocusNode,
-    required this.onDestinationTextChanged,
+    required this.startController,
+    required this.startFocusNode,
+    required this.endController,
+    required this.endFocusNode,
+    required this.onStartTextChanged,
+    required this.onEndTextChanged,
+    required this.onStartMapPinTap,
+    required this.onEndMapPinTap,
+    required this.showUseCurrentLocation,
+    required this.onUseCurrentLocationTap,
     required this.suggestions,
     required this.onSuggestionTap,
     required this.searchError,
@@ -28,19 +30,23 @@ class GoSearchBar extends StatelessWidget {
     required this.routePreviewLoading,
     required this.mapPinAwaitingTap,
     required this.onCancelMapPinMode,
+    required this.activeRoutingField,
+    required this.onActiveRoutingFieldChanged,
   });
 
   final GoSearchBarMode mode;
   final VoidCallback onCollapsedTap;
   final VoidCallback onCollapseExpanded;
-  final String originLabel;
-  final VoidCallback onOriginRowTap;
-  final bool showRevertOriginToGps;
-  final VoidCallback onRevertOriginToGps;
-  final VoidCallback onDestinationMapPinTap;
-  final TextEditingController destinationController;
-  final FocusNode destinationFocusNode;
-  final ValueChanged<String> onDestinationTextChanged;
+  final TextEditingController startController;
+  final FocusNode startFocusNode;
+  final TextEditingController endController;
+  final FocusNode endFocusNode;
+  final ValueChanged<String> onStartTextChanged;
+  final ValueChanged<String> onEndTextChanged;
+  final VoidCallback onStartMapPinTap;
+  final VoidCallback onEndMapPinTap;
+  final bool showUseCurrentLocation;
+  final VoidCallback onUseCurrentLocationTap;
   final List<NominatimSearchHit> suggestions;
   final ValueChanged<NominatimSearchHit> onSuggestionTap;
   final String? searchError;
@@ -49,6 +55,8 @@ class GoSearchBar extends StatelessWidget {
   final bool routePreviewLoading;
   final GoPinTarget? mapPinAwaitingTap;
   final VoidCallback onCancelMapPinMode;
+  final GoRoutingField activeRoutingField;
+  final ValueChanged<GoRoutingField> onActiveRoutingFieldChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -65,22 +73,26 @@ class GoSearchBar extends StatelessWidget {
           children: [
             mode == GoSearchBarMode.collapsed
                 ? _CollapsedBar(onTap: onCollapsedTap)
-                : _ExpandedPanel(
+                : _RoutingHeaderPanel(
                     onCollapse: onCollapseExpanded,
-                    originLabel: originLabel,
-                    onOriginRowTap: onOriginRowTap,
-                    showRevertOriginToGps: showRevertOriginToGps,
-                    onRevertOriginToGps: onRevertOriginToGps,
-                    onDestinationMapPinTap: onDestinationMapPinTap,
-                    destinationController: destinationController,
-                    destinationFocusNode: destinationFocusNode,
-                    onDestinationTextChanged: onDestinationTextChanged,
+                    startController: startController,
+                    startFocusNode: startFocusNode,
+                    endController: endController,
+                    endFocusNode: endFocusNode,
+                    onStartTextChanged: onStartTextChanged,
+                    onEndTextChanged: onEndTextChanged,
+                    onStartMapPinTap: onStartMapPinTap,
+                    onEndMapPinTap: onEndMapPinTap,
+                    showUseCurrentLocation: showUseCurrentLocation,
+                    onUseCurrentLocationTap: onUseCurrentLocationTap,
                     suggestions: suggestions,
                     onSuggestionTap: onSuggestionTap,
                     searchError: searchError,
                     showOutOfAreaDisclaimer: showOutOfAreaDisclaimer,
                     isSearchingNominatim: isSearchingNominatim,
                     routePreviewLoading: routePreviewLoading,
+                    activeRoutingField: activeRoutingField,
+                    onActiveRoutingFieldChanged: onActiveRoutingFieldChanged,
                   ),
             if (mapPinAwaitingTap != null) ...[
               const SizedBox(height: 8),
@@ -148,43 +160,53 @@ class _CollapsedBar extends StatelessWidget {
   }
 }
 
-class _ExpandedPanel extends StatelessWidget {
-  const _ExpandedPanel({
+class _RoutingHeaderPanel extends StatelessWidget {
+  const _RoutingHeaderPanel({
     required this.onCollapse,
-    required this.originLabel,
-    required this.onOriginRowTap,
-    required this.showRevertOriginToGps,
-    required this.onRevertOriginToGps,
-    required this.onDestinationMapPinTap,
-    required this.destinationController,
-    required this.destinationFocusNode,
-    required this.onDestinationTextChanged,
+    required this.startController,
+    required this.startFocusNode,
+    required this.endController,
+    required this.endFocusNode,
+    required this.onStartTextChanged,
+    required this.onEndTextChanged,
+    required this.onStartMapPinTap,
+    required this.onEndMapPinTap,
+    required this.showUseCurrentLocation,
+    required this.onUseCurrentLocationTap,
     required this.suggestions,
     required this.onSuggestionTap,
     required this.searchError,
     required this.showOutOfAreaDisclaimer,
     required this.isSearchingNominatim,
     required this.routePreviewLoading,
+    required this.activeRoutingField,
+    required this.onActiveRoutingFieldChanged,
   });
 
   final VoidCallback onCollapse;
-  final String originLabel;
-  final VoidCallback onOriginRowTap;
-  final bool showRevertOriginToGps;
-  final VoidCallback onRevertOriginToGps;
-  final VoidCallback onDestinationMapPinTap;
-  final TextEditingController destinationController;
-  final FocusNode destinationFocusNode;
-  final ValueChanged<String> onDestinationTextChanged;
+  final TextEditingController startController;
+  final FocusNode startFocusNode;
+  final TextEditingController endController;
+  final FocusNode endFocusNode;
+  final ValueChanged<String> onStartTextChanged;
+  final ValueChanged<String> onEndTextChanged;
+  final VoidCallback onStartMapPinTap;
+  final VoidCallback onEndMapPinTap;
+  final bool showUseCurrentLocation;
+  final VoidCallback onUseCurrentLocationTap;
   final List<NominatimSearchHit> suggestions;
   final ValueChanged<NominatimSearchHit> onSuggestionTap;
   final String? searchError;
   final bool showOutOfAreaDisclaimer;
   final bool isSearchingNominatim;
   final bool routePreviewLoading;
+  final GoRoutingField activeRoutingField;
+  final ValueChanged<GoRoutingField> onActiveRoutingFieldChanged;
 
   @override
   Widget build(BuildContext context) {
+    final mutedText = MapColors.text.withValues(alpha: 0.6);
+
     return Material(
       elevation: 3,
       shadowColor: Colors.black26,
@@ -200,18 +222,21 @@ class _ExpandedPanel extends StatelessWidget {
               children: [
                 IconButton(
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                  icon: const Icon(Icons.expand_less),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  icon: const Icon(Icons.close_rounded),
                   onPressed: onCollapse,
-                  tooltip: 'Collapse',
+                  tooltip: 'Close directions',
                 ),
                 Expanded(
                   child: Text(
-                    'Go',
+                    'Directions',
                     style: TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       fontSize: 16,
-                      color: MapColors.text.withValues(alpha: 0.85),
+                      color: MapColors.text.withValues(alpha: 0.9),
                     ),
                   ),
                 ),
@@ -221,52 +246,53 @@ class _ExpandedPanel extends StatelessWidget {
               const LinearProgressIndicator(minHeight: 3),
               const SizedBox(height: 8),
             ],
-            InkWell(
-              onTap: onOriginRowTap,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                child: Row(
-                  children: [
-                    Icon(Icons.trip_origin, color: MapColors.primary, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        originLabel.isEmpty ? 'Tap to set on map' : originLabel,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: originLabel.isEmpty
-                              ? MapColors.text.withValues(alpha: 0.45)
-                              : MapColors.text,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Icon(
-                      Icons.edit_location_alt_outlined,
-                      size: 20,
-                      color: MapColors.text.withValues(alpha: 0.5),
-                    ),
-                  ],
-                ),
-              ),
+            _RoutingInputRow(
+              icon: Icons.trip_origin,
+              iconColor: MapColors.primary,
+              controller: startController,
+              focusNode: startFocusNode,
+              hintText: 'Choose starting point',
+              textInputAction: TextInputAction.next,
+              isActive: activeRoutingField == GoRoutingField.start,
+              onTap: () => onActiveRoutingFieldChanged(GoRoutingField.start),
+              onChanged: onStartTextChanged,
+              onTrailingTap: onStartMapPinTap,
+              trailingIcon: Icons.edit_location_alt_outlined,
+              trailingTooltip: 'Pin start on map',
             ),
-            if (showRevertOriginToGps) ...[
+            const SizedBox(height: 6),
+            _RoutingInputRow(
+              icon: Icons.place_rounded,
+              iconColor: MapColors.secondary,
+              controller: endController,
+              focusNode: endFocusNode,
+              hintText: 'Search destination',
+              textInputAction: TextInputAction.search,
+              isActive: activeRoutingField == GoRoutingField.end,
+              onTap: () => onActiveRoutingFieldChanged(GoRoutingField.end),
+              onChanged: onEndTextChanged,
+              onTrailingTap: onEndMapPinTap,
+              trailingIcon: Icons.edit_location_alt_outlined,
+              trailingTooltip: 'Pin destination on map',
+              trailingProgress: isSearchingNominatim,
+            ),
+            if (showUseCurrentLocation) ...[
               const SizedBox(height: 4),
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
-                  onPressed: onRevertOriginToGps,
+                  onPressed: onUseCurrentLocationTap,
                   icon: Icon(
                     Icons.my_location,
                     size: 18,
                     color: MapColors.primary.withValues(alpha: 0.9),
                   ),
-                  label: const Text('Use my current location'),
+                  label: const Text('Use my current location for Start'),
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     foregroundColor: MapColors.primary,
                     textStyle: const TextStyle(
                       fontSize: 13,
@@ -276,60 +302,17 @@ class _ExpandedPanel extends StatelessWidget {
                 ),
               ),
             ],
-            const Divider(height: 20),
-            Row(
-              children: [
-                Icon(Icons.search, color: MapColors.primary, size: 22),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: destinationController,
-                    focusNode: destinationFocusNode,
-                    onChanged: onDestinationTextChanged,
-                    textInputAction: TextInputAction.search,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      hintText: 'Search destination...',
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Place destination on map',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  icon: Icon(
-                    Icons.edit_location_alt_outlined,
-                    size: 22,
-                    color: MapColors.text.withValues(alpha: 0.55),
-                  ),
-                  onPressed: onDestinationMapPinTap,
-                ),
-                if (isSearchingNominatim)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 2),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-              ],
-            ),
             if (searchError != null) ...[
               const SizedBox(height: 6),
               Text(
                 searchError!,
-                style: const TextStyle(
-                  color: Color(0xFFB00020),
-                  fontSize: 13,
-                ),
+                style: const TextStyle(color: Color(0xFFB00020), fontSize: 13),
               ),
             ],
             if (showOutOfAreaDisclaimer) ...[
               const SizedBox(height: 6),
               Text(
-                'This destination is outside the covered area — results may be limited.',
+                'This destination is outside the covered area - results may be limited.',
                 style: TextStyle(
                   color: MapColors.text.withValues(alpha: 0.72),
                   fontSize: 12,
@@ -338,6 +321,15 @@ class _ExpandedPanel extends StatelessWidget {
             ],
             if (suggestions.isNotEmpty) ...[
               const SizedBox(height: 6),
+              Text(
+                'Results for ${activeRoutingField == GoRoutingField.start ? 'Start' : 'End'}',
+                style: TextStyle(
+                  color: mutedText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 220),
                 child: ListView.separated(
@@ -363,6 +355,98 @@ class _ExpandedPanel extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoutingInputRow extends StatelessWidget {
+  const _RoutingInputRow({
+    required this.icon,
+    required this.iconColor,
+    required this.controller,
+    required this.focusNode,
+    required this.hintText,
+    required this.textInputAction,
+    required this.isActive,
+    required this.onTap,
+    required this.onChanged,
+    required this.onTrailingTap,
+    required this.trailingIcon,
+    required this.trailingTooltip,
+    this.trailingProgress = false,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String hintText;
+  final TextInputAction textInputAction;
+  final bool isActive;
+  final VoidCallback onTap;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onTrailingTap;
+  final IconData trailingIcon;
+  final String trailingTooltip;
+  final bool trailingProgress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isActive
+                  ? MapColors.primary.withValues(alpha: 0.65)
+                  : MapColors.text.withValues(alpha: 0.14),
+            ),
+            color: MapColors.background,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              Icon(icon, color: iconColor, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  onTap: onTap,
+                  onChanged: onChanged,
+                  textInputAction: textInputAction,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: hintText,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: trailingTooltip,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                icon: Icon(
+                  trailingIcon,
+                  size: 20,
+                  color: MapColors.text.withValues(alpha: 0.58),
+                ),
+                onPressed: onTrailingTap,
+              ),
+              if (trailingProgress)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
         ),
       ),
     );
