@@ -20,14 +20,13 @@ import 'package:jippy_mobile/screens/routes_screen/widgets/route_details_view.da
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_header.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_list_view.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_loading_state.dart';
-import 'package:jippy_mobile/screens/routes_screen/widgets/search_bar_overlay.dart';
-
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/map_data_loader.dart';
 import 'package:jippy_mobile/data/valhalla_route_client.dart';
 import 'package:jippy_mobile/models/jeepney_route.dart';
 import 'package:jippy_mobile/models/road_closure.dart';
 import 'package:jippy_mobile/models/routes_and_stations_data.dart';
+import 'package:jippy_mobile/services/location_service.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 import 'package:jippy_mobile/utils/route_polyline_hit.dart';
@@ -52,14 +51,9 @@ const String _vectorStyleUrl =
 /// App package name for OSM User-Agent (required to avoid tile request blocks).
 const String _userAgentPackageName = 'com.example.jippy_mobile';
 
-/// Distance filter (meters) for position updates so the dot does not jump every second.
-const int _positionStreamDistanceFilterMeters = 8;
-
 /// Debug-only diagnostics for route polylines (decoded vs fallback).
 const bool _debugPolylineDiagnostics = kDebugMode;
 
-/// Temporary UI toggle to hide the search bar overlay.
-const bool _showSearchBar = false;
 const Color _closureColor = Color(0xFFE81123);
 const double _closureFillOpacity = 0.25;
 const double _closureStrokeWidth = 2;
@@ -87,6 +81,7 @@ class RoutesScreen extends StatefulWidget {
 
 class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
+  final LocationService _locationService = LocationService.instance;
   Position? _userPosition;
   StreamSubscription<Position>? _positionSubscription;
   LocationPermission? _locationPermission;
@@ -310,7 +305,12 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
   }
 
   Future<void> _initLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    final cachedPosition = _locationService.lastKnown;
+    if (cachedPosition != null && mounted) {
+      setState(() => _userPosition = cachedPosition);
+    }
+
+    final serviceEnabled = await _locationService.isServiceEnabled();
     if (!serviceEnabled) {
       setState(() {
         _permissionChecked = true;
@@ -319,10 +319,7 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       return;
     }
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
+    final permission = await _locationService.requestPermission();
 
     setState(() {
       _permissionChecked = true;
@@ -334,12 +331,7 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       return;
     }
 
-    final stream = Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
-        accuracy: LocationAccuracy.medium,
-        distanceFilter: _positionStreamDistanceFilterMeters,
-      ),
-    );
+    final stream = _locationService.stream;
     _positionSubscription = stream.listen(
       (Position position) {
         if (mounted) {
@@ -398,7 +390,6 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
               ],
             ),
           ),
-          if (_showSearchBar) const SearchBarOverlay(),
           RoutesActionButtons(
             userPosition: _userPosition,
             mapController: _mapController,

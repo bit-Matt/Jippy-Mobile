@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/map_colors.dart';
-import 'go_screen.dart';
+import 'go_screen/go_screen.dart';
 import 'routes_screen/routes_screen.dart';
 import 'settings_screen.dart';
 
