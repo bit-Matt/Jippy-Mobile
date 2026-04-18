@@ -48,9 +48,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
-  final PageController _routeCardPageController = PageController(
-    viewportFraction: 0.92,
-  );
   final GeocodingService _geocoding = GeocodingService();
   final LocationService _locationService = LocationService.instance;
   final Connectivity _connectivity = Connectivity();
@@ -173,7 +170,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _searchDebounce?.cancel();
     _positionSubscription?.cancel();
     _connectivitySubscription?.cancel();
-    _routeCardPageController.dispose();
     _startController.dispose();
     _endController.dispose();
     _startFocus.dispose();
@@ -356,10 +352,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     _startFocus.unfocus();
     _endFocus.unfocus();
-
-    if (_routeCardPageController.hasClients) {
-      _routeCardPageController.jumpToPage(0);
-    }
   }
 
   void _onCollapsedTap() {
@@ -628,11 +620,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _flow = GoNavigationFlow.routeSelection;
       });
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_routeCardPageController.hasClients) return;
-        _routeCardPageController.jumpToPage(defaultIndex);
-      });
-
       _fitRouteOrStartEnd();
     } on NavigateRequestException catch (e) {
       if (!mounted || requestToken != _navigateRequestToken) return;
@@ -707,7 +694,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return best;
   }
 
-  void _onRouteCardChanged(int index) {
+  void _onSuggestionCardSelected(int index) {
     if (index < 0 || index >= _routeSuggestions.length) return;
     if (_selectedSuggestionIndex == index) return;
     setState(() => _selectedSuggestionIndex = index);
@@ -717,6 +704,57 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   void _startTurnByTurn() {
     if (_selectedSuggestion == null) return;
     setState(() => _flow = GoNavigationFlow.routeDetails);
+  }
+
+  int _rideCountForSuggestion(NavigateSuggestion suggestion) {
+    return suggestion.route.legs
+        .where((leg) => leg.type == NavigateLegType.jeepney)
+        .length;
+  }
+
+  String _modeSummaryForSuggestion(NavigateSuggestion suggestion) {
+    final labels = <String>[];
+    for (final leg in suggestion.route.legs) {
+      final label = switch (leg.type) {
+        NavigateLegType.walk => 'Walk',
+        NavigateLegType.jeepney => 'Jeep',
+        NavigateLegType.tricycle => 'Tricycle',
+        NavigateLegType.unknown => 'Transit',
+      };
+      if (labels.isEmpty || labels.last != label) {
+        labels.add(label);
+      }
+    }
+    if (labels.isEmpty) return 'Transit';
+    return labels.join(' + ');
+  }
+
+  Color _accentColorForSuggestion(NavigateSuggestion suggestion, int index) {
+    for (final leg in suggestion.route.legs) {
+      if (leg.type != NavigateLegType.walk) {
+        return _colorForLeg(leg);
+      }
+    }
+
+    if (suggestion.route.legs.isNotEmpty) {
+      return _colorForLeg(suggestion.route.legs.first);
+    }
+
+    return switch (index % 3) {
+      0 => MapColors.primary,
+      1 => MapColors.secondary,
+      _ => MapColors.accent,
+    };
+  }
+
+  String _routeBadgeText(NavigateSuggestion suggestion) {
+    return suggestion.label == NavigateSuggestionLabel.fastest
+        ? 'FASTEST'
+        : 'ALT';
+  }
+
+  Color _badgeTextColor(Color background) {
+    return background.computeLuminance() > 0.55 ? MapColors.text : Colors.white;
   }
 
   void _fitRouteOrStartEnd() {
@@ -791,10 +829,16 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   String _formatMinutes(double minutes) {
-    final rounded = minutes.round();
-    if (rounded < 60) return '$rounded min';
-    final hours = rounded ~/ 60;
-    final mins = rounded % 60;
+    if (minutes.isNaN || minutes.isInfinite || minutes <= 0) return '0 min';
+
+    final totalSeconds = (minutes * 60).round();
+    if (totalSeconds < 60) return '$totalSeconds sec';
+
+    final roundedMinutes = (totalSeconds / 60).round();
+    if (roundedMinutes < 60) return '$roundedMinutes min';
+
+    final hours = roundedMinutes ~/ 60;
+    final mins = roundedMinutes % 60;
     if (mins == 0) return '${hours}h';
     return '${hours}h ${mins}m';
   }
@@ -1094,44 +1138,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ] else ...[
-                SizedBox(
-                  height: 206,
-                  child: PageView.builder(
-                    controller: _routeCardPageController,
-                    itemCount: _routeSuggestions.length,
-                    onPageChanged: _onRouteCardChanged,
-                    itemBuilder: (context, index) {
-                      final suggestion = _routeSuggestions[index];
-                      final isActive = index == _selectedSuggestionIndex;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: _buildSuggestionCard(
-                          context,
-                          suggestion,
-                          isActive: isActive,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (var i = 0; i < _routeSuggestions.length; i++)
-                      Container(
-                        width: i == _selectedSuggestionIndex ? 18 : 8,
-                        height: 8,
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        decoration: BoxDecoration(
-                          color: i == _selectedSuggestionIndex
-                              ? MapColors.primary
-                              : MapColors.text.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                  ],
-                ),
+                SizedBox(height: 96, child: _buildSuggestedRoutesStrip()),
               ],
               if (selected != null) ...[
                 const SizedBox(height: 16),
@@ -1175,9 +1182,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   Text(
                     'No step previews available for this suggestion.',
                     style: TextStyle(
-                      color: MapColors.text.withValues(alpha: 0.68),
+                      color: MapColors.text.withValues(alpha: 0.72),
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   )
                 else
@@ -1190,124 +1197,139 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildSuggestionCard(
-    BuildContext context,
-    NavigateSuggestion suggestion, {
-    required bool isActive,
-  }) {
-    final distance = _formatDistance(suggestion.totalDistanceMeters);
-    final duration = _formatMinutes(suggestion.totalDurationMinutes);
-    final transfers = suggestion.transferCount;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      decoration: BoxDecoration(
-        color: _sheetSurfaceColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isActive
-              ? MapColors.primary.withValues(alpha: 0.56)
-              : MapColors.text.withValues(alpha: 0.12),
-        ),
-        boxShadow: isActive
-            ? [
-                BoxShadow(
-                  color: MapColors.text.withValues(alpha: 0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ]
-            : null,
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSuggestedRoutesStrip() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
-          Row(
+          for (var i = 0; i < _routeSuggestions.length; i++) ...[
+            _buildSuggestionCard(
+              _routeSuggestions[i],
+              index: i,
+              isSelected: i == _selectedSuggestionIndex,
+            ),
+            if (i != _routeSuggestions.length - 1) const SizedBox(width: 6),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionCard(
+    NavigateSuggestion suggestion, {
+    required int index,
+    required bool isSelected,
+  }) {
+    final accentColor = _accentColorForSuggestion(suggestion, index);
+    final badgeColor = suggestion.label == NavigateSuggestionLabel.fastest
+        ? MapColors.primary
+        : accentColor;
+    final badgeTextColor = _badgeTextColor(badgeColor);
+    final badgeText = _routeBadgeText(suggestion);
+    final rides = _rideCountForSuggestion(suggestion);
+    final rideLabel = rides == 1 ? 'Ride' : 'Rides';
+    final distance = _formatDistance(suggestion.totalDistanceMeters);
+    final modeSummary = _modeSummaryForSuggestion(suggestion);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _onSuggestionCardSelected(index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 182,
+          padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
+          decoration: BoxDecoration(
+            color: _sheetSurfaceColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected
+                  ? MapColors.text.withValues(alpha: 0.24)
+                  : MapColors.text.withValues(alpha: 0.12),
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: MapColors.text.withValues(alpha: 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                width: 5,
+                height: 70,
                 decoration: BoxDecoration(
-                  color: MapColors.primary.withValues(alpha: 0.12),
+                  color: accentColor.withValues(alpha: isSelected ? 1 : 0.55),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text(
-                  suggestion.labelText,
-                  style: const TextStyle(
-                    color: MapColors.text,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
-                  ),
-                ),
               ),
-            ],
-          ),
-          const SizedBox(height: 9),
-          Text(
-            '$duration - $distance',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: MapColors.text,
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            transfers == 1 ? '1 transfer' : '$transfers transfers',
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.75),
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final leg in suggestion.route.legs)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _colorForLeg(leg).withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Icon(_iconForLegType(leg.type), size: 14),
-                        const SizedBox(width: 5),
-                        Text(
-                          _labelForLegType(leg.type),
-                          style: const TextStyle(
-                            color: MapColors.text,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: badgeColor,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            badgeText,
+                            style: TextStyle(
+                              color: badgeTextColor,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-              ],
-            ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '$rides $rideLabel',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isSelected
+                            ? MapColors.text
+                            : MapColors.text.withValues(alpha: 0.85),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$distance - $modeSummary',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isSelected
+                            ? MapColors.text.withValues(alpha: 0.82)
+                            : MapColors.text.withValues(alpha: 0.66),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            _etaText(context, suggestion),
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.65),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

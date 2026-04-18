@@ -168,6 +168,7 @@ class NavigateLeg {
     }
 
     final bbox = _parseBBox(json['bbox']);
+    final durationSeconds = _toDouble(json['duration']) ?? 0;
 
     return NavigateLeg(
       type: parseNavigateLegType(json['type']?.toString()),
@@ -175,7 +176,7 @@ class NavigateLeg {
       polyline: polyline,
       colorHex: _normalizeNullableString(json['color']),
       distanceMeters: _toDouble(json['distance']) ?? 0,
-      durationMinutes: _toDouble(json['duration']) ?? 0,
+      durationMinutes: durationSeconds / 60,
       instructions: instructions,
       bbox: bbox,
     );

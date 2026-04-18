@@ -19,7 +19,7 @@ void main() {
                     'polyline': 'xyz',
                     'color': '#E68C1E',
                     'distance': 1200,
-                    'duration': 15,
+                    'duration': 900,
                     'instructions': [
                       {'text': 'Board route alpha', 'maneuver_type': 'board'},
                       {'text': 'Alight at stop one', 'maneuver_type': 'alight'},
@@ -45,6 +45,7 @@ void main() {
         suggestion.route.legs.first.instructions.first.maneuverType,
         NavigateManeuverType.board,
       );
+      expect(suggestion.route.legs.first.durationMinutes, closeTo(15, 1e-9));
       expect(suggestion.route.legs.first.bbox, hasLength(2));
     });
 
@@ -58,7 +59,7 @@ void main() {
               'route_name': 'Walk Segment',
               'polyline': 'a',
               'distance': 200,
-              'duration': 4,
+              'duration': 240,
               'instructions': [
                 {'text': 'Depart', 'maneuver_type': 'depart'},
               ],
@@ -69,7 +70,7 @@ void main() {
               'route_name': 'Jeep Segment',
               'polyline': 'b',
               'distance': 1500,
-              'duration': 12,
+              'duration': 720,
               'instructions': [
                 {'text': 'Board jeep', 'maneuver_type': 'board'},
                 {'text': 'Alight jeep', 'maneuver_type': 'alight'},
@@ -81,7 +82,7 @@ void main() {
               'route_name': 'Tricycle Segment',
               'polyline': 'c',
               'distance': 900,
-              'duration': 10,
+              'duration': 600,
               'instructions': [
                 {'text': 'Board tricycle', 'maneuver_type': 'board'},
                 {'text': 'Arrive', 'maneuver_type': 'arrive'},
@@ -112,7 +113,7 @@ void main() {
                     'route_name': 'Safe leg',
                     'polyline': '',
                     'distance': '80',
-                    'duration': '2',
+                    'duration': '120',
                     'instructions': [
                       {'text': '', 'maneuver_type': 'turn'},
                       {'text': 'Turn right', 'maneuver_type': 'turn'},
