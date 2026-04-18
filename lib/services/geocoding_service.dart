@@ -17,8 +17,8 @@ class GeocodingService {
   static const String userAgent =
       'Jippy-Mobile/1.0.0 (capstone; contact: https://jippy.shinosawa-laboratories.dev)';
 
-  /// Iloilo-ish bias for forward search: min_lon, max_lat, max_lon, min_lat.
-  static const String iloiloViewBox = '122.50,10.78,122.60,10.65';
+  /// Iloilo bounded search area: min_lon, max_lat, max_lon, min_lat.
+  static const String iloiloViewBox = '122.019,11.628,123.336,10.407';
 
   static const double _iloiloMinLat = 10.65;
   static const double _iloiloMaxLat = 10.78;
@@ -61,7 +61,7 @@ class GeocodingService {
       'format': 'json',
       'countrycodes': 'ph',
       'viewbox': iloiloViewBox,
-      'bounded': '0',
+      'bounded': '1',
       'limit': '8',
     });
 
@@ -111,7 +111,10 @@ class GeocodingService {
     final uri = Uri.https(_baseHost, '/reverse', {
       'lat': point.latitude.toString(),
       'lon': point.longitude.toString(),
-      'format': 'json',
+      'format': 'jsonv2',
+      'countrycodes': 'ph',
+      'viewbox': iloiloViewBox,
+      'bounded': '1',
       'zoom': '18',
     });
 

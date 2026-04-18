@@ -29,26 +29,23 @@ class _AppShellState extends State<AppShell> {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onTabSelected,
         type: BottomNavigationBarType.fixed,
-        backgroundColor: MapColors.background,
+        backgroundColor: Colors.white,
+        elevation: 8,
         selectedItemColor: MapColors.primary,
         unselectedItemColor: MapColors.text.withValues(alpha: 0.45),
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.map_outlined),
-            label: 'Map',
+            icon: Icon(Icons.directions_car_filled_outlined),
+            label: 'Go',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.alt_route),
-            label: 'Routes',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.alt_route), label: 'Routes'),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),
             label: 'Settings',

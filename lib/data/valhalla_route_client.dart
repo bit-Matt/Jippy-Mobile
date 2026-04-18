@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:polyline_codec/polyline_codec.dart';
 
-import 'map_data_loader.dart';
+import '../core/config/api_config.dart';
 import '../models/route_point.dart';
 
 /// Timeout for Valhalla API requests.
@@ -14,7 +14,7 @@ const Duration _valhallaStatusTimeout = Duration(seconds: 5);
 /// Checks whether the Valhalla proxy is available.
 /// Returns true if GET /api/public/osm/valhalla/status returns 200.
 Future<bool> checkValhallaStatus({http.Client? client}) async {
-  final uri = Uri.parse('$apiBaseUrl/api/public/osm/valhalla/status');
+  final uri = Uri.parse(valhallaStatusApiUrl);
   try {
     final response = client != null
         ? await client.get(uri).timeout(_valhallaStatusTimeout)
@@ -57,7 +57,7 @@ Future<List<LatLng>> fetchRoadAlignedRoute(
 
   final jsonString = jsonEncode(payload);
   final encoded = Uri.encodeComponent(jsonString);
-  final uri = Uri.parse('$apiBaseUrl/api/public/osm/valhalla/route?json=$encoded');
+  final uri = Uri.parse('$valhallaRouteApiUrl?json=$encoded');
 
   final response = client != null
       ? await client.get(uri).timeout(_valhallaRouteTimeout)

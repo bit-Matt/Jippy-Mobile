@@ -18,6 +18,8 @@ class GoMapCanvas extends StatelessWidget {
     required this.userPosition,
     required this.origin,
     required this.destination,
+    required this.routePolylines,
+    required this.routeEndpointMarkers,
     required this.osmTileUrl,
     required this.userAgentPackageName,
   });
@@ -30,6 +32,8 @@ class GoMapCanvas extends StatelessWidget {
   final LatLng? userPosition;
   final LatLng? origin;
   final LatLng? destination;
+  final List<Polyline<Object>> routePolylines;
+  final List<Marker> routeEndpointMarkers;
   final String osmTileUrl;
   final String userAgentPackageName;
 
@@ -58,6 +62,9 @@ class GoMapCanvas extends StatelessWidget {
         ),
       );
     }
+    if (routeEndpointMarkers.isNotEmpty) {
+      markers.addAll(routeEndpointMarkers);
+    }
 
     return FlutterMap(
       mapController: mapController,
@@ -85,6 +92,7 @@ class GoMapCanvas extends StatelessWidget {
               },
             ),
           ),
+        if (routePolylines.isNotEmpty) PolylineLayer<Object>(polylines: routePolylines),
         if (markers.isNotEmpty) MarkerLayer(markers: markers),
         if (userPosition != null)
           MarkerLayer(
