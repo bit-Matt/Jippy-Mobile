@@ -20,8 +20,6 @@ import 'package:jippy_mobile/screens/routes_screen/widgets/route_details_view.da
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_header.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_list_view.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_loading_state.dart';
-import 'package:jippy_mobile/screens/routes_screen/widgets/search_bar_overlay.dart';
-
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/map_data_loader.dart';
 import 'package:jippy_mobile/data/valhalla_route_client.dart';
@@ -58,8 +56,6 @@ const int _positionStreamDistanceFilterMeters = 8;
 /// Debug-only diagnostics for route polylines (decoded vs fallback).
 const bool _debugPolylineDiagnostics = kDebugMode;
 
-/// Temporary UI toggle to hide the search bar overlay.
-const bool _showSearchBar = false;
 const Color _closureColor = Color(0xFFE81123);
 const double _closureFillOpacity = 0.25;
 const double _closureStrokeWidth = 2;
@@ -398,7 +394,6 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
               ],
             ),
           ),
-          if (_showSearchBar) const SearchBarOverlay(),
           RoutesActionButtons(
             userPosition: _userPosition,
             mapController: _mapController,
