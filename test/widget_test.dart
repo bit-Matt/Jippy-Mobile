@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jippy_mobile/main.dart';
 
 void main() {
-  testWidgets('JippyApp builds and shows map screen', (WidgetTester tester) async {
+  testWidgets('JippyApp builds and shows shell with Go screen', (WidgetTester tester) async {
     await tester.pumpWidget(const JippyApp());
     await tester.pump();
 
