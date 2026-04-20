@@ -11,7 +11,6 @@ class GoSearchBar extends StatelessWidget {
     super.key,
     required this.mode,
     required this.onCollapsedTap,
-    required this.onCollapseExpanded,
     required this.startController,
     required this.startFocusNode,
     required this.endController,
@@ -27,7 +26,6 @@ class GoSearchBar extends StatelessWidget {
     required this.searchError,
     required this.showOutOfAreaDisclaimer,
     required this.isSearchingNominatim,
-    required this.routePreviewLoading,
     required this.mapPinAwaitingTap,
     required this.onCancelMapPinMode,
     required this.activeRoutingField,
@@ -36,7 +34,6 @@ class GoSearchBar extends StatelessWidget {
 
   final GoSearchBarMode mode;
   final VoidCallback onCollapsedTap;
-  final VoidCallback onCollapseExpanded;
   final TextEditingController startController;
   final FocusNode startFocusNode;
   final TextEditingController endController;
@@ -52,7 +49,6 @@ class GoSearchBar extends StatelessWidget {
   final String? searchError;
   final bool showOutOfAreaDisclaimer;
   final bool isSearchingNominatim;
-  final bool routePreviewLoading;
   final GoPinTarget? mapPinAwaitingTap;
   final VoidCallback onCancelMapPinMode;
   final GoRoutingField activeRoutingField;
@@ -74,7 +70,6 @@ class GoSearchBar extends StatelessWidget {
             mode == GoSearchBarMode.collapsed
                 ? _CollapsedBar(onTap: onCollapsedTap)
                 : _RoutingHeaderPanel(
-                    onCollapse: onCollapseExpanded,
                     startController: startController,
                     startFocusNode: startFocusNode,
                     endController: endController,
@@ -90,7 +85,6 @@ class GoSearchBar extends StatelessWidget {
                     searchError: searchError,
                     showOutOfAreaDisclaimer: showOutOfAreaDisclaimer,
                     isSearchingNominatim: isSearchingNominatim,
-                    routePreviewLoading: routePreviewLoading,
                     activeRoutingField: activeRoutingField,
                     onActiveRoutingFieldChanged: onActiveRoutingFieldChanged,
                   ),
@@ -162,7 +156,6 @@ class _CollapsedBar extends StatelessWidget {
 
 class _RoutingHeaderPanel extends StatelessWidget {
   const _RoutingHeaderPanel({
-    required this.onCollapse,
     required this.startController,
     required this.startFocusNode,
     required this.endController,
@@ -178,12 +171,10 @@ class _RoutingHeaderPanel extends StatelessWidget {
     required this.searchError,
     required this.showOutOfAreaDisclaimer,
     required this.isSearchingNominatim,
-    required this.routePreviewLoading,
     required this.activeRoutingField,
     required this.onActiveRoutingFieldChanged,
   });
 
-  final VoidCallback onCollapse;
   final TextEditingController startController;
   final FocusNode startFocusNode;
   final TextEditingController endController;
@@ -199,7 +190,6 @@ class _RoutingHeaderPanel extends StatelessWidget {
   final String? searchError;
   final bool showOutOfAreaDisclaimer;
   final bool isSearchingNominatim;
-  final bool routePreviewLoading;
   final GoRoutingField activeRoutingField;
   final ValueChanged<GoRoutingField> onActiveRoutingFieldChanged;
 
@@ -213,39 +203,11 @@ class _RoutingHeaderPanel extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       color: MapColors.background,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
-                  ),
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: onCollapse,
-                  tooltip: 'Close directions',
-                ),
-                Expanded(
-                  child: Text(
-                    'Directions',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: MapColors.text.withValues(alpha: 0.9),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (routePreviewLoading) ...[
-              const LinearProgressIndicator(minHeight: 3),
-              const SizedBox(height: 8),
-            ],
             _RoutingInputRow(
               icon: Icons.trip_origin,
               iconColor: MapColors.primary,

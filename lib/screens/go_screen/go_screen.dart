@@ -666,6 +666,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _isolatedLegIndex = null;
     });
 
+    _collapseRouteSelectionSheetForLoading();
+
     try {
       final suggestions = await fetchNavigationSuggestions(
         start: start,
@@ -839,6 +841,25 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         curve: Curves.easeOutCubic,
       );
     } catch (_) {}
+  }
+
+  void _collapseRouteSelectionSheetForLoading() {
+    if (_flow != GoNavigationFlow.routeSelection) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_flow != GoNavigationFlow.routeSelection || !_routePreviewLoading) {
+        return;
+      }
+
+      try {
+        _sheetController.animateTo(
+          0.24,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      } catch (_) {}
+    });
   }
 
   void _expandRouteDetailsSheetToDefault() {
@@ -1148,7 +1169,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           GoSearchBar(
             mode: _searchMode,
             onCollapsedTap: _onCollapsedTap,
-            onCollapseExpanded: _resetToExplore,
             startController: _startController,
             startFocusNode: _startFocus,
             endController: _endController,
@@ -1164,7 +1184,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             searchError: _searchError,
             showOutOfAreaDisclaimer: _destinationOutOfArea,
             isSearchingNominatim: _nominatimBusy,
-            routePreviewLoading: _routePreviewLoading,
             mapPinAwaitingTap: _pinTarget,
             onCancelMapPinMode: _cancelMapPinMode,
             activeRoutingField: _activeRoutingField,
@@ -1301,19 +1320,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   ),
                 ],
               ),
-              if (_routePreviewLoading && _routeSuggestions.isEmpty) ...[
-                const SizedBox(height: 10),
-                const LinearProgressIndicator(minHeight: 3),
-                const SizedBox(height: 16),
-                Text(
-                  'Finding routes...',
-                  style: TextStyle(
-                    color: MapColors.text.withValues(alpha: 0.72),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ] else if (_routeSuggestions.isEmpty) ...[
+              if (_routeSuggestions.isEmpty && !_routePreviewLoading) ...[
                 const SizedBox(height: 10),
                 Text(
                   'No route suggestions available yet.',
