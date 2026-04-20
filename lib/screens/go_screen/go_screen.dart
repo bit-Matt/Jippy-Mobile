@@ -79,6 +79,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   List<NavigateSuggestion> _routeSuggestions = const [];
   int _selectedSuggestionIndex = 0;
+  int? _isolatedLegIndex;
 
   Position? _userPosition;
   LocationPermission? _locationPermission;
@@ -129,6 +130,21 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return null;
   }
 
+  int? get _activeLegIsolationIndex {
+    if (_flow != GoNavigationFlow.routeDetails) return null;
+
+    final isolated = _isolatedLegIndex;
+    if (isolated == null) return null;
+
+    final selected = _selectedSuggestion;
+    if (selected == null) return null;
+    if (isolated < 0 || isolated >= selected.route.legs.length) {
+      return null;
+    }
+
+    return isolated;
+  }
+
   List<Polyline<Object>> get _selectedRoutePolylines {
     if (_flow != GoNavigationFlow.routeSelection &&
         _flow != GoNavigationFlow.routeDetails) {
@@ -137,9 +153,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     final selected = _selectedSuggestion;
     if (selected == null) return const <Polyline<Object>>[];
+    final isolatedIndex = _activeLegIsolationIndex;
 
     final polylines = <Polyline<Object>>[];
-    for (final leg in selected.route.legs) {
+    for (var i = 0; i < selected.route.legs.length; i++) {
+      if (isolatedIndex != null && i != isolatedIndex) continue;
+      final leg = selected.route.legs[i];
       final encoded = leg.polyline.trim();
       if (encoded.isEmpty) continue;
       final points = decodeApiRoutePolyline(encoded);
@@ -147,12 +166,59 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       polylines.add(
         Polyline<Object>(
           points: points,
-          color: _colorForLeg(leg),
+          color: _mapColorForLeg(leg),
           strokeWidth: _strokeWidthForLeg(leg),
+          pattern: _polylinePatternForLeg(leg),
         ),
       );
     }
     return polylines;
+  }
+
+  List<LatLng> get _selectedRideStopPoints {
+    if (_flow != GoNavigationFlow.routeSelection &&
+        _flow != GoNavigationFlow.routeDetails) {
+      return const <LatLng>[];
+    }
+
+    final selected = _selectedSuggestion;
+    if (selected == null) return const <LatLng>[];
+    final isolatedIndex = _activeLegIsolationIndex;
+
+    final points = <LatLng>[];
+
+    for (var i = 0; i < selected.route.legs.length; i++) {
+      if (isolatedIndex != null && i != isolatedIndex) continue;
+      final leg = selected.route.legs[i];
+      if (leg.type != NavigateLegType.jeepney) continue;
+
+      final encoded = leg.polyline.trim();
+      if (encoded.isEmpty) continue;
+
+      final decoded = decodeApiRoutePolyline(encoded);
+      if (decoded == null || decoded.length < 2) continue;
+
+      final boardPoint = decoded.first;
+      final alightPoint = decoded.last;
+      final hasDirectJeepTransferWithoutWalk =
+          i > 0 && selected.route.legs[i - 1].type == NavigateLegType.jeepney;
+
+      if (!hasDirectJeepTransferWithoutWalk) {
+        _addRideStopMarkerPoint(points, boardPoint);
+      }
+      _addRideStopMarkerPoint(points, alightPoint);
+    }
+
+    return points;
+  }
+
+  void _addRideStopMarkerPoint(List<LatLng> points, LatLng candidate) {
+    const distance = Distance();
+    for (final point in points) {
+      final meters = distance.as(LengthUnit.Meter, point, candidate);
+      if (meters <= 12) return;
+    }
+    points.add(candidate);
   }
 
   @override
@@ -296,6 +362,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _routePreviewSignature = null;
       _routeSuggestions = const [];
       _selectedSuggestionIndex = 0;
+      _isolatedLegIndex = null;
 
       _start = null;
       _startController.clear();
@@ -348,6 +415,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _routePreviewSignature = null;
       _routeSuggestions = const [];
       _selectedSuggestionIndex = 0;
+      _isolatedLegIndex = null;
     });
 
     _startFocus.unfocus();
@@ -572,6 +640,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           _routePreviewLoading = false;
           _routeSuggestions = const [];
           _selectedSuggestionIndex = 0;
+          _isolatedLegIndex = null;
           _flow = GoNavigationFlow.routingInput;
         });
       }
@@ -594,6 +663,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _flow = GoNavigationFlow.routeSelection;
       _routeSuggestions = const [];
       _selectedSuggestionIndex = 0;
+      _isolatedLegIndex = null;
     });
 
     try {
@@ -617,6 +687,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _routePreviewLoading = false;
         _routeSuggestions = suggestions;
         _selectedSuggestionIndex = defaultIndex;
+        _isolatedLegIndex = null;
         _flow = GoNavigationFlow.routeSelection;
       });
 
@@ -697,13 +768,88 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   void _onSuggestionCardSelected(int index) {
     if (index < 0 || index >= _routeSuggestions.length) return;
     if (_selectedSuggestionIndex == index) return;
-    setState(() => _selectedSuggestionIndex = index);
+    setState(() {
+      _selectedSuggestionIndex = index;
+      _isolatedLegIndex = null;
+    });
     _fitRouteOrStartEnd();
   }
 
   void _startTurnByTurn() {
     if (_selectedSuggestion == null) return;
-    setState(() => _flow = GoNavigationFlow.routeDetails);
+    setState(() {
+      _flow = GoNavigationFlow.routeDetails;
+      _isolatedLegIndex = null;
+    });
+  }
+
+  void _onLegTimelineStepTapped(int legIndex) {
+    final selected = _selectedSuggestion;
+    if (selected == null) return;
+    if (legIndex < 0 || legIndex >= selected.route.legs.length) return;
+
+    final nextIsolation = _isolatedLegIndex == legIndex ? null : legIndex;
+    setState(() => _isolatedLegIndex = nextIsolation);
+
+    if (nextIsolation == null) {
+      _fitRouteOrStartEnd();
+      _expandRouteDetailsSheetToDefault();
+      return;
+    }
+
+    _collapseRouteDetailsSheetForFocus();
+
+    final encoded = selected.route.legs[nextIsolation].polyline.trim();
+    if (encoded.isEmpty) return;
+
+    final points = decodeApiRoutePolyline(encoded);
+    if (points == null || points.isEmpty) return;
+
+    if (points.length == 1) {
+      _mapController.move(points.first, 16);
+      return;
+    }
+
+    final bounds = LatLngBounds.fromPoints(points);
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.fromLTRB(56, 168, 56, 136),
+        ),
+      );
+    } catch (_) {
+      _mapController.move(bounds.center, _mapController.camera.zoom);
+    }
+  }
+
+  void _showAllRouteSteps() {
+    if (_isolatedLegIndex == null) return;
+    setState(() => _isolatedLegIndex = null);
+    _fitRouteOrStartEnd();
+    _expandRouteDetailsSheetToDefault();
+  }
+
+  void _collapseRouteDetailsSheetForFocus() {
+    if (_flow != GoNavigationFlow.routeDetails) return;
+    try {
+      _sheetController.animateTo(
+        0.32,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    } catch (_) {}
+  }
+
+  void _expandRouteDetailsSheetToDefault() {
+    if (_flow != GoNavigationFlow.routeDetails) return;
+    try {
+      _sheetController.animateTo(
+        0.54,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    } catch (_) {}
   }
 
   int _rideCountForSuggestion(NavigateSuggestion suggestion) {
@@ -812,6 +958,20 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     };
   }
 
+  Color _mapColorForLeg(NavigateLeg leg) {
+    if (leg.type == NavigateLegType.walk) {
+      return const Color(0xFF9E9E9E);
+    }
+    return _colorForLeg(leg);
+  }
+
+  StrokePattern _polylinePatternForLeg(NavigateLeg leg) {
+    if (leg.type == NavigateLegType.walk) {
+      return StrokePattern.dashed(segments: const <double>[7, 5]);
+    }
+    return const StrokePattern.solid();
+  }
+
   double _strokeWidthForLeg(NavigateLeg leg) {
     return switch (leg.type) {
       NavigateLegType.walk => MapColors.walkingStrokeWidth,
@@ -883,6 +1043,31 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     };
   }
 
+  IconData _iconForInstruction({
+    required NavigateLeg leg,
+    required NavigateInstruction instruction,
+    required bool isTransferBoard,
+  }) {
+    if (instruction.maneuverType == NavigateManeuverType.alight) {
+      return Icons.location_on;
+    }
+
+    if (instruction.maneuverType == NavigateManeuverType.board) {
+      if (isTransferBoard) return Icons.swap_horiz;
+      if (leg.type == NavigateLegType.jeepney) return Icons.directions_bus;
+      return _iconForManeuver(instruction.maneuverType);
+    }
+
+    if (leg.type == NavigateLegType.walk) {
+      return Icons.directions_walk;
+    }
+    if (leg.type == NavigateLegType.jeepney) {
+      return Icons.directions_bus;
+    }
+
+    return _iconForManeuver(instruction.maneuverType);
+  }
+
   Color _colorForManeuver(NavigateManeuverType maneuver) {
     return switch (maneuver) {
       NavigateManeuverType.board => MapColors.primary,
@@ -948,6 +1133,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               initialZoom: _initialZoom,
               onMapTap: _handleMapTap,
               routePolylines: _selectedRoutePolylines,
+              dropOffPoints: _selectedRideStopPoints,
               userPosition: userLatLng,
               origin: _mapOrigin,
               destination: _mapDestination,
@@ -1139,6 +1325,27 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                 ),
               ] else ...[
                 SizedBox(height: 96, child: _buildSuggestedRoutesStrip()),
+                if (_routeSuggestions.length > 1) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.swipe_left_rounded,
+                        size: 14,
+                        color: MapColors.text.withValues(alpha: 0.55),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Swipe to see more route options',
+                        style: TextStyle(
+                          color: MapColors.text.withValues(alpha: 0.6),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
               if (selected != null) ...[
                 const SizedBox(height: 16),
@@ -1198,20 +1405,51 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildSuggestedRoutesStrip() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (var i = 0; i < _routeSuggestions.length; i++) ...[
-            _buildSuggestionCard(
-              _routeSuggestions[i],
-              index: i,
-              isSelected: i == _selectedSuggestionIndex,
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var i = 0; i < _routeSuggestions.length; i++) ...[
+                _buildSuggestionCard(
+                  _routeSuggestions[i],
+                  index: i,
+                  isSelected: i == _selectedSuggestionIndex,
+                ),
+                if (i != _routeSuggestions.length - 1) const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+        if (_routeSuggestions.length > 1)
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: Container(
+                width: 30,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      _sheetSurfaceColor.withValues(alpha: 0),
+                      _sheetSurfaceColor.withValues(alpha: 0.95),
+                    ],
+                  ),
+                ),
+                alignment: Alignment.centerRight,
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: MapColors.text.withValues(alpha: 0.5),
+                ),
+              ),
             ),
-            if (i != _routeSuggestions.length - 1) const SizedBox(width: 6),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -1337,9 +1575,14 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   List<Widget> _buildPreviewInstructionRows(NavigateSuggestion suggestion) {
     final widgets = <Widget>[];
     var rendered = 0;
+    var boardCount = 0;
 
     for (final leg in suggestion.route.legs) {
       for (final instruction in leg.instructions) {
+        final isBoard =
+            instruction.maneuverType == NavigateManeuverType.board;
+        final isTransferBoard = isBoard && boardCount > 0;
+
         rendered += 1;
         if (rendered > 5) return widgets;
         widgets.add(
@@ -1349,7 +1592,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  _iconForManeuver(instruction.maneuverType),
+                  _iconForInstruction(
+                    leg: leg,
+                    instruction: instruction,
+                    isTransferBoard: isTransferBoard,
+                  ),
                   size: 16,
                   color: _colorForManeuver(instruction.maneuverType),
                 ),
@@ -1369,6 +1616,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             ),
           ),
         );
+
+        if (isBoard) {
+          boardCount += 1;
+        }
       }
     }
 
@@ -1379,6 +1630,29 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final selected = _selectedSuggestion;
     if (selected == null) {
       return const SizedBox.shrink();
+    }
+
+    final legTimelineBlocks = <Widget>[];
+    var boardCountBeforeLeg = 0;
+    for (int i = 0; i < selected.route.legs.length; i++) {
+      final leg = selected.route.legs[i];
+      legTimelineBlocks.add(
+        _buildLegTimelineBlock(
+          leg,
+          index: i,
+          isLast: i == selected.route.legs.length - 1,
+          boardCountBeforeLeg: boardCountBeforeLeg,
+          isIsolated: _activeLegIsolationIndex == i,
+          onTap: () => _onLegTimelineStepTapped(i),
+        ),
+      );
+
+      boardCountBeforeLeg += leg.instructions
+          .where(
+            (instruction) =>
+                instruction.maneuverType == NavigateManeuverType.board,
+          )
+          .length;
     }
 
     return DraggableScrollableSheet(
@@ -1422,13 +1696,22 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 16),
-              for (int i = 0; i < selected.route.legs.length; i++)
-                _buildLegTimelineBlock(
-                  selected.route.legs[i],
-                  index: i,
-                  isLast: i == selected.route.legs.length - 1,
+              if (_activeLegIsolationIndex != null) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _showAllRouteSteps,
+                  icon: const Icon(Icons.center_focus_strong_rounded),
+                  label: const Text('Show all step-by-step'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(42),
+                    side: BorderSide(
+                      color: MapColors.text.withValues(alpha: 0.2),
+                    ),
+                  ),
                 ),
+              ],
+              const SizedBox(height: 16),
+              ...legTimelineBlocks,
             ],
           ),
         );
@@ -1440,7 +1723,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     NavigateLeg leg, {
     required int index,
     required bool isLast,
+    required int boardCountBeforeLeg,
+    required bool isIsolated,
+    required VoidCallback onTap,
   }) {
+    var boardCount = boardCountBeforeLeg;
+
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
       child: IntrinsicHeight(
@@ -1480,106 +1768,136 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                decoration: BoxDecoration(
-                  color: _sheetSurfaceColor,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: MapColors.text.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    decoration: BoxDecoration(
+                      color: _sheetSurfaceColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isIsolated
+                            ? MapColors.primary.withValues(alpha: 0.55)
+                            : MapColors.text.withValues(alpha: 0.1),
+                        width: isIsolated ? 1.6 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            '${_labelForLegType(leg.type)} ${index + 1}',
-                            style: const TextStyle(
-                              color: MapColors.text,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${_labelForLegType(leg.type)} ${index + 1}',
+                                style: const TextStyle(
+                                  color: MapColors.text,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _formatMinutes(leg.durationMinutes),
+                              style: TextStyle(
+                                color: MapColors.text.withValues(alpha: 0.74),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (leg.routeName.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            leg.routeName,
+                            style: TextStyle(
+                              color: MapColors.text.withValues(alpha: 0.84),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ),
+                        ],
+                        const SizedBox(height: 4),
                         Text(
-                          _formatMinutes(leg.durationMinutes),
+                          _formatDistance(leg.distanceMeters),
                           style: TextStyle(
-                            color: MapColors.text.withValues(alpha: 0.74),
+                            color: MapColors.text.withValues(alpha: 0.65),
                             fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        if (leg.instructions.isEmpty)
+                          Text(
+                            'No detailed instructions for this leg.',
+                            style: TextStyle(
+                              color: MapColors.text.withValues(alpha: 0.68),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        else
+                          for (int i = 0; i < leg.instructions.length; i++)
+                            Builder(
+                              builder: (context) {
+                                final instruction = leg.instructions[i];
+                                final isBoard =
+                                    instruction.maneuverType ==
+                                    NavigateManeuverType.board;
+                                final isTransferBoard =
+                                    isBoard && boardCount > 0;
+
+                                if (isBoard) {
+                                  boardCount += 1;
+                                }
+
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    bottom: i == leg.instructions.length - 1
+                                        ? 0
+                                        : 8,
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        _iconForInstruction(
+                                          leg: leg,
+                                          instruction: instruction,
+                                          isTransferBoard: isTransferBoard,
+                                        ),
+                                        size: 15,
+                                        color: _colorForManeuver(
+                                          instruction.maneuverType,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 7),
+                                      Expanded(
+                                        child: Text(
+                                          instruction.text,
+                                          style: TextStyle(
+                                            color: MapColors.text.withValues(
+                                              alpha: 0.8,
+                                            ),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.33,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
                       ],
                     ),
-                    if (leg.routeName.trim().isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        leg.routeName,
-                        style: TextStyle(
-                          color: MapColors.text.withValues(alpha: 0.84),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatDistance(leg.distanceMeters),
-                      style: TextStyle(
-                        color: MapColors.text.withValues(alpha: 0.65),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (leg.instructions.isEmpty)
-                      Text(
-                        'No detailed instructions for this leg.',
-                        style: TextStyle(
-                          color: MapColors.text.withValues(alpha: 0.68),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      )
-                    else
-                      for (int i = 0; i < leg.instructions.length; i++)
-                        Padding(
-                          padding: EdgeInsets.only(
-                            bottom: i == leg.instructions.length - 1 ? 0 : 8,
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                _iconForManeuver(
-                                  leg.instructions[i].maneuverType,
-                                ),
-                                size: 15,
-                                color: _colorForManeuver(
-                                  leg.instructions[i].maneuverType,
-                                ),
-                              ),
-                              const SizedBox(width: 7),
-                              Expanded(
-                                child: Text(
-                                  leg.instructions[i].text,
-                                  style: TextStyle(
-                                    color: MapColors.text.withValues(
-                                      alpha: 0.8,
-                                    ),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.33,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                  ],
+                  ),
                 ),
               ),
             ),

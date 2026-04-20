@@ -16,6 +16,7 @@ class GoMapCanvas extends StatelessWidget {
     required this.initialZoom,
     required this.onMapTap,
     required this.routePolylines,
+    required this.dropOffPoints,
     required this.userPosition,
     required this.origin,
     required this.destination,
@@ -29,6 +30,7 @@ class GoMapCanvas extends StatelessWidget {
   final double initialZoom;
   final TapCallback onMapTap;
   final List<Polyline<Object>> routePolylines;
+  final List<LatLng> dropOffPoints;
   final LatLng? userPosition;
   final LatLng? origin;
   final LatLng? destination;
@@ -57,6 +59,23 @@ class GoMapCanvas extends StatelessWidget {
           height: 36,
           alignment: Alignment.center,
           child: Icon(Icons.place, color: MapColors.secondary, size: 34),
+        ),
+      );
+    }
+    for (final dropOff in dropOffPoints) {
+      markers.add(
+        Marker(
+          point: dropOff,
+          width: 22,
+          height: 22,
+          alignment: Alignment.center,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF9E9E9E),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 1.5),
+            ),
+          ),
         ),
       );
     }
