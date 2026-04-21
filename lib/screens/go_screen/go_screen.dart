@@ -8,28 +8,26 @@ import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
+import 'package:jippy_mobile/data/navigate_client.dart';
+import 'package:jippy_mobile/models/navigate_suggestion.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_map_canvas.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
+import 'package:jippy_mobile/utils/polyline_1e6.dart';
+import 'package:jippy_mobile/utils/route_color_parser.dart';
 
-/// Default center for the Go routes map: Iloilo City, Philippines.
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
 
 const double _initialZoom = 14.0;
-
 const String _osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-
 const String _vectorStyleUrl =
     'https://jippy.shinosawa-laboratories.dev/tileserver/style.json';
-
 const String _userAgentPackageName = 'com.example.jippy_mobile';
 
-const double _sheetInitialSize = 0.30;
-
-const Color _cardSurfaceColor = Colors.white;
+const Color _sheetSurfaceColor = Colors.white;
 const Color _timelineSubtleLineColor = Color(0xFFCFD4DB);
 
 bool _hasNetworkInterface(List<ConnectivityResult> results) {
@@ -39,7 +37,6 @@ bool _hasNetworkInterface(List<ConnectivityResult> results) {
   return true;
 }
 
-/// Map-first "Go" flow: search / pins for origin and destination (Steps 1–4 surface).
 class GoScreen extends StatefulWidget {
   const GoScreen({super.key});
 
@@ -54,26 +51,35 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   final GeocodingService _geocoding = GeocodingService();
   final LocationService _locationService = LocationService.instance;
   final Connectivity _connectivity = Connectivity();
-  final TextEditingController _destinationController = TextEditingController();
-  final FocusNode _destinationFocus = FocusNode();
+  final TextEditingController _startController = TextEditingController();
+  final TextEditingController _endController = TextEditingController();
+  final FocusNode _startFocus = FocusNode();
+  final FocusNode _endFocus = FocusNode();
 
   Style? _vectorStyle;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
-  GoSearchBarMode _searchMode = GoSearchBarMode.collapsed;
+  GoNavigationFlow _flow = GoNavigationFlow.explore;
   GoPinTarget? _pinTarget;
+  GoRoutingField _activeRoutingField = GoRoutingField.end;
 
-  LatLng? _origin;
-  LatLng? _destination;
-  String _originLabel = '';
-  bool _originLockedToMap = false;
+  LatLng? _start;
+  LatLng? _end;
+  LatLng? _selectedExplorePoint;
+  String _selectedExploreLabel = '';
 
   List<NominatimSearchHit> _suggestions = const [];
   String? _searchError;
   bool _nominatimBusy = false;
+
   bool _routePreviewLoading = false;
   String? _routePreviewSignature;
+  int _navigateRequestToken = 0;
+
+  List<NavigateSuggestion> _routeSuggestions = const [];
+  int _selectedSuggestionIndex = 0;
+  int? _isolatedLegIndex;
 
   Position? _userPosition;
   LocationPermission? _locationPermission;
@@ -81,11 +87,139 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   bool _hasCenteredToUserOnce = false;
 
   bool _online = true;
-  late final List<_GoRouteOption> _routeOptions = _buildMockRouteOptions();
-  static const List<int> _estimatedRidersByRoute = <int>[34, 27, 19];
-  int _selectedRouteIndex = 0;
-
   Timer? _searchDebounce;
+
+  bool get _gpsOriginAvailable {
+    if (_userPosition == null) return false;
+    final p = _locationPermission;
+    return p == LocationPermission.whileInUse || p == LocationPermission.always;
+  }
+
+  bool get _showRoutingHeader {
+    return _flow == GoNavigationFlow.routingInput ||
+        _flow == GoNavigationFlow.routeSelection ||
+        _flow == GoNavigationFlow.routeDetails;
+  }
+
+  GoSearchBarMode get _searchMode {
+    return _showRoutingHeader
+        ? GoSearchBarMode.expanded
+        : GoSearchBarMode.collapsed;
+  }
+
+  bool get _destinationOutOfArea {
+    final d = _end;
+    if (d == null) return false;
+    return !_geocoding.isWithinIloiloServiceArea(d);
+  }
+
+  NavigateSuggestion? get _selectedSuggestion {
+    if (_routeSuggestions.isEmpty) return null;
+    if (_selectedSuggestionIndex < 0 ||
+        _selectedSuggestionIndex >= _routeSuggestions.length) {
+      return _routeSuggestions.first;
+    }
+    return _routeSuggestions[_selectedSuggestionIndex];
+  }
+
+  LatLng? get _mapOrigin => _showRoutingHeader ? _start : null;
+
+  LatLng? get _mapDestination {
+    if (_flow == GoNavigationFlow.locationDetail) return _selectedExplorePoint;
+    if (_showRoutingHeader) return _end;
+    return null;
+  }
+
+  int? get _activeLegIsolationIndex {
+    if (_flow != GoNavigationFlow.routeDetails) return null;
+
+    final isolated = _isolatedLegIndex;
+    if (isolated == null) return null;
+
+    final selected = _selectedSuggestion;
+    if (selected == null) return null;
+    if (isolated < 0 || isolated >= selected.route.legs.length) {
+      return null;
+    }
+
+    return isolated;
+  }
+
+  List<Polyline<Object>> get _selectedRoutePolylines {
+    if (_flow != GoNavigationFlow.routeSelection &&
+        _flow != GoNavigationFlow.routeDetails) {
+      return const <Polyline<Object>>[];
+    }
+
+    final selected = _selectedSuggestion;
+    if (selected == null) return const <Polyline<Object>>[];
+    final isolatedIndex = _activeLegIsolationIndex;
+
+    final polylines = <Polyline<Object>>[];
+    for (var i = 0; i < selected.route.legs.length; i++) {
+      if (isolatedIndex != null && i != isolatedIndex) continue;
+      final leg = selected.route.legs[i];
+      final encoded = leg.polyline.trim();
+      if (encoded.isEmpty) continue;
+      final points = decodeApiRoutePolyline(encoded);
+      if (points == null || points.length < 2) continue;
+      polylines.add(
+        Polyline<Object>(
+          points: points,
+          color: _mapColorForLeg(leg),
+          strokeWidth: _strokeWidthForLeg(leg),
+          pattern: _polylinePatternForLeg(leg),
+        ),
+      );
+    }
+    return polylines;
+  }
+
+  List<LatLng> get _selectedRideStopPoints {
+    if (_flow != GoNavigationFlow.routeSelection &&
+        _flow != GoNavigationFlow.routeDetails) {
+      return const <LatLng>[];
+    }
+
+    final selected = _selectedSuggestion;
+    if (selected == null) return const <LatLng>[];
+    final isolatedIndex = _activeLegIsolationIndex;
+
+    final points = <LatLng>[];
+
+    for (var i = 0; i < selected.route.legs.length; i++) {
+      if (isolatedIndex != null && i != isolatedIndex) continue;
+      final leg = selected.route.legs[i];
+      if (leg.type != NavigateLegType.jeepney) continue;
+
+      final encoded = leg.polyline.trim();
+      if (encoded.isEmpty) continue;
+
+      final decoded = decodeApiRoutePolyline(encoded);
+      if (decoded == null || decoded.length < 2) continue;
+
+      final boardPoint = decoded.first;
+      final alightPoint = decoded.last;
+      final hasDirectJeepTransferWithoutWalk =
+          i > 0 && selected.route.legs[i - 1].type == NavigateLegType.jeepney;
+
+      if (!hasDirectJeepTransferWithoutWalk) {
+        _addRideStopMarkerPoint(points, boardPoint);
+      }
+      _addRideStopMarkerPoint(points, alightPoint);
+    }
+
+    return points;
+  }
+
+  void _addRideStopMarkerPoint(List<LatLng> points, LatLng candidate) {
+    const distance = Distance();
+    for (final point in points) {
+      final meters = distance.as(LengthUnit.Meter, point, candidate);
+      if (meters <= 12) return;
+    }
+    points.add(candidate);
+  }
 
   @override
   void initState() {
@@ -94,6 +228,26 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _loadVectorStyle();
     _initLocation();
     _initConnectivity();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _searchDebounce?.cancel();
+    _positionSubscription?.cancel();
+    _connectivitySubscription?.cancel();
+    _startController.dispose();
+    _endController.dispose();
+    _startFocus.dispose();
+    _endFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadVectorStyle();
+    }
   }
 
   Future<void> _initConnectivity() async {
@@ -106,13 +260,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() => _online = _hasNetworkInterface(results));
     });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _loadVectorStyle();
-    }
   }
 
   Future<void> _loadVectorStyle() async {
@@ -168,21 +315,20 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _positionSubscription = stream.listen(
       (Position position) {
         if (!mounted) return;
-        final journeyWasIncomplete = _origin == null || _destination == null;
+        final shouldPrimeRoutingStart =
+            _showRoutingHeader &&
+            _start == null &&
+            _startController.text.trim().isEmpty;
+
         setState(() {
           _userPosition = position;
-          if (!_originLockedToMap &&
-              _locationPermission != LocationPermission.denied &&
-              _locationPermission != LocationPermission.deniedForever) {
-            _origin = LatLng(position.latitude, position.longitude);
-            _originLabel = 'Your location';
-          }
         });
-        _centerToUserOnce(position);
-        final journeyNowComplete = _origin != null && _destination != null;
-        if (journeyWasIncomplete && journeyNowComplete) {
-          _requestRoutePreviewIfComplete();
+
+        if (shouldPrimeRoutingStart) {
+          _useCurrentLocationForStart();
         }
+
+        _centerToUserOnce(position);
       },
       onError: (_) {
         if (mounted) setState(() => _userPosition = null);
@@ -191,7 +337,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _centerToUserOnce(Position position) {
-    if (!mounted || _hasCenteredToUserOnce || _destination != null) return;
+    if (!mounted || _hasCenteredToUserOnce) return;
+    if (_selectedExplorePoint != null || _end != null) return;
     _hasCenteredToUserOnce = true;
     _mapController.move(
       LatLng(position.latitude, position.longitude),
@@ -199,70 +346,220 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _searchDebounce?.cancel();
-    _positionSubscription?.cancel();
-    _connectivitySubscription?.cancel();
-    _destinationController.dispose();
-    _destinationFocus.dispose();
-    super.dispose();
+  void _setActiveRoutingField(GoRoutingField field) {
+    if (_activeRoutingField == field) return;
+    setState(() => _activeRoutingField = field);
   }
 
-  bool get _destinationOutOfArea {
-    final d = _destination;
-    if (d == null) return false;
-    return !_geocoding.isWithinIloiloServiceArea(d);
-  }
-
-  bool get _gpsOriginAvailable {
-    if (_userPosition == null) return false;
-    final p = _locationPermission;
-    return p == LocationPermission.whileInUse || p == LocationPermission.always;
-  }
-
-  void _revertOriginToGps() {
-    final pos = _userPosition;
-    if (pos == null || !_gpsOriginAvailable) return;
+  void _startRoutingSession({LatLng? endPoint, String? endLabel}) {
     setState(() {
-      _originLockedToMap = false;
-      _origin = LatLng(pos.latitude, pos.longitude);
-      _originLabel = 'Your location';
+      _flow = GoNavigationFlow.routingInput;
+      _pinTarget = null;
+      _activeRoutingField = GoRoutingField.end;
+      _suggestions = const [];
+      _searchError = null;
+      _routePreviewLoading = false;
       _routePreviewSignature = null;
+      _routeSuggestions = const [];
+      _selectedSuggestionIndex = 0;
+      _isolatedLegIndex = null;
+
+      _start = null;
+      _startController.clear();
+
+      _end = endPoint;
+      _endController.text = endPoint == null
+          ? ''
+          : (endLabel?.trim().isNotEmpty == true
+                ? endLabel!.trim()
+                : 'Selected location');
     });
-    _requestRoutePreviewIfComplete();
+
+    _useCurrentLocationForStart(triggerRequest: false);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_start == null) {
+        _setActiveRoutingField(GoRoutingField.start);
+        _startFocus.requestFocus();
+        return;
+      }
+      if (_end == null) {
+        _setActiveRoutingField(GoRoutingField.end);
+        _endFocus.requestFocus();
+      }
+    });
+
+    _requestNavigationIfComplete();
   }
 
-  void _openDestinationPinOnMap() {
-    _expandSearch();
-    setState(() => _pinTarget = GoPinTarget.destination);
+  void _resetToExplore() {
+    setState(() {
+      _flow = GoNavigationFlow.explore;
+      _pinTarget = null;
+      _activeRoutingField = GoRoutingField.end;
+
+      _start = null;
+      _end = null;
+      _startController.clear();
+      _endController.clear();
+
+      _selectedExplorePoint = null;
+      _selectedExploreLabel = '';
+
+      _suggestions = const [];
+      _searchError = null;
+      _nominatimBusy = false;
+
+      _routePreviewLoading = false;
+      _routePreviewSignature = null;
+      _routeSuggestions = const [];
+      _selectedSuggestionIndex = 0;
+      _isolatedLegIndex = null;
+    });
+
+    _startFocus.unfocus();
+    _endFocus.unfocus();
+  }
+
+  void _onCollapsedTap() {
+    _startRoutingSession();
+  }
+
+  void _onDirectionsFromLocationDetail() {
+    final selectedPoint = _selectedExplorePoint;
+    if (selectedPoint == null) return;
+
+    _startRoutingSession(
+      endPoint: selectedPoint,
+      endLabel: _selectedExploreLabel,
+    );
+  }
+
+  void _openStartPinOnMap() {
+    setState(() {
+      _pinTarget = GoPinTarget.origin;
+      _activeRoutingField = GoRoutingField.start;
+    });
+  }
+
+  void _openEndPinOnMap() {
+    setState(() {
+      _pinTarget = GoPinTarget.destination;
+      _activeRoutingField = GoRoutingField.end;
+    });
+  }
+
+  void _cancelMapPinMode() {
+    setState(() => _pinTarget = null);
   }
 
   void _handleMapTap(TapPosition _, LatLng point) {
-    final role = _pinTarget;
-    if (role == null) return;
-    setState(() => _pinTarget = null);
-    unawaited(_applyReverseLabel(point, isOrigin: role == GoPinTarget.origin));
+    final target = _pinTarget;
+    if (target != null) {
+      _applyMapPinTarget(target, point);
+      return;
+    }
+
+    if (_flow == GoNavigationFlow.explore ||
+        _flow == GoNavigationFlow.locationDetail) {
+      _selectExplorePoint(point);
+    }
   }
 
-  void _expandSearch() {
-    setState(() => _searchMode = GoSearchBarMode.expanded);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _destinationFocus.requestFocus();
-    });
-  }
-
-  void _collapseSearch() {
+  Future<void> _selectExplorePoint(LatLng point) async {
     setState(() {
-      _searchMode = GoSearchBarMode.collapsed;
+      _selectedExplorePoint = point;
+      _selectedExploreLabel = 'Loading location...';
+      _flow = GoNavigationFlow.locationDetail;
+      _searchError = null;
       _suggestions = const [];
       _pinTarget = null;
     });
-    _destinationFocus.unfocus();
+
+    _mapController.move(
+      point,
+      _mapController.camera.zoom < 15 ? 15 : _mapController.camera.zoom,
+    );
+
+    try {
+      final label = await _geocoding.reverseLabel(point);
+      if (!mounted) return;
+      setState(() => _selectedExploreLabel = label);
+    } on GeocodingException {
+      if (!mounted) return;
+      setState(() => _selectedExploreLabel = 'Pinned location');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _selectedExploreLabel = 'Pinned location');
+    }
   }
 
-  void _onDestinationQueryChanged(String raw) {
+  Future<void> _applyMapPinTarget(GoPinTarget target, LatLng point) async {
+    setState(() {
+      _pinTarget = null;
+      _searchError = null;
+    });
+
+    String label = 'Pinned location';
+    try {
+      label = await _geocoding.reverseLabel(point);
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    setState(() {
+      if (target == GoPinTarget.origin) {
+        _start = point;
+        _startController.text = label;
+        _activeRoutingField = GoRoutingField.end;
+      } else {
+        _end = point;
+        _endController.text = label;
+      }
+      _routePreviewSignature = null;
+      _suggestions = const [];
+    });
+
+    _requestNavigationIfComplete();
+  }
+
+  void _useCurrentLocationForStart({bool triggerRequest = true}) {
+    final pos = _userPosition;
+    if (pos == null || !_gpsOriginAvailable) return;
+    setState(() {
+      _start = LatLng(pos.latitude, pos.longitude);
+      _startController.text = 'Your location';
+      _routePreviewSignature = null;
+      if (_activeRoutingField == GoRoutingField.start) {
+        _activeRoutingField = GoRoutingField.end;
+      }
+    });
+
+    if (triggerRequest) {
+      _requestNavigationIfComplete();
+    }
+  }
+
+  void _onStartTextChanged(String raw) {
+    _setActiveRoutingField(GoRoutingField.start);
+    setState(() {
+      _start = null;
+      _routePreviewSignature = null;
+    });
+    _onSearchQueryChanged(raw);
+  }
+
+  void _onEndTextChanged(String raw) {
+    _setActiveRoutingField(GoRoutingField.end);
+    setState(() {
+      _end = null;
+      _routePreviewSignature = null;
+    });
+    _onSearchQueryChanged(raw);
+  }
+
+  void _onSearchQueryChanged(String raw) {
     _searchDebounce?.cancel();
     final q = raw.trim();
     if (q.isEmpty) {
@@ -271,8 +568,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _searchError = null;
         _nominatimBusy = false;
       });
+      _requestNavigationIfComplete();
       return;
     }
+
     _searchDebounce = Timer(const Duration(milliseconds: 400), () {
       _runForwardSearch(q);
     });
@@ -296,7 +595,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _suggestions = const [];
         _nominatimBusy = false;
         _searchError =
-            'Connection problem — please check your internet and try again.';
+            'Connection problem - please check your internet and try again.';
       });
     } catch (_) {
       if (!mounted) return;
@@ -304,99 +603,356 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _suggestions = const [];
         _nominatimBusy = false;
         _searchError =
-            'Connection problem — please check your internet and try again.';
+            'Connection problem - please check your internet and try again.';
       });
-    }
-  }
-
-  Future<void> _applyReverseLabel(LatLng point, {required bool isOrigin}) async {
-    setState(() => _searchError = null);
-    try {
-      final label = await _geocoding.reverseLabel(point);
-      if (!mounted) return;
-      setState(() {
-        if (isOrigin) {
-          _origin = point;
-          _originLabel = label;
-          _originLockedToMap = true;
-        } else {
-          _destination = point;
-          _destinationController.text = label;
-        }
-      });
-      _requestRoutePreviewIfComplete();
-    } on GeocodingException {
-      if (!mounted) return;
-      setState(() {
-        _searchError =
-            'Connection problem — please check your internet and try again.';
-        if (isOrigin) {
-          _origin = point;
-          _originLabel = 'Pinned location';
-          _originLockedToMap = true;
-        } else {
-          _destination = point;
-          _destinationController.text = 'Pinned location';
-        }
-      });
-      _requestRoutePreviewIfComplete();
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _searchError =
-            'Connection problem — please check your internet and try again.';
-        if (isOrigin) {
-          _origin = point;
-          _originLabel = 'Pinned location';
-          _originLockedToMap = true;
-        } else {
-          _destination = point;
-          _destinationController.text = 'Pinned location';
-        }
-      });
-      _requestRoutePreviewIfComplete();
     }
   }
 
   void _onPickSuggestion(NominatimSearchHit hit) {
     setState(() {
-      _destination = hit.point;
-      _destinationController.text = hit.displayName;
+      if (_activeRoutingField == GoRoutingField.start) {
+        _start = hit.point;
+        _startController.text = hit.displayName;
+      } else {
+        _end = hit.point;
+        _endController.text = hit.displayName;
+      }
       _suggestions = const [];
       _searchError = null;
-    });
-    _requestRoutePreviewIfComplete();
-  }
-
-  void _cancelMapPinMode() {
-    setState(() => _pinTarget = null);
-  }
-
-  Future<void> _requestRoutePreviewIfComplete() async {
-    final o = _origin;
-    final d = _destination;
-    if (o == null || d == null) {
       _routePreviewSignature = null;
+    });
+
+    if (_activeRoutingField == GoRoutingField.start && _end == null) {
+      _setActiveRoutingField(GoRoutingField.end);
+      _endFocus.requestFocus();
+    }
+
+    _requestNavigationIfComplete();
+  }
+
+  Future<void> _requestNavigationIfComplete() async {
+    final start = _start;
+    final end = _end;
+    if (start == null || end == null) {
+      if (_showRoutingHeader) {
+        setState(() {
+          _routePreviewSignature = null;
+          _routePreviewLoading = false;
+          _routeSuggestions = const [];
+          _selectedSuggestionIndex = 0;
+          _isolatedLegIndex = null;
+          _flow = GoNavigationFlow.routingInput;
+        });
+      }
       return;
     }
-    final sig =
-        '${o.latitude.toStringAsFixed(5)},${o.longitude.toStringAsFixed(5)}|'
-        '${d.latitude.toStringAsFixed(5)},${d.longitude.toStringAsFixed(5)}';
-    if (_routePreviewSignature == sig) return;
-    _routePreviewSignature = sig;
 
-    setState(() => _routePreviewLoading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 320));
-    if (!mounted) return;
-    _fitOriginDestination();
-    setState(() => _routePreviewLoading = false);
+    final sig =
+        '${start.latitude.toStringAsFixed(5)},${start.longitude.toStringAsFixed(5)}|'
+        '${end.latitude.toStringAsFixed(5)},${end.longitude.toStringAsFixed(5)}';
+    if (_routePreviewSignature == sig && _routeSuggestions.isNotEmpty) {
+      return;
+    }
+
+    _routePreviewSignature = sig;
+    final requestToken = ++_navigateRequestToken;
+
+    setState(() {
+      _routePreviewLoading = true;
+      _searchError = null;
+      _flow = GoNavigationFlow.routeSelection;
+      _routeSuggestions = const [];
+      _selectedSuggestionIndex = 0;
+      _isolatedLegIndex = null;
+    });
+
+    _collapseRouteSelectionSheetForLoading();
+
+    try {
+      final suggestions = await fetchNavigationSuggestions(
+        start: start,
+        end: end,
+      );
+      if (!mounted || requestToken != _navigateRequestToken) return;
+
+      if (suggestions.isEmpty) {
+        setState(() {
+          _routePreviewLoading = false;
+          _flow = GoNavigationFlow.routingInput;
+          _searchError = 'No route suggestions found for this trip.';
+        });
+        return;
+      }
+
+      final defaultIndex = _defaultSuggestionIndex(suggestions);
+      setState(() {
+        _routePreviewLoading = false;
+        _routeSuggestions = suggestions;
+        _selectedSuggestionIndex = defaultIndex;
+        _isolatedLegIndex = null;
+        _flow = GoNavigationFlow.routeSelection;
+      });
+
+      _fitRouteOrStartEnd();
+    } on NavigateRequestException catch (e) {
+      if (!mounted || requestToken != _navigateRequestToken) return;
+      setState(() {
+        _routePreviewLoading = false;
+        _flow = GoNavigationFlow.routingInput;
+        _searchError = e.message;
+      });
+    } catch (_) {
+      if (!mounted || requestToken != _navigateRequestToken) return;
+      setState(() {
+        _routePreviewLoading = false;
+        _flow = GoNavigationFlow.routingInput;
+        _searchError =
+            'Connection problem - please check your internet and try again.';
+      });
+    }
   }
 
-  void _fitOriginDestination() {
-    final o = _origin;
-    final d = _destination;
-    if (o == null || d == null) return;
-    final bounds = LatLngBounds.fromPoints([o, d]);
+  int _defaultSuggestionIndex(List<NavigateSuggestion> suggestions) {
+    if (suggestions.isEmpty) return 0;
+
+    final simplestIndices = <int>[];
+    final fastestIndices = <int>[];
+
+    for (var i = 0; i < suggestions.length; i++) {
+      if (suggestions[i].label == NavigateSuggestionLabel.simplest) {
+        simplestIndices.add(i);
+      }
+      if (suggestions[i].label == NavigateSuggestionLabel.fastest) {
+        fastestIndices.add(i);
+      }
+    }
+
+    if (simplestIndices.isNotEmpty) {
+      return _indexWithShortestDuration(suggestions, simplestIndices);
+    }
+
+    if (fastestIndices.isNotEmpty) {
+      return _indexWithShortestDuration(suggestions, fastestIndices);
+    }
+
+    var bestIndex = 0;
+    for (var i = 1; i < suggestions.length; i++) {
+      final current = suggestions[i];
+      final best = suggestions[bestIndex];
+      if (current.transferCount < best.transferCount) {
+        bestIndex = i;
+        continue;
+      }
+      if (current.transferCount == best.transferCount &&
+          current.totalDurationMinutes < best.totalDurationMinutes) {
+        bestIndex = i;
+      }
+    }
+
+    return bestIndex;
+  }
+
+  int _indexWithShortestDuration(
+    List<NavigateSuggestion> suggestions,
+    List<int> indices,
+  ) {
+    var best = indices.first;
+    for (var i = 1; i < indices.length; i++) {
+      final candidateIndex = indices[i];
+      if (suggestions[candidateIndex].totalDurationMinutes <
+          suggestions[best].totalDurationMinutes) {
+        best = candidateIndex;
+      }
+    }
+    return best;
+  }
+
+  void _onSuggestionCardSelected(int index) {
+    if (index < 0 || index >= _routeSuggestions.length) return;
+    if (_selectedSuggestionIndex == index) return;
+    setState(() {
+      _selectedSuggestionIndex = index;
+      _isolatedLegIndex = null;
+    });
+    _fitRouteOrStartEnd();
+  }
+
+  void _startTurnByTurn() {
+    if (_selectedSuggestion == null) return;
+    setState(() {
+      _flow = GoNavigationFlow.routeDetails;
+      _isolatedLegIndex = null;
+    });
+  }
+
+  void _onLegTimelineStepTapped(int legIndex) {
+    final selected = _selectedSuggestion;
+    if (selected == null) return;
+    if (legIndex < 0 || legIndex >= selected.route.legs.length) return;
+
+    final nextIsolation = _isolatedLegIndex == legIndex ? null : legIndex;
+    setState(() => _isolatedLegIndex = nextIsolation);
+
+    if (nextIsolation == null) {
+      _fitRouteOrStartEnd();
+      _expandRouteDetailsSheetToDefault();
+      return;
+    }
+
+    _collapseRouteDetailsSheetForFocus();
+
+    final encoded = selected.route.legs[nextIsolation].polyline.trim();
+    if (encoded.isEmpty) return;
+
+    final points = decodeApiRoutePolyline(encoded);
+    if (points == null || points.isEmpty) return;
+
+    if (points.length == 1) {
+      _mapController.move(points.first, 16);
+      return;
+    }
+
+    final bounds = LatLngBounds.fromPoints(points);
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.fromLTRB(56, 168, 56, 136),
+        ),
+      );
+    } catch (_) {
+      _mapController.move(bounds.center, _mapController.camera.zoom);
+    }
+  }
+
+  void _showAllRouteSteps() {
+    if (_isolatedLegIndex == null) return;
+    setState(() => _isolatedLegIndex = null);
+    _fitRouteOrStartEnd();
+    _expandRouteDetailsSheetToDefault();
+  }
+
+  void _collapseRouteDetailsSheetForFocus() {
+    if (_flow != GoNavigationFlow.routeDetails) return;
+    try {
+      _sheetController.animateTo(
+        0.32,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    } catch (_) {}
+  }
+
+  void _collapseRouteSelectionSheetForLoading() {
+    if (_flow != GoNavigationFlow.routeSelection) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_flow != GoNavigationFlow.routeSelection || !_routePreviewLoading) {
+        return;
+      }
+
+      try {
+        _sheetController.animateTo(
+          0.24,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      } catch (_) {}
+    });
+  }
+
+  void _expandRouteDetailsSheetToDefault() {
+    if (_flow != GoNavigationFlow.routeDetails) return;
+    try {
+      _sheetController.animateTo(
+        0.54,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    } catch (_) {}
+  }
+
+  int _rideCountForSuggestion(NavigateSuggestion suggestion) {
+    return suggestion.route.legs
+        .where((leg) => leg.type == NavigateLegType.jeepney)
+        .length;
+  }
+
+  String _modeSummaryForSuggestion(NavigateSuggestion suggestion) {
+    final labels = <String>[];
+    for (final leg in suggestion.route.legs) {
+      final label = switch (leg.type) {
+        NavigateLegType.walk => 'Walk',
+        NavigateLegType.jeepney => 'Jeep',
+        NavigateLegType.tricycle => 'Tricycle',
+        NavigateLegType.unknown => 'Transit',
+      };
+      if (labels.isEmpty || labels.last != label) {
+        labels.add(label);
+      }
+    }
+    if (labels.isEmpty) return 'Transit';
+    return labels.join(' + ');
+  }
+
+  Color _accentColorForSuggestion(NavigateSuggestion suggestion, int index) {
+    for (final leg in suggestion.route.legs) {
+      if (leg.type != NavigateLegType.walk) {
+        return _colorForLeg(leg);
+      }
+    }
+
+    if (suggestion.route.legs.isNotEmpty) {
+      return _colorForLeg(suggestion.route.legs.first);
+    }
+
+    return switch (index % 3) {
+      0 => MapColors.primary,
+      1 => MapColors.secondary,
+      _ => MapColors.accent,
+    };
+  }
+
+  String _routeBadgeText(NavigateSuggestion suggestion) {
+    return suggestion.label == NavigateSuggestionLabel.fastest
+        ? 'FASTEST'
+        : 'ALT';
+  }
+
+  Color _badgeTextColor(Color background) {
+    return background.computeLuminance() > 0.55 ? MapColors.text : Colors.white;
+  }
+
+  void _fitRouteOrStartEnd() {
+    final selected = _selectedSuggestion;
+    final points = <LatLng>[];
+
+    if (selected != null) {
+      for (final leg in selected.route.legs) {
+        final encoded = leg.polyline.trim();
+        if (encoded.isEmpty) continue;
+        final decoded = decodeApiRoutePolyline(encoded);
+        if (decoded == null || decoded.length < 2) continue;
+        points.addAll(decoded);
+      }
+    }
+
+    if (points.length < 2) {
+      final s = _start;
+      final e = _end;
+      if (s != null) points.add(s);
+      if (e != null) points.add(e);
+    }
+
+    if (points.isEmpty) return;
+
+    if (points.length == 1) {
+      _mapController.move(points.first, 15);
+      return;
+    }
+
+    final bounds = LatLngBounds.fromPoints(points);
     try {
       _mapController.fitCamera(
         CameraFit.bounds(
@@ -409,19 +965,139 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     }
   }
 
-  void _onRouteSelected(int index) {
-    if (_selectedRouteIndex == index) return;
-    setState(() => _selectedRouteIndex = index);
+  Color _colorForLeg(NavigateLeg leg) {
+    final fromApi = leg.colorHex;
+    if (fromApi != null && fromApi.isNotEmpty) {
+      return parseRouteColor(fromApi);
+    }
+
+    return switch (leg.type) {
+      NavigateLegType.walk => MapColors.walkingColor,
+      NavigateLegType.jeepney => MapColors.jeepneyRouteColor,
+      NavigateLegType.tricycle => MapColors.accentColor,
+      NavigateLegType.unknown => MapColors.primary,
+    };
   }
 
-  String _etaText(BuildContext context) {
-    final route = _routeOptions[_selectedRouteIndex];
-    final arrival = DateTime.now().add(Duration(minutes: route.minutes));
+  Color _mapColorForLeg(NavigateLeg leg) {
+    if (leg.type == NavigateLegType.walk) {
+      return const Color(0xFF9E9E9E);
+    }
+    return _colorForLeg(leg);
+  }
+
+  StrokePattern _polylinePatternForLeg(NavigateLeg leg) {
+    if (leg.type == NavigateLegType.walk) {
+      return StrokePattern.dashed(segments: const <double>[7, 5]);
+    }
+    return const StrokePattern.solid();
+  }
+
+  double _strokeWidthForLeg(NavigateLeg leg) {
+    return switch (leg.type) {
+      NavigateLegType.walk => MapColors.walkingStrokeWidth,
+      NavigateLegType.jeepney => MapColors.jeepneyRouteStrokeWidth,
+      NavigateLegType.tricycle => MapColors.accentStrokeWidth,
+      NavigateLegType.unknown => MapColors.jeepneyRouteStrokeWidth,
+    };
+  }
+
+  String _formatDistance(double meters) {
+    if (meters >= 1000) {
+      return '${(meters / 1000).toStringAsFixed(1)} km';
+    }
+    return '${meters.round()} m';
+  }
+
+  String _formatMinutes(double minutes) {
+    if (minutes.isNaN || minutes.isInfinite || minutes <= 0) return '0 min';
+
+    final totalSeconds = (minutes * 60).round();
+    if (totalSeconds < 60) return '$totalSeconds sec';
+
+    final roundedMinutes = (totalSeconds / 60).round();
+    if (roundedMinutes < 60) return '$roundedMinutes min';
+
+    final hours = roundedMinutes ~/ 60;
+    final mins = roundedMinutes % 60;
+    if (mins == 0) return '${hours}h';
+    return '${hours}h ${mins}m';
+  }
+
+  String _etaText(BuildContext context, NavigateSuggestion suggestion) {
+    final arrival = DateTime.now().add(
+      Duration(minutes: suggestion.totalDurationMinutes.round()),
+    );
     final time = TimeOfDay.fromDateTime(arrival);
     final formattedTime = MaterialLocalizations.of(
       context,
     ).formatTimeOfDay(time, alwaysUse24HourFormat: false);
     return 'Estimated arrival: $formattedTime';
+  }
+
+  int _previewInstructionCount(NavigateSuggestion suggestion) {
+    var count = 0;
+    for (final leg in suggestion.route.legs) {
+      count += leg.instructions.length;
+    }
+    if (count < 1) return 0;
+    return count > 5 ? 5 : count;
+  }
+
+  IconData _iconForLegType(NavigateLegType type) {
+    return switch (type) {
+      NavigateLegType.walk => Icons.directions_walk_rounded,
+      NavigateLegType.jeepney => Icons.directions_bus_rounded,
+      NavigateLegType.tricycle => Icons.pedal_bike_rounded,
+      NavigateLegType.unknown => Icons.route_rounded,
+    };
+  }
+
+  IconData _iconForManeuver(NavigateManeuverType maneuver) {
+    return switch (maneuver) {
+      NavigateManeuverType.board => Icons.login_rounded,
+      NavigateManeuverType.alight => Icons.logout_rounded,
+      NavigateManeuverType.depart => Icons.near_me_rounded,
+      NavigateManeuverType.turn => Icons.turn_right_rounded,
+      NavigateManeuverType.arrive => Icons.flag_rounded,
+      NavigateManeuverType.unknown => Icons.chevron_right_rounded,
+    };
+  }
+
+  IconData _iconForInstruction({
+    required NavigateLeg leg,
+    required NavigateInstruction instruction,
+    required bool isTransferBoard,
+  }) {
+    if (instruction.maneuverType == NavigateManeuverType.alight) {
+      return Icons.location_on;
+    }
+
+    if (instruction.maneuverType == NavigateManeuverType.board) {
+      if (isTransferBoard) return Icons.swap_horiz;
+      if (leg.type == NavigateLegType.jeepney) return Icons.directions_bus;
+      return _iconForManeuver(instruction.maneuverType);
+    }
+
+    if (leg.type == NavigateLegType.walk) {
+      return Icons.directions_walk;
+    }
+    if (leg.type == NavigateLegType.jeepney) {
+      return Icons.directions_bus;
+    }
+
+    return _iconForManeuver(instruction.maneuverType);
+  }
+
+  Color _colorForManeuver(NavigateManeuverType maneuver) {
+    return switch (maneuver) {
+      NavigateManeuverType.board => MapColors.primary,
+      NavigateManeuverType.alight => MapColors.accent,
+      NavigateManeuverType.depart => MapColors.secondary,
+      NavigateManeuverType.turn => MapColors.text,
+      NavigateManeuverType.arrive => MapColors.accent,
+      NavigateManeuverType.unknown => MapColors.text.withValues(alpha: 0.7),
+    };
   }
 
   @override
@@ -443,9 +1119,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                 Text(
                   'Go is not available offline.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -477,9 +1153,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               initialCenter: _iloiloCenter,
               initialZoom: _initialZoom,
               onMapTap: _handleMapTap,
+              routePolylines: _selectedRoutePolylines,
+              dropOffPoints: _selectedRideStopPoints,
               userPosition: userLatLng,
-              origin: _origin,
-              destination: _destination,
+              origin: _mapOrigin,
+              destination: _mapDestination,
               osmTileUrl: _osmTileUrl,
               userAgentPackageName: _userAgentPackageName,
             ),
@@ -490,30 +1168,32 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           ),
           GoSearchBar(
             mode: _searchMode,
-            onCollapsedTap: _expandSearch,
-            onCollapseExpanded: _collapseSearch,
-            originLabel: _originLabel,
-            onOriginRowTap: () {
-              _expandSearch();
-              setState(() => _pinTarget = GoPinTarget.origin);
-            },
-            showRevertOriginToGps: _originLockedToMap && _gpsOriginAvailable,
-            onRevertOriginToGps: _revertOriginToGps,
-            onDestinationMapPinTap: _openDestinationPinOnMap,
-            destinationController: _destinationController,
-            destinationFocusNode: _destinationFocus,
-            onDestinationTextChanged: _onDestinationQueryChanged,
+            onCollapsedTap: _onCollapsedTap,
+            startController: _startController,
+            startFocusNode: _startFocus,
+            endController: _endController,
+            endFocusNode: _endFocus,
+            onStartTextChanged: _onStartTextChanged,
+            onEndTextChanged: _onEndTextChanged,
+            onStartMapPinTap: _openStartPinOnMap,
+            onEndMapPinTap: _openEndPinOnMap,
+            showUseCurrentLocation: _gpsOriginAvailable,
+            onUseCurrentLocationTap: _useCurrentLocationForStart,
             suggestions: _suggestions,
             onSuggestionTap: _onPickSuggestion,
             searchError: _searchError,
             showOutOfAreaDisclaimer: _destinationOutOfArea,
             isSearchingNominatim: _nominatimBusy,
-            routePreviewLoading: _routePreviewLoading,
             mapPinAwaitingTap: _pinTarget,
             onCancelMapPinMode: _cancelMapPinMode,
+            activeRoutingField: _activeRoutingField,
+            onActiveRoutingFieldChanged: _setActiveRoutingField,
           ),
-          if (_searchMode == GoSearchBarMode.collapsed && _destination != null)
-            _buildDraggableSheet(_routeOptions[_selectedRouteIndex]),
+          if (_flow == GoNavigationFlow.locationDetail)
+            _buildLocationDetailSheet(),
+          if (_flow == GoNavigationFlow.routeSelection)
+            _buildRouteSelectionSheet(context),
+          if (_flow == GoNavigationFlow.routeDetails) _buildRouteDetailsSheet(),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
@@ -528,84 +1208,74 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildDraggableSheet(_GoRouteOption selectedRoute) {
+  Widget _buildLocationDetailSheet() {
+    final selectedPoint = _selectedExplorePoint;
+    if (selectedPoint == null) {
+      return const SizedBox.shrink();
+    }
+
+    final title = _selectedExploreLabel.trim().isEmpty
+        ? 'Selected location'
+        : _selectedExploreLabel;
+
     return DraggableScrollableSheet(
       controller: _sheetController,
-      initialChildSize: _sheetInitialSize,
-      minChildSize: 0.24,
-      maxChildSize: 0.86,
+      initialChildSize: 0.28,
+      minChildSize: 0.22,
+      maxChildSize: 0.42,
       snap: true,
-      snapSizes: const <double>[_sheetInitialSize, 0.8],
+      snapSizes: const <double>[0.28, 0.4],
       builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: MapColors.background,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border.all(color: MapColors.text.withValues(alpha: 0.08)),
-            boxShadow: [
-              BoxShadow(
-                color: MapColors.text.withValues(alpha: 0.13),
-                blurRadius: 20,
-                offset: const Offset(0, -4),
-              ),
-            ],
-          ),
-          child: Column(
+        return _SheetSurface(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
             children: [
-              const SizedBox(height: 12),
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: MapColors.text.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                  children: [
-                    Text(
-                      'Follow these steps to reach ${selectedRoute.destinationName}',
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: MapColors.text,
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        height: 1.06,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Suggested Routes',
-                      style: TextStyle(
-                        color: MapColors.text.withValues(alpha: 0.85),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildSuggestedRoutesStrip(),
-                    const SizedBox(height: 18),
-                    Text(
-                      _etaText(context),
-                      style: TextStyle(
-                        color: MapColors.text.withValues(alpha: 0.72),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    for (int i = 0; i < selectedRoute.steps.length; i++)
-                      _buildTimelineStep(
-                        selectedRoute.steps[i],
-                        isLast: i == selectedRoute.steps.length - 1,
-                      ),
-                  ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Close',
+                    onPressed: _resetToExplore,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${selectedPoint.latitude.toStringAsFixed(5)}, ${selectedPoint.longitude.toStringAsFixed(5)}',
+                style: TextStyle(
+                  color: MapColors.text.withValues(alpha: 0.6),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: MapColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: _onDirectionsFromLocationDetail,
+                icon: const Icon(Icons.navigation_rounded),
+                label: const Text(
+                  'Directions',
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
             ],
@@ -615,46 +1285,209 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildSuggestedRoutesStrip() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (int i = 0; i < _routeOptions.length; i++) ...[
-            _buildRouteCard(
-              option: _routeOptions[i],
-              index: i,
-              isSelected: i == _selectedRouteIndex,
-            ),
-            if (i != _routeOptions.length - 1) const SizedBox(width: 6),
-          ],
-        ],
-      ),
+  Widget _buildRouteSelectionSheet(BuildContext context) {
+    final selected = _selectedSuggestion;
+
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: 0.38,
+      minChildSize: 0.24,
+      maxChildSize: 0.88,
+      snap: true,
+      snapSizes: const <double>[0.38, 0.82],
+      builder: (context, scrollController) {
+        return _SheetSurface(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Route Suggestions',
+                      style: TextStyle(
+                        color: MapColors.text,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Cancel route',
+                    onPressed: _resetToExplore,
+                  ),
+                ],
+              ),
+              if (_routeSuggestions.isEmpty && !_routePreviewLoading) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'No route suggestions available yet.',
+                  style: TextStyle(
+                    color: MapColors.text.withValues(alpha: 0.72),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ] else ...[
+                SizedBox(height: 96, child: _buildSuggestedRoutesStrip()),
+                if (_routeSuggestions.length > 1) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.swipe_left_rounded,
+                        size: 14,
+                        color: MapColors.text.withValues(alpha: 0.55),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Swipe to see more route options',
+                        style: TextStyle(
+                          color: MapColors.text.withValues(alpha: 0.6),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+              if (selected != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _etaText(context, selected),
+                  style: TextStyle(
+                    color: MapColors.text.withValues(alpha: 0.72),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: MapColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: _startTurnByTurn,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text(
+                    'Start',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Preview instructions',
+                  style: TextStyle(
+                    color: MapColors.text.withValues(alpha: 0.82),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (_previewInstructionCount(selected) == 0)
+                  Text(
+                    'No step previews available for this suggestion.',
+                    style: TextStyle(
+                      color: MapColors.text.withValues(alpha: 0.72),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  )
+                else
+                  ..._buildPreviewInstructionRows(selected),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildRouteCard({
-    required _GoRouteOption option,
+  Widget _buildSuggestedRoutesStrip() {
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var i = 0; i < _routeSuggestions.length; i++) ...[
+                _buildSuggestionCard(
+                  _routeSuggestions[i],
+                  index: i,
+                  isSelected: i == _selectedSuggestionIndex,
+                ),
+                if (i != _routeSuggestions.length - 1) const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+        if (_routeSuggestions.length > 1)
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: Container(
+                width: 30,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      _sheetSurfaceColor.withValues(alpha: 0),
+                      _sheetSurfaceColor.withValues(alpha: 0.95),
+                    ],
+                  ),
+                ),
+                alignment: Alignment.centerRight,
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: MapColors.text.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSuggestionCard(
+    NavigateSuggestion suggestion, {
     required int index,
     required bool isSelected,
   }) {
-    final mutedText = MapColors.text.withValues(alpha: 0.66);
-    final routeTypeLabel = option.badge;
-    final cardColor = _cardSurfaceColor;
-    final estimatedRiders = _estimatedRidersByRoute[index];
-    final tagColor = option.badgeBackgroundColor;
+    final accentColor = _accentColorForSuggestion(suggestion, index);
+    final badgeColor = suggestion.label == NavigateSuggestionLabel.fastest
+        ? MapColors.primary
+        : accentColor;
+    final badgeTextColor = _badgeTextColor(badgeColor);
+    final badgeText = _routeBadgeText(suggestion);
+    final rides = _rideCountForSuggestion(suggestion);
+    final rideLabel = rides == 1 ? 'Ride' : 'Rides';
+    final distance = _formatDistance(suggestion.totalDistanceMeters);
+    final modeSummary = _modeSummaryForSuggestion(suggestion);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _onRouteSelected(index),
-        child: Container(
-          width: 176,
+        onTap: () => _onSuggestionCardSelected(index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 182,
           padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
           decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(12),
+            color: _sheetSurfaceColor,
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isSelected
                   ? MapColors.text.withValues(alpha: 0.24)
@@ -675,12 +1508,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             children: [
               Container(
                 width: 5,
-                height: 62,
+                height: 70,
                 decoration: BoxDecoration(
-                  color: option.pathColor.withValues(
-                    alpha: isSelected ? 1 : 0.55,
-                  ),
-                  borderRadius: BorderRadius.circular(99),
+                  color: accentColor.withValues(alpha: isSelected ? 1 : 0.55),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
               const SizedBox(width: 8),
@@ -696,13 +1527,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: tagColor,
+                            color: badgeColor,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            routeTypeLabel,
+                            badgeText,
                             style: TextStyle(
-                              color: option.badgeTextColor,
+                              color: badgeTextColor,
                               fontSize: 8,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.2,
@@ -713,11 +1544,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '$estimatedRiders Rides',
+                      '$rides $rideLabel',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: isSelected ? MapColors.text : mutedText,
+                        color: isSelected
+                            ? MapColors.text
+                            : MapColors.text.withValues(alpha: 0.85),
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         height: 1.05,
@@ -725,13 +1558,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${option.distanceLabel} - ${option.modeSummary}',
+                      '$distance - $modeSummary',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: isSelected
                             ? MapColors.text.withValues(alpha: 0.82)
-                            : mutedText,
+                            : MapColors.text.withValues(alpha: 0.66),
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -746,7 +1579,163 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTimelineStep(_GoTimelineStep step, {required bool isLast}) {
+  List<Widget> _buildPreviewInstructionRows(NavigateSuggestion suggestion) {
+    final widgets = <Widget>[];
+    var rendered = 0;
+    var boardCount = 0;
+
+    for (final leg in suggestion.route.legs) {
+      for (final instruction in leg.instructions) {
+        final isBoard =
+            instruction.maneuverType == NavigateManeuverType.board;
+        final isTransferBoard = isBoard && boardCount > 0;
+
+        rendered += 1;
+        if (rendered > 5) return widgets;
+        widgets.add(
+          Padding(
+            padding: EdgeInsets.only(bottom: rendered == 5 ? 0 : 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  _iconForInstruction(
+                    leg: leg,
+                    instruction: instruction,
+                    isTransferBoard: isTransferBoard,
+                  ),
+                  size: 16,
+                  color: _colorForManeuver(instruction.maneuverType),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    instruction.text,
+                    style: TextStyle(
+                      color: MapColors.text.withValues(alpha: 0.83),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+
+        if (isBoard) {
+          boardCount += 1;
+        }
+      }
+    }
+
+    return widgets;
+  }
+
+  Widget _buildRouteDetailsSheet() {
+    final selected = _selectedSuggestion;
+    if (selected == null) {
+      return const SizedBox.shrink();
+    }
+
+    final legTimelineBlocks = <Widget>[];
+    var boardCountBeforeLeg = 0;
+    for (int i = 0; i < selected.route.legs.length; i++) {
+      final leg = selected.route.legs[i];
+      legTimelineBlocks.add(
+        _buildLegTimelineBlock(
+          leg,
+          index: i,
+          isLast: i == selected.route.legs.length - 1,
+          boardCountBeforeLeg: boardCountBeforeLeg,
+          isIsolated: _activeLegIsolationIndex == i,
+          onTap: () => _onLegTimelineStepTapped(i),
+        ),
+      );
+
+      boardCountBeforeLeg += leg.instructions
+          .where(
+            (instruction) =>
+                instruction.maneuverType == NavigateManeuverType.board,
+          )
+          .length;
+    }
+
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: 0.54,
+      minChildSize: 0.32,
+      maxChildSize: 0.92,
+      snap: true,
+      snapSizes: const <double>[0.54, 0.88],
+      builder: (context, scrollController) {
+        return _SheetSurface(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 28),
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${selected.labelText} Details',
+                      style: const TextStyle(
+                        color: MapColors.text,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Close and reset',
+                    onPressed: _resetToExplore,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${_formatMinutes(selected.totalDurationMinutes)} - ${_formatDistance(selected.totalDistanceMeters)}',
+                style: TextStyle(
+                  color: MapColors.text.withValues(alpha: 0.72),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (_activeLegIsolationIndex != null) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _showAllRouteSteps,
+                  icon: const Icon(Icons.center_focus_strong_rounded),
+                  label: const Text('Show all step-by-step'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(42),
+                    side: BorderSide(
+                      color: MapColors.text.withValues(alpha: 0.2),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              ...legTimelineBlocks,
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLegTimelineBlock(
+    NavigateLeg leg, {
+    required int index,
+    required bool isLast,
+    required int boardCountBeforeLeg,
+    required bool isIsolated,
+    required VoidCallback onTap,
+  }) {
+    var boardCount = boardCountBeforeLeg;
+
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
       child: IntrinsicHeight(
@@ -754,24 +1743,29 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              width: 46,
+              width: 38,
               child: Column(
                 children: [
-                  _buildTimelineIcon(step),
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: _colorForLeg(leg).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Icon(
+                      _iconForLegType(leg.type),
+                      size: 18,
+                      color: MapColors.text,
+                    ),
+                  ),
                   if (!isLast)
                     Expanded(
                       child: Container(
-                        width: step.connector == _GoStepConnector.blueBold
-                            ? 3
-                            : 1.5,
+                        width: 2,
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         decoration: BoxDecoration(
-                          color: switch (step.connector) {
-                            _GoStepConnector.blueBold => MapColors.primary,
-                            _GoStepConnector.greyThin =>
-                              _timelineSubtleLineColor,
-                            _GoStepConnector.none => Colors.transparent,
-                          },
+                          color: _timelineSubtleLineColor,
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -781,30 +1775,136 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      step.title,
-                      style: const TextStyle(
-                        color: MapColors.text,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    decoration: BoxDecoration(
+                      color: _sheetSurfaceColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isIsolated
+                            ? MapColors.primary.withValues(alpha: 0.55)
+                            : MapColors.text.withValues(alpha: 0.1),
+                        width: isIsolated ? 1.6 : 1,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      step.subtitle,
-                      style: TextStyle(
-                        color: MapColors.text.withValues(alpha: 0.75),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        height: 1.35,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '${_labelForLegType(leg.type)} ${index + 1}',
+                                style: const TextStyle(
+                                  color: MapColors.text,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _formatMinutes(leg.durationMinutes),
+                              style: TextStyle(
+                                color: MapColors.text.withValues(alpha: 0.74),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (leg.routeName.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            leg.routeName,
+                            style: TextStyle(
+                              color: MapColors.text.withValues(alpha: 0.84),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDistance(leg.distanceMeters),
+                          style: TextStyle(
+                            color: MapColors.text.withValues(alpha: 0.65),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        if (leg.instructions.isEmpty)
+                          Text(
+                            'No detailed instructions for this leg.',
+                            style: TextStyle(
+                              color: MapColors.text.withValues(alpha: 0.68),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        else
+                          for (int i = 0; i < leg.instructions.length; i++)
+                            Builder(
+                              builder: (context) {
+                                final instruction = leg.instructions[i];
+                                final isBoard =
+                                    instruction.maneuverType ==
+                                    NavigateManeuverType.board;
+                                final isTransferBoard =
+                                    isBoard && boardCount > 0;
+
+                                if (isBoard) {
+                                  boardCount += 1;
+                                }
+
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    bottom: i == leg.instructions.length - 1
+                                        ? 0
+                                        : 8,
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        _iconForInstruction(
+                                          leg: leg,
+                                          instruction: instruction,
+                                          isTransferBoard: isTransferBoard,
+                                        ),
+                                        size: 15,
+                                        color: _colorForManeuver(
+                                          instruction.maneuverType,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 7),
+                                      Expanded(
+                                        child: Text(
+                                          instruction.text,
+                                          style: TextStyle(
+                                            color: MapColors.text.withValues(
+                                              alpha: 0.8,
+                                            ),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.33,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -814,210 +1914,53 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTimelineIcon(_GoTimelineStep step) {
-    switch (step.kind) {
-      case _GoStepKind.walk:
-        return Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: MapColors.secondary.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(99),
-          ),
-          child: const Icon(
-            Icons.directions_walk_rounded,
-            color: MapColors.text,
-            size: 18,
-          ),
-        );
-      case _GoStepKind.board:
-        return Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: MapColors.primary,
-            borderRadius: BorderRadius.circular(99),
-          ),
-          child: const Icon(
-            Icons.directions_car_filled_rounded,
-            color: Colors.white,
-            size: 18,
-          ),
-        );
-      case _GoStepKind.alight:
-        return Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: MapColors.accent.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(99),
-          ),
-          child: const Icon(
-            Icons.directions_walk_rounded,
-            color: MapColors.accent,
-            size: 18,
-          ),
-        );
-    }
+  String _labelForLegType(NavigateLegType type) {
+    return switch (type) {
+      NavigateLegType.walk => 'Walk',
+      NavigateLegType.jeepney => 'Jeepney',
+      NavigateLegType.tricycle => 'Tricycle',
+      NavigateLegType.unknown => 'Transit',
+    };
   }
 }
 
-List<_GoRouteOption> _buildMockRouteOptions() {
-  return const [
-    _GoRouteOption(
-      badge: 'FASTEST',
-      minutes: 15,
-      distanceLabel: '3.2 km',
-      modeSummary: 'Walk + Jeep',
-      destinationName: 'SM City Iloilo',
-      pathColor: MapColors.primary,
-      badgeBackgroundColor: MapColors.primary,
-      badgeTextColor: Colors.white,
-      polylinePoints: [
-        LatLng(10.7188, 122.5605),
-        LatLng(10.7205, 122.5619),
-        LatLng(10.7227, 122.5642),
-        LatLng(10.7249, 122.5670),
-        LatLng(10.7262, 122.5694),
-      ],
-      steps: [
-        _GoTimelineStep(
-          kind: _GoStepKind.walk,
-          connector: _GoStepConnector.greyThin,
-          title: 'Walk to Savannah Central Terminal',
-          subtitle: 'About 3 mins (240 m). Exit North Gate and turn left.',
-        ),
-        _GoTimelineStep(
-          kind: _GoStepKind.board,
-          connector: _GoStepConnector.blueBold,
-          title: 'Board Savannah 2 Jeepney',
-          subtitle: 'Board the jeep and proceed toward Diversion Road.',
-        ),
-        _GoTimelineStep(
-          kind: _GoStepKind.alight,
-          connector: _GoStepConnector.none,
-          title: 'Alight at Diversion Crossing',
-          subtitle: 'Proceed to the SM City direct-link loading area.',
-        ),
-      ],
-    ),
-    _GoRouteOption(
-      badge: 'ALT',
-      minutes: 18,
-      distanceLabel: '3.5 km',
-      modeSummary: 'Jeep',
-      destinationName: 'SM City Iloilo',
-      pathColor: MapColors.secondary,
-      badgeBackgroundColor: MapColors.secondary,
-      badgeTextColor: MapColors.text,
-      polylinePoints: [
-        LatLng(10.7188, 122.5605),
-        LatLng(10.7199, 122.5625),
-        LatLng(10.7218, 122.5650),
-        LatLng(10.7238, 122.5678),
-        LatLng(10.7256, 122.5706),
-      ],
-      steps: [
-        _GoTimelineStep(
-          kind: _GoStepKind.walk,
-          connector: _GoStepConnector.greyThin,
-          title: 'Walk to Diversion Link Stop',
-          subtitle: 'About 4 mins (320 m). Follow the pedestrian lane.',
-        ),
-        _GoTimelineStep(
-          kind: _GoStepKind.board,
-          connector: _GoStepConnector.blueBold,
-          title: 'Board Direct Jeepney',
-          subtitle: 'Ride straight to the mall loop without transfer.',
-        ),
-        _GoTimelineStep(
-          kind: _GoStepKind.alight,
-          connector: _GoStepConnector.none,
-          title: 'Alight at SM City Main Dropoff',
-          subtitle: 'Walk 1 min to the main entrance near the transport hub.',
-        ),
-      ],
-    ),
-    _GoRouteOption(
-      badge: 'ALT',
-      minutes: 21,
-      distanceLabel: '3.9 km',
-      modeSummary: 'Walk + Tricycle',
-      destinationName: 'SM City Iloilo',
-      pathColor: MapColors.accent,
-      badgeBackgroundColor: MapColors.accent,
-      badgeTextColor: Colors.white,
-      polylinePoints: [
-        LatLng(10.7188, 122.5605),
-        LatLng(10.7195, 122.5622),
-        LatLng(10.7209, 122.5648),
-        LatLng(10.7226, 122.5679),
-        LatLng(10.7248, 122.5701),
-      ],
-      steps: [
-        _GoTimelineStep(
-          kind: _GoStepKind.walk,
-          connector: _GoStepConnector.greyThin,
-          title: 'Walk to Benigno Aquino Tricycle Bay',
-          subtitle: 'About 4 mins (300 m). Cross at the pedestrian lane.',
-        ),
-        _GoTimelineStep(
-          kind: _GoStepKind.board,
-          connector: _GoStepConnector.blueBold,
-          title: 'Ride Tricycle to Diversion Transfer Point',
-          subtitle: 'Take a tricycle heading to Diversion Road junction.',
-        ),
-        _GoTimelineStep(
-          kind: _GoStepKind.alight,
-          connector: _GoStepConnector.none,
-          title: 'Alight and walk to SM City Iloilo',
-          subtitle: 'Walk 8 mins (650 m) to the mall transport entrance.',
-        ),
-      ],
-    ),
-  ];
-}
+class _SheetSurface extends StatelessWidget {
+  const _SheetSurface({required this.child});
 
-enum _GoStepKind { walk, board, alight }
+  final Widget child;
 
-enum _GoStepConnector { none, greyThin, blueBold }
-
-class _GoTimelineStep {
-  const _GoTimelineStep({
-    required this.kind,
-    required this.connector,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final _GoStepKind kind;
-  final _GoStepConnector connector;
-  final String title;
-  final String subtitle;
-}
-
-class _GoRouteOption {
-  const _GoRouteOption({
-    required this.badge,
-    required this.minutes,
-    required this.distanceLabel,
-    required this.modeSummary,
-    required this.destinationName,
-    required this.pathColor,
-    required this.badgeBackgroundColor,
-    required this.badgeTextColor,
-    required this.polylinePoints,
-    required this.steps,
-  });
-
-  final String badge;
-  final int minutes;
-  final String distanceLabel;
-  final String modeSummary;
-  final String destinationName;
-  final Color pathColor;
-  final Color badgeBackgroundColor;
-  final Color badgeTextColor;
-  final List<LatLng> polylinePoints;
-  final List<_GoTimelineStep> steps;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: MapColors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(color: MapColors.text.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: MapColors.text.withValues(alpha: 0.13),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Center(
+            child: Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: MapColors.text.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
 }

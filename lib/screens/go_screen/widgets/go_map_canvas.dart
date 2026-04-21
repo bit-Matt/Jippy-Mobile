@@ -15,6 +15,8 @@ class GoMapCanvas extends StatelessWidget {
     required this.initialCenter,
     required this.initialZoom,
     required this.onMapTap,
+    required this.routePolylines,
+    required this.dropOffPoints,
     required this.userPosition,
     required this.origin,
     required this.destination,
@@ -27,6 +29,8 @@ class GoMapCanvas extends StatelessWidget {
   final LatLng initialCenter;
   final double initialZoom;
   final TapCallback onMapTap;
+  final List<Polyline<Object>> routePolylines;
+  final List<LatLng> dropOffPoints;
   final LatLng? userPosition;
   final LatLng? origin;
   final LatLng? destination;
@@ -58,6 +62,23 @@ class GoMapCanvas extends StatelessWidget {
         ),
       );
     }
+    for (final dropOff in dropOffPoints) {
+      markers.add(
+        Marker(
+          point: dropOff,
+          width: 22,
+          height: 22,
+          alignment: Alignment.center,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF9E9E9E),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 1.5),
+            ),
+          ),
+        ),
+      );
+    }
     return FlutterMap(
       mapController: mapController,
       options: MapOptions(
@@ -84,6 +105,8 @@ class GoMapCanvas extends StatelessWidget {
               },
             ),
           ),
+        if (routePolylines.isNotEmpty)
+          PolylineLayer<Object>(polylines: routePolylines),
         if (markers.isNotEmpty) MarkerLayer(markers: markers),
         if (userPosition != null)
           MarkerLayer(
@@ -153,13 +176,13 @@ class GoRecenterButton extends StatelessWidget {
         child: InkWell(
           onTap: hasUserPosition
               ? () {
-            final position = userPosition;
-            if (position == null) return;
-            mapController.move(
-              LatLng(position.latitude, position.longitude),
-              mapController.camera.zoom,
-            );
-          }
+                  final position = userPosition;
+                  if (position == null) return;
+                  mapController.move(
+                    LatLng(position.latitude, position.longitude),
+                    mapController.camera.zoom,
+                  );
+                }
               : null,
           borderRadius: BorderRadius.circular(14),
           child: SizedBox(
