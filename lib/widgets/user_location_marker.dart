@@ -175,8 +175,8 @@ class _TweenedUserMarkerLayerState extends State<_TweenedUserMarkerLayer> {
           markers: [
             Marker(
               point: LatLng(lat, lng),
-              width: 42,
-              height: 42,
+              width: 20,
+              height: 20,
               alignment: Alignment.center,
               child: _UserMarkerVisual(headingDegrees: heading),
             ),
