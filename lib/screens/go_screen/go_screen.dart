@@ -24,7 +24,7 @@ final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
 const double _initialZoom = 14.0;
 const String _osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const String _vectorStyleUrl =
-    'https://jippy.shinosawa-laboratories.dev/tileserver/style.json';
+    'https://jippy.shinosawa-laboratories.dev/tileserver/liberty.json';
 const String _userAgentPackageName = 'com.example.jippy_mobile';
 
 const Color _sheetSurfaceColor = Colors.white;
@@ -59,6 +59,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   Style? _vectorStyle;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
+  StreamSubscription<double?>? _headingSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   GoNavigationFlow _flow = GoNavigationFlow.explore;
@@ -83,6 +84,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   int? _isolatedLegIndex;
 
   Position? _userPosition;
+  double? _compassHeading;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
   bool _hasCenteredToUserOnce = false;
@@ -231,6 +233,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _loadVectorStyle();
     _initLocation();
     _subscribeToServiceStatus();
+    _subscribeToHeading();
     _initConnectivity();
   }
 
@@ -240,6 +243,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _searchDebounce?.cancel();
     _positionSubscription?.cancel();
     _serviceStatusSubscription?.cancel();
+    _headingSubscription?.cancel();
     _connectivitySubscription?.cancel();
     _startController.dispose();
     _endController.dispose();
@@ -272,6 +276,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         }
       },
     );
+  }
+
+  void _subscribeToHeading() {
+    _headingSubscription = _locationService.headingStream.listen((heading) {
+      if (!mounted) return;
+      setState(() => _compassHeading = heading);
+    });
   }
 
   Future<void> _initConnectivity() async {
@@ -1227,7 +1238,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               routePolylines: _selectedRoutePolylines,
               dropOffPoints: _selectedRideStopPoints,
               userPosition: userLatLng,
-              userHeading: _userPosition?.heading,
+              userHeading: _compassHeading,
               userSpeedMps: _userPosition?.speed,
               userAccuracyMeters: _userPosition?.accuracy,
               origin: _mapOrigin,
