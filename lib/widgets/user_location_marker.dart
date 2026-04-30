@@ -7,9 +7,6 @@ import 'package:latlong2/latlong.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 
-/// Minimum speed (m/s) before we trust GPS heading and render the arrow.
-const double _headingMinSpeedMps = 0.5;
-
 /// Duration of the position tween between GPS fixes.
 const Duration _positionTweenDuration = Duration(milliseconds: 750);
 
@@ -26,9 +23,7 @@ List<Widget> buildUserLocationLayers({
 }) {
   if (position == null) return const <Widget>[];
 
-  final showHeading = speedMps != null &&
-      speedMps > _headingMinSpeedMps &&
-      headingDegrees != null &&
+  final showHeading = headingDegrees != null &&
       !headingDegrees.isNaN &&
       headingDegrees >= 0;
 
@@ -99,8 +94,8 @@ class _TweenedCircleLayerState extends State<_TweenedCircleLayer> {
               point: LatLng(lat, lng),
               useRadiusInMeter: true,
               radius: widget.accuracyMeters,
-              color: MapColors.userLocationColor.withValues(alpha: 0.12),
-              borderColor: MapColors.userLocationColor.withValues(alpha: 0.35),
+              color: MapColors.userLocationColor.withValues(alpha: 0.06),
+              borderColor: MapColors.userLocationColor.withValues(alpha: 0.14),
               borderStrokeWidth: 1,
             ),
           ],
@@ -175,8 +170,8 @@ class _TweenedUserMarkerLayerState extends State<_TweenedUserMarkerLayer> {
           markers: [
             Marker(
               point: LatLng(lat, lng),
-              width: 20,
-              height: 20,
+              width: 60,
+              height: 60,
               alignment: Alignment.center,
               child: _UserMarkerVisual(headingDegrees: heading),
             ),
@@ -198,15 +193,15 @@ class _UserMarkerVisual extends StatelessWidget {
       return _buildDot();
     }
     return SizedBox(
-      width: 42,
-      height: 42,
+      width: 52,
+      height: 52,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Transform.rotate(
             angle: headingDegrees! * math.pi / 180,
             child: CustomPaint(
-              size: const Size(42, 42),
+              size: const Size(52, 52),
               painter: _HeadingConePainter(),
             ),
           ),
@@ -218,8 +213,8 @@ class _UserMarkerVisual extends StatelessWidget {
 
   Widget _buildDot() {
     return Container(
-      width: 22,
-      height: 22,
+      width: 20,
+      height: 20,
       decoration: BoxDecoration(
         color: MapColors.userLocationColor,
         shape: BoxShape.circle,
@@ -249,8 +244,8 @@ class _HeadingConePainter extends CustomPainter {
     final rect = Rect.fromCircle(center: center, radius: radius);
     final gradient = RadialGradient(
       colors: [
-        MapColors.userLocationColor.withValues(alpha: 0.55),
-        MapColors.userLocationColor.withValues(alpha: 0.0),
+        MapColors.accentColor.withValues(alpha: 0.55),
+        MapColors.accentColor.withValues(alpha: 0.08),
       ],
       stops: const [0.0, 1.0],
     );

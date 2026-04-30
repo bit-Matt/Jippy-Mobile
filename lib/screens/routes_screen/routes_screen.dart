@@ -83,8 +83,10 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
   final MapController _mapController = MapController();
   final LocationService _locationService = LocationService.instance;
   Position? _userPosition;
+  double? _compassHeading;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
+  StreamSubscription<double?>? _headingSubscription;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
 
@@ -156,6 +158,7 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
     _loadVectorStyle();
     _initLocation();
     _subscribeToServiceStatus();
+    _subscribeToHeading();
     _loadRoutesData();
   }
 
@@ -184,6 +187,13 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
         }
       },
     );
+  }
+
+  void _subscribeToHeading() {
+    _headingSubscription = _locationService.headingStream.listen((heading) {
+      if (!mounted) return;
+      setState(() => _compassHeading = heading);
+    });
   }
 
   Future<void> _loadVectorStyle() async {
@@ -380,6 +390,7 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
     _serviceStatusSubscription?.cancel();
+    _headingSubscription?.cancel();
     _closureHitNotifier.removeListener(_onClosureLayerHit);
     _closureHitNotifier.dispose();
     super.dispose();
@@ -413,7 +424,7 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
                   userPosition: _userPosition == null
                       ? null
                       : LatLng(_userPosition!.latitude, _userPosition!.longitude),
-                  userHeading: _userPosition?.heading,
+                  userHeading: _compassHeading,
                   userSpeedMps: _userPosition?.speed,
                   userAccuracyMeters: _userPosition?.accuracy,
                   osmTileUrl: _osmTileUrl,

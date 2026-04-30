@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
 
 /// Shared location stream for screens that need live GPS updates.
@@ -39,6 +40,16 @@ class LocationService {
   /// Broadcast stream that mirrors [Geolocator.getServiceStatusStream].
   /// Subscribed for the entire app lifetime.
   Stream<ServiceStatus> get serviceStatusStream => _statusController.stream;
+
+  /// Device orientation heading in degrees from compass/magnetometer.
+  ///
+  /// Unlike [Position.heading], this updates while stationary as the user rotates
+  /// the phone, which is ideal for orienting an on-map cone.
+  Stream<double?> get headingStream {
+    final events = FlutterCompass.events;
+    if (events == null) return const Stream<double?>.empty();
+    return events.map((event) => event.heading);
+  }
 
   /// Live position stream. Shared across all listeners (multicast).
   Stream<Position> get stream {
