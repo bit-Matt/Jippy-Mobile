@@ -678,7 +678,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       if (suggestions.isEmpty) {
         setState(() {
           _routePreviewLoading = false;
-          _flow = GoNavigationFlow.routingInput;
+          _flow = GoNavigationFlow.routeSelection;
           _searchError = 'No route suggestions found for this trip.';
         });
         return;
@@ -698,14 +698,14 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       if (!mounted || requestToken != _navigateRequestToken) return;
       setState(() {
         _routePreviewLoading = false;
-        _flow = GoNavigationFlow.routingInput;
+        _flow = GoNavigationFlow.routeSelection;
         _searchError = e.message;
       });
     } catch (_) {
       if (!mounted || requestToken != _navigateRequestToken) return;
       setState(() {
         _routePreviewLoading = false;
-        _flow = GoNavigationFlow.routingInput;
+        _flow = GoNavigationFlow.routeSelection;
         _searchError =
             'Connection problem - please check your internet and try again.';
       });
@@ -1038,10 +1038,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   int _previewInstructionCount(NavigateSuggestion suggestion) {
     var count = 0;
     for (final leg in suggestion.route.legs) {
-      count += leg.instructions.length;
+      if (_previewInstructionText(leg).isEmpty) continue;
+      count += 1;
+      if (count >= 5) break;
     }
-    if (count < 1) return 0;
-    return count > 5 ? 5 : count;
+    return count;
   }
 
   IconData _iconForLegType(NavigateLegType type) {
@@ -1181,7 +1182,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             onUseCurrentLocationTap: _useCurrentLocationForStart,
             suggestions: _suggestions,
             onSuggestionTap: _onPickSuggestion,
-            searchError: _searchError,
+            searchError:
+              _flow == GoNavigationFlow.routeSelection ? null : _searchError,
             showOutOfAreaDisclaimer: _destinationOutOfArea,
             isSearchingNominatim: _nominatimBusy,
             mapPinAwaitingTap: _pinTarget,
@@ -1287,6 +1289,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   Widget _buildRouteSelectionSheet(BuildContext context) {
     final selected = _selectedSuggestion;
+    final showRouteError = _searchError != null && !_routePreviewLoading;
+    const errorColor = Color(0xFFB00020);
 
     return DraggableScrollableSheet(
       controller: _sheetController,
@@ -1320,7 +1324,55 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   ),
                 ],
               ),
-              if (_routeSuggestions.isEmpty && !_routePreviewLoading) ...[
+              if (showRouteError) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: errorColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: errorColor.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.error_outline_rounded,
+                            size: 18,
+                            color: errorColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _searchError!,
+                              style: const TextStyle(
+                                color: errorColor,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: _requestNavigationIfComplete,
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: const Text('Retry'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: MapColors.primary,
+                          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (_routeSuggestions.isEmpty && !_routePreviewLoading) ...[
                 const SizedBox(height: 10),
                 Text(
                   'No route suggestions available yet.',
@@ -1412,22 +1464,29 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildSuggestedRoutesStrip() {
+    const cardWidth = 182.0;
+    const cardSpacing = 6.0;
+    const trailingPadding = 36.0;
+
     return Stack(
       children: [
-        SingleChildScrollView(
+        ListView.separated(
           scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (var i = 0; i < _routeSuggestions.length; i++) ...[
-                _buildSuggestionCard(
-                  _routeSuggestions[i],
-                  index: i,
-                  isSelected: i == _selectedSuggestionIndex,
-                ),
-                if (i != _routeSuggestions.length - 1) const SizedBox(width: 6),
-              ],
-            ],
-          ),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.only(right: trailingPadding),
+          itemCount: _routeSuggestions.length,
+          separatorBuilder: (context, index) =>
+              const SizedBox(width: cardSpacing),
+          itemBuilder: (context, index) {
+            return SizedBox(
+              width: cardWidth,
+              child: _buildSuggestionCard(
+                _routeSuggestions[index],
+                index: index,
+                isSelected: index == _selectedSuggestionIndex,
+              ),
+            );
+          },
         ),
         if (_routeSuggestions.length > 1)
           Positioned(
@@ -1582,55 +1641,113 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   List<Widget> _buildPreviewInstructionRows(NavigateSuggestion suggestion) {
     final widgets = <Widget>[];
     var rendered = 0;
-    var boardCount = 0;
-
     for (final leg in suggestion.route.legs) {
-      for (final instruction in leg.instructions) {
-        final isBoard =
-            instruction.maneuverType == NavigateManeuverType.board;
-        final isTransferBoard = isBoard && boardCount > 0;
+      final previewText = _previewInstructionText(leg);
+      if (previewText.isEmpty) continue;
 
-        rendered += 1;
-        if (rendered > 5) return widgets;
-        widgets.add(
-          Padding(
-            padding: EdgeInsets.only(bottom: rendered == 5 ? 0 : 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  _iconForInstruction(
-                    leg: leg,
-                    instruction: instruction,
-                    isTransferBoard: isTransferBoard,
-                  ),
-                  size: 16,
-                  color: _colorForManeuver(instruction.maneuverType),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    instruction.text,
-                    style: TextStyle(
-                      color: MapColors.text.withValues(alpha: 0.83),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      height: 1.35,
-                    ),
+      rendered += 1;
+      if (rendered > 5) break;
+      widgets.add(
+        Padding(
+          padding: EdgeInsets.only(bottom: rendered == 5 ? 0 : 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                _iconForLegType(leg.type),
+                size: 16,
+                color: _colorForLeg(leg),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  previewText,
+                  style: TextStyle(
+                    color: MapColors.text.withValues(alpha: 0.83),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-
-        if (isBoard) {
-          boardCount += 1;
-        }
-      }
+        ),
+      );
     }
 
     return widgets;
+  }
+
+  String _previewInstructionText(NavigateLeg leg) {
+    final distance = _formatDistance(leg.distanceMeters);
+    switch (leg.type) {
+      case NavigateLegType.walk:
+        return 'Walk $distance';
+      case NavigateLegType.jeepney:
+        final label = _jeepneyPreviewLabel(leg);
+        final base = label.isEmpty ? _labelForLegType(leg.type) : label;
+        return '$base - $distance';
+      case NavigateLegType.tricycle:
+      case NavigateLegType.unknown:
+        final routeName = leg.routeName.trim();
+        final base = routeName.isNotEmpty ? routeName : _labelForLegType(leg.type);
+        return '$base - $distance';
+    }
+  }
+
+  String _jeepneyPreviewLabel(NavigateLeg leg) {
+    final routeName = leg.routeName.trim();
+    if (routeName.isEmpty) return '';
+
+    final routeNumber = leg.routeNumber.trim();
+    if (routeNumber.isNotEmpty) {
+      final normalized = _normalizeRouteNumber(routeNumber);
+      return '$routeName (Route $normalized)';
+    }
+
+    if (_hasRouteNumberInName(routeName)) {
+      return routeName;
+    }
+
+    final extracted = _extractRouteNumberFromName(routeName);
+    if (extracted == null || extracted.isEmpty) return routeName;
+    final normalized = _normalizeRouteNumber(extracted);
+    return '$routeName (Route $normalized)';
+  }
+
+  bool _hasRouteNumberInName(String name) {
+    return RegExp(r'\broute\s*\w+\b', caseSensitive: false).hasMatch(name) ||
+        RegExp(r'\bR\s*\d+\b', caseSensitive: false).hasMatch(name);
+  }
+
+  String? _extractRouteNumberFromName(String name) {
+    final parenMatch =
+        RegExp(r'\(\s*Route\s*([^)]+)\)', caseSensitive: false)
+            .firstMatch(name);
+    if (parenMatch != null) return parenMatch.group(1)?.trim();
+
+    final routeMatch =
+        RegExp(r'\bRoute\s*([A-Za-z0-9-]+)\b', caseSensitive: false)
+            .firstMatch(name);
+    if (routeMatch != null) return routeMatch.group(1)?.trim();
+
+    final rMatch =
+        RegExp(r'\bR\s*\d+\b', caseSensitive: false).firstMatch(name);
+    if (rMatch != null) return rMatch.group(0)?.replaceAll(' ', '');
+
+    return null;
+  }
+
+  String _normalizeRouteNumber(String raw) {
+    final trimmed = raw.trim();
+    final prefixed =
+        RegExp(r'^Route\s*(.+)$', caseSensitive: false).firstMatch(trimmed);
+    if (prefixed != null) return prefixed.group(1)?.trim() ?? trimmed;
+    final match =
+        RegExp(r'^R\s*(\d+)$', caseSensitive: false).firstMatch(trimmed);
+    if (match != null) return match.group(1) ?? trimmed;
+    return trimmed;
   }
 
   Widget _buildRouteDetailsSheet() {
