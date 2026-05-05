@@ -8,13 +8,16 @@ class GoMapPinInstructionBanner extends StatelessWidget {
     super.key,
     required this.forOrigin,
     required this.onCancel,
+    this.onUseCurrentLocation,
   });
 
   final bool forOrigin;
   final VoidCallback onCancel;
+  final VoidCallback? onUseCurrentLocation;
 
   @override
   Widget build(BuildContext context) {
+    final showUseCurrentLocation = forOrigin && onUseCurrentLocation != null;
     return Material(
       elevation: 3,
       shadowColor: Colors.black26,
@@ -43,6 +46,11 @@ class GoMapPinInstructionBanner extends StatelessWidget {
                 ),
               ),
             ),
+            if (showUseCurrentLocation)
+              TextButton(
+                onPressed: onUseCurrentLocation,
+                child: const Text('Use my location'),
+              ),
             TextButton(
               onPressed: onCancel,
               child: const Text('Cancel'),
