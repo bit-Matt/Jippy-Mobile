@@ -921,22 +921,36 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
   }
 
   void _closeRouteDetails() {
+    final resumeOverlap = _uiState.returnToOverlappingRoutesAfterDetails &&
+        _uiState.overlappingRoutes.isNotEmpty;
     final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
     final allIds = allRoutes.map((r) => r.id).toSet();
     setState(() {
-      _setPanelMode(
-        RoutesPanelMode.routes,
-        clearSelectedRoute: true,
-        overlappingRoutes: const <JeepneyRoute>[],
-        returnToOverlappingRoutesAfterDetails: false,
-      );
-      _uiState = _uiState.copyWith(
-        isFocusedMode: false,
-        selectedRouteIds: allIds,
-      );
-      _clearOverlapTapVisuals();
+      if (resumeOverlap) {
+        _setPanelMode(
+          RoutesPanelMode.overlap,
+          clearSelectedRoute: true,
+          returnToOverlappingRoutesAfterDetails: false,
+        );
+      } else {
+        _setPanelMode(
+          RoutesPanelMode.routes,
+          clearSelectedRoute: true,
+          overlappingRoutes: const <JeepneyRoute>[],
+          returnToOverlappingRoutesAfterDetails: false,
+        );
+        _uiState = _uiState.copyWith(
+          isFocusedMode: false,
+          selectedRouteIds: allIds,
+        );
+        _clearOverlapTapVisuals();
+      }
     });
-    _fitRoutesBounds(allRoutes);
+    if (resumeOverlap) {
+      _fitRoutesBounds(_uiState.overlappingRoutes);
+    } else {
+      _fitRoutesBounds(allRoutes);
+    }
     _expandDrawerToDefault();
   }
 
@@ -1033,14 +1047,22 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
   }
 
   void _closeOverlappingRoutes() {
+    final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
+    final allIds = allRoutes.map((r) => r.id).toSet();
     setState(() {
       _setPanelMode(
         RoutesPanelMode.routes,
         overlappingRoutes: const <JeepneyRoute>[],
         returnToOverlappingRoutesAfterDetails: false,
       );
+      _uiState = _uiState.copyWith(
+        isFocusedMode: false,
+        selectedRouteIds: allIds,
+      );
       _clearOverlapTapVisuals();
     });
+    _fitRoutesBounds(allRoutes);
+    _expandDrawerToDefault();
   }
 
   void _openRouteFromOverlap(JeepneyRoute route) {
