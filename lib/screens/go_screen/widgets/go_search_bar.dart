@@ -93,6 +93,8 @@ class GoSearchBar extends StatelessWidget {
               GoMapPinInstructionBanner(
                 forOrigin: mapPinAwaitingTap == GoPinTarget.origin,
                 onCancel: onCancelMapPinMode,
+                onUseCurrentLocation:
+                    showUseCurrentLocation ? onUseCurrentLocationTap : null,
               ),
             ],
           ],

@@ -528,6 +528,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final pos = _userPosition;
     if (pos == null || !_gpsOriginAvailable) return;
     setState(() {
+      _pinTarget = null;
       _start = LatLng(pos.latitude, pos.longitude);
       _startController.text = 'Your location';
       _routePreviewSignature = null;
@@ -684,11 +685,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         return;
       }
 
-      final defaultIndex = _defaultSuggestionIndex(suggestions);
+      final prioritized = _prioritizeSuggestions(suggestions);
       setState(() {
         _routePreviewLoading = false;
-        _routeSuggestions = suggestions;
-        _selectedSuggestionIndex = defaultIndex;
+        _routeSuggestions = prioritized;
+        _selectedSuggestionIndex = 0;
         _isolatedLegIndex = null;
         _flow = GoNavigationFlow.routeSelection;
       });
@@ -712,59 +713,43 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     }
   }
 
-  int _defaultSuggestionIndex(List<NavigateSuggestion> suggestions) {
-    if (suggestions.isEmpty) return 0;
-
-    final simplestIndices = <int>[];
-    final fastestIndices = <int>[];
-
-    for (var i = 0; i < suggestions.length; i++) {
-      if (suggestions[i].label == NavigateSuggestionLabel.simplest) {
-        simplestIndices.add(i);
-      }
-      if (suggestions[i].label == NavigateSuggestionLabel.fastest) {
-        fastestIndices.add(i);
-      }
-    }
-
-    if (simplestIndices.isNotEmpty) {
-      return _indexWithShortestDuration(suggestions, simplestIndices);
-    }
-
-    if (fastestIndices.isNotEmpty) {
-      return _indexWithShortestDuration(suggestions, fastestIndices);
-    }
-
-    var bestIndex = 0;
-    for (var i = 1; i < suggestions.length; i++) {
-      final current = suggestions[i];
-      final best = suggestions[bestIndex];
-      if (current.transferCount < best.transferCount) {
-        bestIndex = i;
-        continue;
-      }
-      if (current.transferCount == best.transferCount &&
-          current.totalDurationMinutes < best.totalDurationMinutes) {
-        bestIndex = i;
-      }
-    }
-
-    return bestIndex;
-  }
-
-  int _indexWithShortestDuration(
+  List<NavigateSuggestion> _prioritizeSuggestions(
     List<NavigateSuggestion> suggestions,
-    List<int> indices,
   ) {
-    var best = indices.first;
-    for (var i = 1; i < indices.length; i++) {
-      final candidateIndex = indices[i];
-      if (suggestions[candidateIndex].totalDurationMinutes <
-          suggestions[best].totalDurationMinutes) {
-        best = candidateIndex;
+    if (suggestions.isEmpty) return const [];
+
+    final grouped = <NavigateSuggestionLabel, List<NavigateSuggestion>>{};
+    for (final suggestion in suggestions) {
+      grouped.putIfAbsent(suggestion.label, () => []).add(suggestion);
+    }
+
+    final priority = <NavigateSuggestionLabel>[
+      NavigateSuggestionLabel.simplest,
+      NavigateSuggestionLabel.fastest,
+      NavigateSuggestionLabel.leastWalking,
+      NavigateSuggestionLabel.explorer,
+      NavigateSuggestionLabel.unknown,
+    ];
+
+    final selected = <NavigateSuggestion>[];
+    for (final label in priority) {
+      final group = grouped[label];
+      if (group == null || group.isEmpty) continue;
+      selected.add(group.first);
+      if (selected.length == 3) return selected;
+    }
+
+    for (final label in priority) {
+      final group = grouped[label];
+      if (group == null || group.isEmpty) continue;
+      for (final suggestion in group) {
+        if (selected.length == 3) return selected;
+        if (selected.contains(suggestion)) continue;
+        selected.add(suggestion);
       }
     }
-    return best;
+
+    return selected;
   }
 
   void _onSuggestionCardSelected(int index) {
@@ -914,10 +899,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     };
   }
 
-  String _routeBadgeText(NavigateSuggestion suggestion) {
-    return suggestion.label == NavigateSuggestionLabel.fastest
-        ? 'FASTEST'
-        : 'ALT';
+  String _routeBadgeText(NavigateSuggestion suggestion, int index) {
+    if (_isBestSuggestionIndex(index)) return 'Best';
+    return suggestion.labelText;
+  }
+
+  bool _isBestSuggestionIndex(int index) => index == 0;
+
+  String _displayLabelForSuggestion(NavigateSuggestion suggestion, int index) {
+    return _isBestSuggestionIndex(index) ? 'Best' : suggestion.labelText;
   }
 
   Color _badgeTextColor(Color background) {
@@ -1529,7 +1519,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ? MapColors.primary
         : accentColor;
     final badgeTextColor = _badgeTextColor(badgeColor);
-    final badgeText = _routeBadgeText(suggestion);
+    final badgeText = _routeBadgeText(suggestion, index);
     final rides = _rideCountForSuggestion(suggestion);
     final rideLabel = rides == 1 ? 'Ride' : 'Rides';
     final distance = _formatDistance(suggestion.totalDistanceMeters);
@@ -1756,16 +1746,28 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       return const SizedBox.shrink();
     }
 
+    final selectedIndex = _selectedSuggestionIndex < 0 ||
+            _selectedSuggestionIndex >= _routeSuggestions.length
+        ? 0
+        : _selectedSuggestionIndex;
+
     final legTimelineBlocks = <Widget>[];
     var boardCountBeforeLeg = 0;
+    var jeepStepNumber = 0;
     for (int i = 0; i < selected.route.legs.length; i++) {
       final leg = selected.route.legs[i];
+      int? jeepNumber;
+      if (leg.type == NavigateLegType.jeepney) {
+        jeepStepNumber += 1;
+        jeepNumber = jeepStepNumber;
+      }
       legTimelineBlocks.add(
         _buildLegTimelineBlock(
           leg,
           index: i,
           isLast: i == selected.route.legs.length - 1,
           boardCountBeforeLeg: boardCountBeforeLeg,
+          jeepStepNumber: jeepNumber,
           isIsolated: _activeLegIsolationIndex == i,
           onTap: () => _onLegTimelineStepTapped(i),
         ),
@@ -1796,7 +1798,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                 children: [
                   Expanded(
                     child: Text(
-                      '${selected.labelText} Details',
+                      '${_displayLabelForSuggestion(selected, selectedIndex)} Details',
                       style: const TextStyle(
                         color: MapColors.text,
                         fontSize: 24,
@@ -1848,10 +1850,17 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     required int index,
     required bool isLast,
     required int boardCountBeforeLeg,
+    required int? jeepStepNumber,
     required bool isIsolated,
     required VoidCallback onTap,
   }) {
     var boardCount = boardCountBeforeLeg;
+    final baseLabel = leg.type == NavigateLegType.jeepney
+        ? 'Jeep'
+        : _labelForLegType(leg.type);
+    final stepLabel = jeepStepNumber == null
+        ? baseLabel
+        : '$baseLabel $jeepStepNumber';
 
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
@@ -1916,7 +1925,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                           children: [
                             Expanded(
                               child: Text(
-                                '${_labelForLegType(leg.type)} ${index + 1}',
+                                stepLabel,
                                 style: const TextStyle(
                                   color: MapColors.text,
                                   fontSize: 15,
