@@ -93,6 +93,8 @@ class GoSearchBar extends StatelessWidget {
               GoMapPinInstructionBanner(
                 forOrigin: mapPinAwaitingTap == GoPinTarget.origin,
                 onCancel: onCancelMapPinMode,
+                onUseCurrentLocation:
+                    showUseCurrentLocation ? onUseCurrentLocationTap : null,
               ),
             ],
           ],
@@ -238,32 +240,6 @@ class _RoutingHeaderPanel extends StatelessWidget {
               trailingTooltip: 'Pin destination on map',
               trailingProgress: isSearchingNominatim,
             ),
-            if (showUseCurrentLocation) ...[
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: onUseCurrentLocationTap,
-                  icon: Icon(
-                    Icons.my_location,
-                    size: 18,
-                    color: MapColors.primary.withValues(alpha: 0.9),
-                  ),
-                  label: const Text('Use my current location for Start'),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    foregroundColor: MapColors.primary,
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
             if (searchError != null) ...[
               const SizedBox(height: 6),
               Text(
