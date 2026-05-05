@@ -48,7 +48,12 @@ class LocationService {
   Stream<double?> get headingStream {
     final events = FlutterCompass.events;
     if (events == null) return const Stream<double?>.empty();
-    return events.map((event) => event.heading);
+    return events.map((event) {
+      final heading = event.heading;
+      if (heading == null || heading.isNaN || !heading.isFinite) return null;
+      // Normalize provider output (some devices emit [-180, 180]) to [0, 360).
+      return ((heading % 360) + 360) % 360;
+    });
   }
 
   /// Live position stream. Shared across all listeners (multicast).
