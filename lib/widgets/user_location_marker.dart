@@ -9,6 +9,7 @@ import 'package:jippy_mobile/core/theme/map_colors.dart';
 
 /// Duration of the position tween between GPS fixes.
 const Duration _positionTweenDuration = Duration(milliseconds: 750);
+const double _userMarkerSize = 20;
 
 /// Inserts the user location rendering layers into a [FlutterMap]:
 /// - translucent accuracy halo (meters-accurate circle) when available
@@ -170,8 +171,8 @@ class _TweenedUserMarkerLayerState extends State<_TweenedUserMarkerLayer> {
           markers: [
             Marker(
               point: LatLng(lat, lng),
-              width: 60,
-              height: 60,
+              width: _userMarkerSize,
+              height: _userMarkerSize,
               alignment: Alignment.center,
               child: _UserMarkerVisual(headingDegrees: heading),
             ),
@@ -193,15 +194,15 @@ class _UserMarkerVisual extends StatelessWidget {
       return _buildDot();
     }
     return SizedBox(
-      width: 52,
-      height: 52,
+      width: _userMarkerSize,
+      height: _userMarkerSize,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Transform.rotate(
             angle: headingDegrees! * math.pi / 180,
             child: CustomPaint(
-              size: const Size(52, 52),
+              size: const Size(_userMarkerSize, _userMarkerSize),
               painter: _HeadingConePainter(),
             ),
           ),
@@ -213,8 +214,8 @@ class _UserMarkerVisual extends StatelessWidget {
 
   Widget _buildDot() {
     return Container(
-      width: 20,
-      height: 20,
+      width: _userMarkerSize,
+      height: _userMarkerSize,
       decoration: BoxDecoration(
         color: MapColors.userLocationColor,
         shape: BoxShape.circle,
