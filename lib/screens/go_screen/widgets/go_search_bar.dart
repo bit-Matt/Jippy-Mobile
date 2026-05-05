@@ -17,6 +17,7 @@ class GoSearchBar extends StatelessWidget {
     required this.endFocusNode,
     required this.onStartTextChanged,
     required this.onEndTextChanged,
+    required this.onEndSubmitted,
     required this.onStartMapPinTap,
     required this.onEndMapPinTap,
     required this.showUseCurrentLocation,
@@ -40,6 +41,7 @@ class GoSearchBar extends StatelessWidget {
   final FocusNode endFocusNode;
   final ValueChanged<String> onStartTextChanged;
   final ValueChanged<String> onEndTextChanged;
+  final ValueChanged<String> onEndSubmitted;
   final VoidCallback onStartMapPinTap;
   final VoidCallback onEndMapPinTap;
   final bool showUseCurrentLocation;
@@ -57,6 +59,8 @@ class GoSearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top + 8;
+    final showOriginPinUseLocation = showUseCurrentLocation &&
+      activeRoutingField == GoRoutingField.start;
     return Positioned(
       top: 0,
       left: 0,
@@ -76,9 +80,10 @@ class GoSearchBar extends StatelessWidget {
                     endFocusNode: endFocusNode,
                     onStartTextChanged: onStartTextChanged,
                     onEndTextChanged: onEndTextChanged,
+                    onEndSubmitted: onEndSubmitted,
                     onStartMapPinTap: onStartMapPinTap,
                     onEndMapPinTap: onEndMapPinTap,
-                    showUseCurrentLocation: showUseCurrentLocation,
+                    showUseCurrentLocationAction: showOriginPinUseLocation,
                     onUseCurrentLocationTap: onUseCurrentLocationTap,
                     suggestions: suggestions,
                     onSuggestionTap: onSuggestionTap,
@@ -93,8 +98,6 @@ class GoSearchBar extends StatelessWidget {
               GoMapPinInstructionBanner(
                 forOrigin: mapPinAwaitingTap == GoPinTarget.origin,
                 onCancel: onCancelMapPinMode,
-                onUseCurrentLocation:
-                    showUseCurrentLocation ? onUseCurrentLocationTap : null,
               ),
             ],
           ],
@@ -164,9 +167,10 @@ class _RoutingHeaderPanel extends StatelessWidget {
     required this.endFocusNode,
     required this.onStartTextChanged,
     required this.onEndTextChanged,
+    required this.onEndSubmitted,
     required this.onStartMapPinTap,
     required this.onEndMapPinTap,
-    required this.showUseCurrentLocation,
+    required this.showUseCurrentLocationAction,
     required this.onUseCurrentLocationTap,
     required this.suggestions,
     required this.onSuggestionTap,
@@ -183,9 +187,10 @@ class _RoutingHeaderPanel extends StatelessWidget {
   final FocusNode endFocusNode;
   final ValueChanged<String> onStartTextChanged;
   final ValueChanged<String> onEndTextChanged;
+  final ValueChanged<String> onEndSubmitted;
   final VoidCallback onStartMapPinTap;
   final VoidCallback onEndMapPinTap;
-  final bool showUseCurrentLocation;
+  final bool showUseCurrentLocationAction;
   final VoidCallback onUseCurrentLocationTap;
   final List<NominatimSearchHit> suggestions;
   final ValueChanged<NominatimSearchHit> onSuggestionTap;
@@ -235,11 +240,34 @@ class _RoutingHeaderPanel extends StatelessWidget {
               isActive: activeRoutingField == GoRoutingField.end,
               onTap: () => onActiveRoutingFieldChanged(GoRoutingField.end),
               onChanged: onEndTextChanged,
+              onSubmitted: onEndSubmitted,
               onTrailingTap: onEndMapPinTap,
               trailingIcon: Icons.edit_location_alt_outlined,
               trailingTooltip: 'Pin destination on map',
               trailingProgress: isSearchingNominatim,
             ),
+            if (showUseCurrentLocationAction) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onUseCurrentLocationTap,
+                  icon: const Icon(Icons.my_location, size: 18),
+                  label: const Text('Use my current location'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: MapColors.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             if (searchError != null) ...[
               const SizedBox(height: 6),
               Text(
@@ -310,6 +338,7 @@ class _RoutingInputRow extends StatelessWidget {
     required this.isActive,
     required this.onTap,
     required this.onChanged,
+    this.onSubmitted,
     required this.onTrailingTap,
     required this.trailingIcon,
     required this.trailingTooltip,
@@ -325,6 +354,7 @@ class _RoutingInputRow extends StatelessWidget {
   final bool isActive;
   final VoidCallback onTap;
   final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onSubmitted;
   final VoidCallback onTrailingTap;
   final IconData trailingIcon;
   final String trailingTooltip;
@@ -332,6 +362,15 @@ class _RoutingInputRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    void selectAllText() {
+      final text = controller.text;
+      if (text.isEmpty) return;
+      controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: text.length,
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -356,8 +395,9 @@ class _RoutingInputRow extends StatelessWidget {
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,
-                  onTap: onTap,
+                  onTap: selectAllText,
                   onChanged: onChanged,
+                  onSubmitted: onSubmitted,
                   textInputAction: textInputAction,
                   decoration: InputDecoration(
                     isDense: true,
