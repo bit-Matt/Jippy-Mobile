@@ -846,33 +846,22 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
   }
 
   void _closeRouteDetails() {
-    final resumeOverlap = _uiState.returnToOverlappingRoutesAfterDetails &&
-        _uiState.overlappingRoutes.isNotEmpty;
-    final allIds = (_routesData?.routes ?? const <JeepneyRoute>[])
-        .map((r) => r.id)
-        .toSet();
+    final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
+    final allIds = allRoutes.map((r) => r.id).toSet();
     setState(() {
-      if (resumeOverlap) {
-        _setPanelMode(
-          RoutesPanelMode.overlap,
-          clearSelectedRoute: true,
-          returnToOverlappingRoutesAfterDetails: false,
-        );
-        _uiState = _uiState.copyWith(
-          isFocusedMode: false,
-          selectedRouteIds: allIds,
-        );
-      } else {
-        _setPanelMode(
-          RoutesPanelMode.routes,
-          clearSelectedRoute: true,
-          returnToOverlappingRoutesAfterDetails: false,
-        );
-      }
+      _setPanelMode(
+        RoutesPanelMode.routes,
+        clearSelectedRoute: true,
+        overlappingRoutes: const <JeepneyRoute>[],
+        returnToOverlappingRoutesAfterDetails: false,
+      );
+      _uiState = _uiState.copyWith(
+        isFocusedMode: false,
+        selectedRouteIds: allIds,
+      );
+      _clearOverlapTapVisuals();
     });
-    if (resumeOverlap) {
-      _fitRoutesBounds(_uiState.overlappingRoutes);
-    }
+    _fitRoutesBounds(allRoutes);
   }
 
   /// Fits routes-map camera to route geometry (decoded/Valhalla polylines when present).
@@ -909,11 +898,22 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       _overlapThresholdMetersMin,
       _overlapThresholdMetersMax,
     );
-    final matchIds = routeIdsNearPolylines(point, _hitTestPolylines, threshold);
+    final distanceByRoute = <String, double>{};
+    for (final pl in _hitTestPolylines) {
+      if (pl.points.length < 2) continue;
+      final distance = minDistanceMetersPointToPolyline(point, pl.points);
+      final current = distanceByRoute[pl.routeId];
+      if (current == null || distance < current) {
+        distanceByRoute[pl.routeId] = distance;
+      }
+    }
+    final nearEntries = distanceByRoute.entries
+        .where((entry) => entry.value <= threshold)
+        .toList();
 
     _mapController.move(point, math.max(cam.zoom, _overlapTapMinZoom));
 
-    if (matchIds.isEmpty) {
+    if (nearEntries.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -924,9 +924,24 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       return;
     }
 
+    var minDistance = nearEntries.first.value;
+    for (final entry in nearEntries.skip(1)) {
+      if (entry.value < minDistance) minDistance = entry.value;
+    }
+    final exactTolerance = math.min(12.0, threshold * 0.35);
+    final exactIds = <String>{
+      for (final entry in nearEntries)
+        if (entry.value <= minDistance + exactTolerance) entry.key,
+    };
+
     final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
-    final matched = allRoutes.where((r) => matchIds.contains(r.id)).toList()
+    final matched = allRoutes.where((r) => exactIds.contains(r.id)).toList()
       ..sort(compareRouteNumbersAsc);
+
+    if (matched.length == 1) {
+      _openRouteFromMapTap(matched.first);
+      return;
+    }
 
     setState(() {
       _setPanelMode(
@@ -960,6 +975,24 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
         selectedRoute: route,
         clearSelectedClosure: true,
         returnToOverlappingRoutesAfterDetails: true,
+      );
+      _uiState = _uiState.copyWith(
+        isFocusedMode: true,
+        selectedRouteIds: <String>{route.id},
+      );
+      _clearOverlapTapVisuals();
+    });
+    _fitRoutesBounds([route]);
+  }
+
+  void _openRouteFromMapTap(JeepneyRoute route) {
+    setState(() {
+      _setPanelMode(
+        RoutesPanelMode.routeDetails,
+        selectedRoute: route,
+        clearSelectedClosure: true,
+        overlappingRoutes: const <JeepneyRoute>[],
+        returnToOverlappingRoutesAfterDetails: false,
       );
       _uiState = _uiState.copyWith(
         isFocusedMode: true,
