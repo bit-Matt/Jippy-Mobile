@@ -20,7 +20,7 @@ class RouteDetailsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final detailText = (route != null && route!.routeDetails.trim().isNotEmpty)
         ? route!.routeDetails.trim()
-        : 'No route details available for this route yet.';
+      : 'No details available for this route.';
 
     return ListView(
       key: const ValueKey<String>('route-details-view'),
