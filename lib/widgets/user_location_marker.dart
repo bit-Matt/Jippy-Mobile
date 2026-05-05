@@ -10,12 +10,17 @@ import 'package:jippy_mobile/core/theme/map_colors.dart';
 /// Duration of the position tween between GPS fixes.
 const Duration _positionTweenDuration = Duration(milliseconds: 750);
 const double _userMarkerSize = 20;
+const double _orientationConeSize = 60;
 
 /// Inserts the user location rendering layers into a [FlutterMap]:
 /// - translucent accuracy halo (meters-accurate circle) when available
-/// - smoothly tweened marker (heading arrow while moving, dot when still)
+/// - heading cone in its own layer (keeps orientation visuals independent)
+/// - smoothly tweened fixed-size user dot marker
 ///
 /// Returns an empty list when [position] is null.
+///
+/// [speedMps] is currently reserved for future cone-visibility tuning
+/// (for example, hiding/softening cone while stationary).
 List<Widget> buildUserLocationLayers({
   required LatLng? position,
   double? headingDegrees,
@@ -43,11 +48,13 @@ List<Widget> buildUserLocationLayers({
   }
 
   layers.add(
-    _TweenedUserMarkerLayer(
+    _TweenedHeadingConeLayer(
       target: position,
       headingDegrees: showHeading ? headingDegrees : null,
     ),
   );
+
+  layers.add(_TweenedUserMarkerLayer(target: position));
 
   return layers;
 }
@@ -111,11 +118,9 @@ class _TweenedCircleLayerState extends State<_TweenedCircleLayer> {
 class _TweenedUserMarkerLayer extends StatefulWidget {
   const _TweenedUserMarkerLayer({
     required this.target,
-    required this.headingDegrees,
   });
 
   final LatLng target;
-  final double? headingDegrees;
 
   @override
   State<_TweenedUserMarkerLayer> createState() =>
@@ -125,15 +130,6 @@ class _TweenedUserMarkerLayer extends StatefulWidget {
 class _TweenedUserMarkerLayerState extends State<_TweenedUserMarkerLayer> {
   late LatLng _fromPos = widget.target;
   late LatLng _toPos = widget.target;
-  double? _fromHeading;
-  double? _toHeading;
-
-  @override
-  void initState() {
-    super.initState();
-    _fromHeading = widget.headingDegrees;
-    _toHeading = widget.headingDegrees;
-  }
 
   @override
   void didUpdateWidget(covariant _TweenedUserMarkerLayer oldWidget) {
@@ -141,10 +137,6 @@ class _TweenedUserMarkerLayerState extends State<_TweenedUserMarkerLayer> {
     if (oldWidget.target != widget.target) {
       _fromPos = _toPos;
       _toPos = widget.target;
-    }
-    if (oldWidget.headingDegrees != widget.headingDegrees) {
-      _fromHeading = _toHeading;
-      _toHeading = widget.headingDegrees;
     }
   }
 
@@ -158,15 +150,6 @@ class _TweenedUserMarkerLayerState extends State<_TweenedUserMarkerLayer> {
         final lat = _lerp(_fromPos.latitude, _toPos.latitude, t);
         final lng = _lerp(_fromPos.longitude, _toPos.longitude, t);
 
-        final from = _fromHeading;
-        final to = _toHeading;
-        double? heading;
-        if (from != null && to != null) {
-          heading = _lerpHeading(from, to, t);
-        } else {
-          heading = to;
-        }
-
         return MarkerLayer(
           markers: [
             Marker(
@@ -174,7 +157,7 @@ class _TweenedUserMarkerLayerState extends State<_TweenedUserMarkerLayer> {
               width: _userMarkerSize,
               height: _userMarkerSize,
               alignment: Alignment.center,
-              child: _UserMarkerVisual(headingDegrees: heading),
+              child: const _UserMarkerDot(),
             ),
           ],
         );
@@ -183,36 +166,94 @@ class _TweenedUserMarkerLayerState extends State<_TweenedUserMarkerLayer> {
   }
 }
 
-class _UserMarkerVisual extends StatelessWidget {
-  const _UserMarkerVisual({required this.headingDegrees});
+class _TweenedHeadingConeLayer extends StatefulWidget {
+  const _TweenedHeadingConeLayer({
+    required this.target,
+    required this.headingDegrees,
+  });
 
+  final LatLng target;
   final double? headingDegrees;
 
   @override
-  Widget build(BuildContext context) {
-    if (headingDegrees == null) {
-      return _buildDot();
-    }
-    return SizedBox(
-      width: _userMarkerSize,
-      height: _userMarkerSize,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Transform.rotate(
-            angle: headingDegrees! * math.pi / 180,
-            child: CustomPaint(
-              size: const Size(_userMarkerSize, _userMarkerSize),
-              painter: _HeadingConePainter(),
-            ),
-          ),
-          _buildDot(),
-        ],
-      ),
-    );
+  State<_TweenedHeadingConeLayer> createState() =>
+      _TweenedHeadingConeLayerState();
+}
+
+class _TweenedHeadingConeLayerState extends State<_TweenedHeadingConeLayer> {
+  late LatLng _fromPos = widget.target;
+  late LatLng _toPos = widget.target;
+  double? _fromHeading;
+  double? _toHeading;
+
+  @override
+  void initState() {
+    super.initState();
+    _fromHeading = widget.headingDegrees;
+    _toHeading = widget.headingDegrees;
   }
 
-  Widget _buildDot() {
+  @override
+  void didUpdateWidget(covariant _TweenedHeadingConeLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.target != widget.target) {
+      _fromPos = _toPos;
+      _toPos = widget.target;
+    }
+    if (oldWidget.headingDegrees != widget.headingDegrees) {
+      _fromHeading = _toHeading;
+      _toHeading = widget.headingDegrees;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.headingDegrees == null) return const SizedBox.shrink();
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: _positionTweenDuration,
+      curve: Curves.linear,
+      builder: (context, t, _) {
+        final lat = _lerp(_fromPos.latitude, _toPos.latitude, t);
+        final lng = _lerp(_fromPos.longitude, _toPos.longitude, t);
+        final from = _fromHeading;
+        final to = _toHeading;
+        double? heading;
+        if (from != null && to != null) {
+          heading = _lerpHeading(from, to, t);
+        } else {
+          heading = to;
+        }
+        if (heading == null) return const SizedBox.shrink();
+        return MarkerLayer(
+          markers: [
+            Marker(
+              point: LatLng(lat, lng),
+              width: _orientationConeSize,
+              height: _orientationConeSize,
+              alignment: Alignment.center,
+              child: IgnorePointer(
+                child: Transform.rotate(
+                  angle: heading * math.pi / 180,
+                  child: CustomPaint(
+                    size: const Size(_orientationConeSize, _orientationConeSize),
+                    painter: _HeadingConePainter(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _UserMarkerDot extends StatelessWidget {
+  const _UserMarkerDot();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: _userMarkerSize,
       height: _userMarkerSize,
@@ -245,8 +286,8 @@ class _HeadingConePainter extends CustomPainter {
     final rect = Rect.fromCircle(center: center, radius: radius);
     final gradient = RadialGradient(
       colors: [
-        MapColors.accentColor.withValues(alpha: 0.55),
-        MapColors.accentColor.withValues(alpha: 0.08),
+        MapColors.accentColor.withValues(alpha: 0.42),
+        MapColors.accentColor.withValues(alpha: 0.14),
       ],
       stops: const [0.0, 1.0],
     );
