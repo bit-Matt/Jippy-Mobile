@@ -94,7 +94,10 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       DraggableScrollableController();
   final LocationService _locationService = LocationService.instance;
   Position? _userPosition;
+  double? _compassHeading;
   StreamSubscription<Position>? _positionSubscription;
+  StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
+  StreamSubscription<double?>? _headingSubscription;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
 
@@ -165,6 +168,8 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
     _closureHitNotifier.addListener(_onClosureLayerHit);
     _loadVectorStyle();
     _initLocation();
+    _subscribeToServiceStatus();
+    _subscribeToHeading();
     _loadRoutesData();
   }
 
@@ -173,7 +178,33 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
     if (state == AppLifecycleState.resumed) {
       _loadVectorStyle();
       _loadRoutesData();
+      _locationService.refresh();
+      _initLocation();
     }
+  }
+
+  void _subscribeToServiceStatus() {
+    _serviceStatusSubscription = _locationService.serviceStatusStream.listen(
+      (ServiceStatus status) {
+        if (!mounted) return;
+        if (status == ServiceStatus.enabled) {
+          _initLocation();
+        } else if (status == ServiceStatus.disabled) {
+          setState(() {
+            _permissionChecked = true;
+            _locationPermission = null;
+            _userPosition = null;
+          });
+        }
+      },
+    );
+  }
+
+  void _subscribeToHeading() {
+    _headingSubscription = _locationService.headingStream.listen((heading) {
+      if (!mounted) return;
+      setState(() => _compassHeading = heading);
+    });
   }
 
   Future<void> _loadVectorStyle() async {
@@ -317,20 +348,22 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
 
   Future<void> _initLocation() async {
     final cachedPosition = _locationService.lastKnown;
-    if (cachedPosition != null && mounted) {
+    if (cachedPosition != null && mounted && _userPosition == null) {
       setState(() => _userPosition = cachedPosition);
     }
 
     final serviceEnabled = await _locationService.isServiceEnabled();
+    if (!mounted) return;
     if (!serviceEnabled) {
       setState(() {
         _permissionChecked = true;
-        _locationPermission = null; // service disabled
+        _locationPermission = null;
       });
       return;
     }
 
     final permission = await _locationService.requestPermission();
+    if (!mounted) return;
 
     setState(() {
       _permissionChecked = true;
@@ -339,6 +372,12 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    if (_positionSubscription != null) {
+      // Already subscribed; service was re-enabled or screen resumed.
+      await _locationService.refresh();
       return;
     }
 
@@ -361,6 +400,8 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
+    _serviceStatusSubscription?.cancel();
+    _headingSubscription?.cancel();
     _closureHitNotifier.removeListener(_onClosureLayerHit);
     _closureHitNotifier.dispose();
     _drawerController.dispose();
@@ -396,6 +437,9 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
                   userPosition: _userPosition == null
                       ? null
                       : LatLng(_userPosition!.latitude, _userPosition!.longitude),
+                  userHeading: _compassHeading,
+                  userSpeedMps: _userPosition?.speed,
+                  userAccuracyMeters: _userPosition?.accuracy,
                   osmTileUrl: _osmTileUrl,
                   userAgentPackageName: _userAgentPackageName,
                 ),
