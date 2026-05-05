@@ -24,7 +24,7 @@ final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
 const double _initialZoom = 14.0;
 const String _osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const String _vectorStyleUrl =
-    'https://jippy.shinosawa-laboratories.dev/tileserver/style.json';
+    'https://jippy.shinosawa-laboratories.dev/tileserver/liberty.json';
 const String _userAgentPackageName = 'com.example.jippy_mobile';
 
 const Color _sheetSurfaceColor = Colors.white;
@@ -58,6 +58,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   Style? _vectorStyle;
   StreamSubscription<Position>? _positionSubscription;
+  StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
+  StreamSubscription<double?>? _headingSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   GoNavigationFlow _flow = GoNavigationFlow.explore;
@@ -82,9 +84,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   int? _isolatedLegIndex;
 
   Position? _userPosition;
+  double? _compassHeading;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
   bool _hasCenteredToUserOnce = false;
+  bool _followUser = true;
+  bool _suppressNextGestureFollowBreak = false;
 
   bool _online = true;
   Timer? _searchDebounce;
@@ -225,8 +230,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _startFocus.addListener(_handleStartFocusChange);
+    _endFocus.addListener(_handleEndFocusChange);
     _loadVectorStyle();
     _initLocation();
+    _subscribeToServiceStatus();
+    _subscribeToHeading();
     _initConnectivity();
   }
 
@@ -235,7 +244,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _searchDebounce?.cancel();
     _positionSubscription?.cancel();
+    _serviceStatusSubscription?.cancel();
+    _headingSubscription?.cancel();
     _connectivitySubscription?.cancel();
+    _startFocus.removeListener(_handleStartFocusChange);
+    _endFocus.removeListener(_handleEndFocusChange);
     _startController.dispose();
     _endController.dispose();
     _startFocus.dispose();
@@ -243,11 +256,61 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  void _handleStartFocusChange() {
+    _selectAllOnFocus(_startController, _startFocus);
+  }
+
+  void _handleEndFocusChange() {
+    _selectAllOnFocus(_endController, _endFocus);
+  }
+
+  void _selectAllOnFocus(
+    TextEditingController controller,
+    FocusNode focusNode,
+  ) {
+    if (!focusNode.hasFocus) return;
+    final text = controller.text;
+    if (text.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!focusNode.hasFocus) return;
+      controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: text.length,
+      );
+    });
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadVectorStyle();
+      _locationService.refresh();
+      _initLocation();
     }
+  }
+
+  void _subscribeToServiceStatus() {
+    _serviceStatusSubscription = _locationService.serviceStatusStream.listen(
+      (ServiceStatus status) {
+        if (!mounted) return;
+        if (status == ServiceStatus.enabled) {
+          _initLocation();
+        } else if (status == ServiceStatus.disabled) {
+          setState(() {
+            _permissionChecked = true;
+            _locationPermission = null;
+            _userPosition = null;
+          });
+        }
+      },
+    );
+  }
+
+  void _subscribeToHeading() {
+    _headingSubscription = _locationService.headingStream.listen((heading) {
+      if (!mounted) return;
+      setState(() => _compassHeading = heading);
+    });
   }
 
   Future<void> _initConnectivity() async {
@@ -283,7 +346,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   Future<void> _initLocation() async {
     final cachedPosition = _locationService.lastKnown;
-    if (cachedPosition != null && mounted) {
+    if (cachedPosition != null && mounted && _userPosition == null) {
       setState(() => _userPosition = cachedPosition);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _centerToUserOnce(cachedPosition);
@@ -291,6 +354,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     }
 
     final serviceEnabled = await _locationService.isServiceEnabled();
+    if (!mounted) return;
     if (!serviceEnabled) {
       setState(() {
         _permissionChecked = true;
@@ -300,6 +364,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     }
 
     final permission = await _locationService.requestPermission();
+    if (!mounted) return;
 
     setState(() {
       _permissionChecked = true;
@@ -308,6 +373,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    if (_positionSubscription != null) {
+      // Already subscribed; this is a re-entry after resume or service toggle.
+      await _locationService.refresh();
       return;
     }
 
@@ -329,6 +400,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         }
 
         _centerToUserOnce(position);
+        _maybeFollowUser(position);
       },
       onError: (_) {
         if (mounted) setState(() => _userPosition = null);
@@ -340,9 +412,44 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     if (!mounted || _hasCenteredToUserOnce) return;
     if (_selectedExplorePoint != null || _end != null) return;
     _hasCenteredToUserOnce = true;
+    _suppressNextGestureFollowBreak = true;
     _mapController.move(
       LatLng(position.latitude, position.longitude),
       _initialZoom,
+    );
+  }
+
+  /// While in [_followUser] mode, re-center the camera on every new GPS fix
+  /// so the blue dot stays glued to the viewport. Suppressed during routing
+  /// flows where we want bounds-fit camera to remain authoritative.
+  void _maybeFollowUser(Position position) {
+    if (!_followUser) return;
+    if (_flow != GoNavigationFlow.explore) return;
+    _suppressNextGestureFollowBreak = true;
+    _mapController.move(
+      LatLng(position.latitude, position.longitude),
+      _mapController.camera.zoom,
+    );
+  }
+
+  void _onMapPositionChanged(MapCamera camera, bool hasGesture) {
+    if (!hasGesture) return;
+    if (_suppressNextGestureFollowBreak) {
+      _suppressNextGestureFollowBreak = false;
+      return;
+    }
+    if (!_followUser) return;
+    setState(() => _followUser = false);
+  }
+
+  void _recenterOnUser() {
+    final pos = _userPosition;
+    if (pos == null) return;
+    setState(() => _followUser = true);
+    _suppressNextGestureFollowBreak = true;
+    _mapController.move(
+      LatLng(pos.latitude, pos.longitude),
+      _mapController.camera.zoom,
     );
   }
 
@@ -521,6 +628,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _suggestions = const [];
     });
 
+    _dismissKeyboard();
+
     _requestNavigationIfComplete();
   }
 
@@ -536,6 +645,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _activeRoutingField = GoRoutingField.end;
       }
     });
+
+    _dismissKeyboard();
 
     if (triggerRequest) {
       _requestNavigationIfComplete();
@@ -558,6 +669,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _routePreviewSignature = null;
     });
     _onSearchQueryChanged(raw);
+  }
+
+  void _onEndSearchSubmitted(String raw) {
+    _setActiveRoutingField(GoRoutingField.end);
+    _dismissKeyboard();
+    final q = raw.trim();
+    if (q.isEmpty) {
+      _onSearchQueryChanged(raw);
+      return;
+    }
+
+    _searchDebounce?.cancel();
+    _runForwardSearch(q);
   }
 
   void _onSearchQueryChanged(String raw) {
@@ -623,12 +747,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _routePreviewSignature = null;
     });
 
+    _dismissKeyboard();
+
     if (_activeRoutingField == GoRoutingField.start && _end == null) {
       _setActiveRoutingField(GoRoutingField.end);
       _endFocus.requestFocus();
     }
 
     _requestNavigationIfComplete();
+  }
+
+  void _dismissKeyboard() {
+    _startFocus.unfocus();
+    _endFocus.unfocus();
   }
 
   Future<void> _requestNavigationIfComplete() async {
@@ -915,6 +1046,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _fitRouteOrStartEnd() {
+    if (_followUser) {
+      _followUser = false;
+    }
     final selected = _selectedSuggestion;
     final points = <LatLng>[];
 
@@ -1147,15 +1281,21 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               routePolylines: _selectedRoutePolylines,
               dropOffPoints: _selectedRideStopPoints,
               userPosition: userLatLng,
+              userHeading: _compassHeading,
+              userSpeedMps: _userPosition?.speed,
+              userAccuracyMeters: _userPosition?.accuracy,
               origin: _mapOrigin,
               destination: _mapDestination,
               osmTileUrl: _osmTileUrl,
               userAgentPackageName: _userAgentPackageName,
+              onPositionChanged: _onMapPositionChanged,
             ),
           ),
           GoRecenterButton(
             userPosition: _userPosition,
             mapController: _mapController,
+            isFollowing: _followUser,
+            onRecenter: _recenterOnUser,
           ),
           GoSearchBar(
             mode: _searchMode,
@@ -1166,6 +1306,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             endFocusNode: _endFocus,
             onStartTextChanged: _onStartTextChanged,
             onEndTextChanged: _onEndTextChanged,
+            onEndSubmitted: _onEndSearchSubmitted,
             onStartMapPinTap: _openStartPinOnMap,
             onEndMapPinTap: _openEndPinOnMap,
             showUseCurrentLocation: _gpsOriginAvailable,

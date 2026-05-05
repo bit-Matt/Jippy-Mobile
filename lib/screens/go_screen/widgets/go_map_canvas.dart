@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
+import 'package:jippy_mobile/widgets/user_location_marker.dart';
 
 /// Lean routes-map style canvas for Go: vector or raster tiles, markers, recenter only.
 class GoMapCanvas extends StatelessWidget {
@@ -22,6 +23,10 @@ class GoMapCanvas extends StatelessWidget {
     required this.destination,
     required this.osmTileUrl,
     required this.userAgentPackageName,
+    this.userHeading,
+    this.userSpeedMps,
+    this.userAccuracyMeters,
+    this.onPositionChanged,
   });
 
   final MapController mapController;
@@ -36,6 +41,10 @@ class GoMapCanvas extends StatelessWidget {
   final LatLng? destination;
   final String osmTileUrl;
   final String userAgentPackageName;
+  final double? userHeading;
+  final double? userSpeedMps;
+  final double? userAccuracyMeters;
+  final void Function(MapCamera camera, bool hasGesture)? onPositionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +95,10 @@ class GoMapCanvas extends StatelessWidget {
         initialZoom: initialZoom,
         backgroundColor: MapColors.background,
         onTap: onMapTap,
+        onPositionChanged: onPositionChanged == null
+            ? null
+            : (MapCamera camera, bool hasGesture) =>
+                onPositionChanged!(camera, hasGesture),
       ),
       children: [
         if (vectorStyle != null)
@@ -108,36 +121,12 @@ class GoMapCanvas extends StatelessWidget {
         if (routePolylines.isNotEmpty)
           PolylineLayer<Object>(polylines: routePolylines),
         if (markers.isNotEmpty) MarkerLayer(markers: markers),
-        if (userPosition != null)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: userPosition!,
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: MapColors.userLocationColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2.5),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.my_location,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        ...buildUserLocationLayers(
+          position: userPosition,
+          headingDegrees: userHeading,
+          speedMps: userSpeedMps,
+          accuracyMeters: userAccuracyMeters,
+        ),
         RichAttributionWidget(
           animationConfig: const ScaleRAWA(),
           showFlutterMapAttribution: false,
@@ -151,15 +140,22 @@ class GoMapCanvas extends StatelessWidget {
 }
 
 /// Single recenter control (Go screen does not use layer toggles).
+///
+/// When [isFollowing] is true, the button renders in its "locked" follow state
+/// (filled icon); otherwise it invites the user to re-enable follow mode.
 class GoRecenterButton extends StatelessWidget {
   const GoRecenterButton({
     super.key,
     required this.userPosition,
     required this.mapController,
+    this.isFollowing = false,
+    this.onRecenter,
   });
 
   final Position? userPosition;
   final MapController mapController;
+  final bool isFollowing;
+  final VoidCallback? onRecenter;
 
   @override
   Widget build(BuildContext context) {
@@ -176,6 +172,10 @@ class GoRecenterButton extends StatelessWidget {
         child: InkWell(
           onTap: hasUserPosition
               ? () {
+                  if (onRecenter != null) {
+                    onRecenter!();
+                    return;
+                  }
                   final position = userPosition;
                   if (position == null) return;
                   mapController.move(
@@ -189,7 +189,7 @@ class GoRecenterButton extends StatelessWidget {
             width: 48,
             height: 48,
             child: Icon(
-              Icons.gps_fixed,
+              isFollowing ? Icons.gps_fixed : Icons.gps_not_fixed,
               color: hasUserPosition
                   ? MapColors.primary
                   : MapColors.text.withValues(alpha: 0.35),

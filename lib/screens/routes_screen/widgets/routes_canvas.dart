@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
+import 'package:jippy_mobile/widgets/user_location_marker.dart';
 
 class RoutesCanvas extends StatelessWidget {
   const RoutesCanvas({
@@ -25,6 +26,9 @@ class RoutesCanvas extends StatelessWidget {
     required this.userPosition,
     required this.osmTileUrl,
     required this.userAgentPackageName,
+    this.userHeading,
+    this.userSpeedMps,
+    this.userAccuracyMeters,
   });
 
   final MapController mapController;
@@ -44,6 +48,9 @@ class RoutesCanvas extends StatelessWidget {
   final LatLng? userPosition;
   final String osmTileUrl;
   final String userAgentPackageName;
+  final double? userHeading;
+  final double? userSpeedMps;
+  final double? userAccuracyMeters;
 
   @override
   Widget build(BuildContext context) {
@@ -98,36 +105,12 @@ class RoutesCanvas extends StatelessWidget {
           MarkerLayer(markers: closureLabelMarkers),
         if (showStations && stationMarkers.isNotEmpty)
           MarkerLayer(markers: stationMarkers),
-        if (userPosition != null)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: userPosition!,
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: MapColors.userLocationColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.my_location,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        ...buildUserLocationLayers(
+          position: userPosition,
+          headingDegrees: userHeading,
+          speedMps: userSpeedMps,
+          accuracyMeters: userAccuracyMeters,
+        ),
         RichAttributionWidget(
           animationConfig: const ScaleRAWA(),
           showFlutterMapAttribution: false,
