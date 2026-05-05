@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/theme/map_colors.dart';
-import 'screens/map_screen.dart';
+import 'screens/app_shell.dart';
 
 void main() {
   runApp(const JippyApp());
@@ -19,15 +19,17 @@ class JippyApp extends StatelessWidget {
         colorScheme: ColorScheme.light(
           primary: MapColors.primary,
           secondary: MapColors.secondary,
+          tertiary: MapColors.accent,
           surface: MapColors.background,
-          onPrimary: MapColors.text,
+          onPrimary: Colors.white,
           onSecondary: MapColors.text,
           onSurface: MapColors.text,
         ),
         scaffoldBackgroundColor: MapColors.background,
+        canvasColor: MapColors.background,
         useMaterial3: true,
       ),
-      home: const MapScreen(),
+      home: const AppShell(),
     );
   }
 }
