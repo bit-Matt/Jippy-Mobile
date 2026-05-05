@@ -230,6 +230,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _startFocus.addListener(_handleStartFocusChange);
+    _endFocus.addListener(_handleEndFocusChange);
     _loadVectorStyle();
     _initLocation();
     _subscribeToServiceStatus();
@@ -245,11 +247,37 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _serviceStatusSubscription?.cancel();
     _headingSubscription?.cancel();
     _connectivitySubscription?.cancel();
+    _startFocus.removeListener(_handleStartFocusChange);
+    _endFocus.removeListener(_handleEndFocusChange);
     _startController.dispose();
     _endController.dispose();
     _startFocus.dispose();
     _endFocus.dispose();
     super.dispose();
+  }
+
+  void _handleStartFocusChange() {
+    _selectAllOnFocus(_startController, _startFocus);
+  }
+
+  void _handleEndFocusChange() {
+    _selectAllOnFocus(_endController, _endFocus);
+  }
+
+  void _selectAllOnFocus(
+    TextEditingController controller,
+    FocusNode focusNode,
+  ) {
+    if (!focusNode.hasFocus) return;
+    final text = controller.text;
+    if (text.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!focusNode.hasFocus) return;
+      controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: text.length,
+      );
+    });
   }
 
   @override
@@ -600,6 +628,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _suggestions = const [];
     });
 
+    _dismissKeyboard();
+
     _requestNavigationIfComplete();
   }
 
@@ -615,6 +645,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _activeRoutingField = GoRoutingField.end;
       }
     });
+
+    _dismissKeyboard();
 
     if (triggerRequest) {
       _requestNavigationIfComplete();
@@ -637,6 +669,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _routePreviewSignature = null;
     });
     _onSearchQueryChanged(raw);
+  }
+
+  void _onEndSearchSubmitted(String raw) {
+    _setActiveRoutingField(GoRoutingField.end);
+    _dismissKeyboard();
+    final q = raw.trim();
+    if (q.isEmpty) {
+      _onSearchQueryChanged(raw);
+      return;
+    }
+
+    _searchDebounce?.cancel();
+    _runForwardSearch(q);
   }
 
   void _onSearchQueryChanged(String raw) {
@@ -702,12 +747,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _routePreviewSignature = null;
     });
 
+    _dismissKeyboard();
+
     if (_activeRoutingField == GoRoutingField.start && _end == null) {
       _setActiveRoutingField(GoRoutingField.end);
       _endFocus.requestFocus();
     }
 
     _requestNavigationIfComplete();
+  }
+
+  void _dismissKeyboard() {
+    _startFocus.unfocus();
+    _endFocus.unfocus();
   }
 
   Future<void> _requestNavigationIfComplete() async {
@@ -1254,6 +1306,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             endFocusNode: _endFocus,
             onStartTextChanged: _onStartTextChanged,
             onEndTextChanged: _onEndTextChanged,
+            onEndSubmitted: _onEndSearchSubmitted,
             onStartMapPinTap: _openStartPinOnMap,
             onEndMapPinTap: _openEndPinOnMap,
             showUseCurrentLocation: _gpsOriginAvailable,
