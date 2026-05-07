@@ -70,6 +70,15 @@ const double _overlapThresholdMetersMax = 220;
 /// After a routes map tap for overlap, ensure at least this zoom when nudging the camera.
 const double _overlapTapMinZoom = 15;
 
+const double _drawerCollapsedSize = 0.16;
+const double _drawerDefaultSize = 0.38;
+const double _drawerMaxSize = 0.74;
+const List<double> _drawerSnapSizes = <double>[
+  _drawerCollapsedSize,
+  _drawerDefaultSize,
+  _drawerMaxSize,
+];
+
 /// Full-screen routes map with OpenStreetMap tiles, user location dot, and structure for
 /// static route polylines and A* path segments.
 class RoutesScreen extends StatefulWidget {
@@ -81,9 +90,14 @@ class RoutesScreen extends StatefulWidget {
 
 class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
+  final DraggableScrollableController _drawerController =
+      DraggableScrollableController();
   final LocationService _locationService = LocationService.instance;
   Position? _userPosition;
+  double? _compassHeading;
   StreamSubscription<Position>? _positionSubscription;
+  StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
+  StreamSubscription<double?>? _headingSubscription;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
 
@@ -154,6 +168,8 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
     _closureHitNotifier.addListener(_onClosureLayerHit);
     _loadVectorStyle();
     _initLocation();
+    _subscribeToServiceStatus();
+    _subscribeToHeading();
     _loadRoutesData();
   }
 
@@ -162,7 +178,33 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
     if (state == AppLifecycleState.resumed) {
       _loadVectorStyle();
       _loadRoutesData();
+      _locationService.refresh();
+      _initLocation();
     }
+  }
+
+  void _subscribeToServiceStatus() {
+    _serviceStatusSubscription = _locationService.serviceStatusStream.listen(
+      (ServiceStatus status) {
+        if (!mounted) return;
+        if (status == ServiceStatus.enabled) {
+          _initLocation();
+        } else if (status == ServiceStatus.disabled) {
+          setState(() {
+            _permissionChecked = true;
+            _locationPermission = null;
+            _userPosition = null;
+          });
+        }
+      },
+    );
+  }
+
+  void _subscribeToHeading() {
+    _headingSubscription = _locationService.headingStream.listen((heading) {
+      if (!mounted) return;
+      setState(() => _compassHeading = heading);
+    });
   }
 
   Future<void> _loadVectorStyle() async {
@@ -306,20 +348,22 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
 
   Future<void> _initLocation() async {
     final cachedPosition = _locationService.lastKnown;
-    if (cachedPosition != null && mounted) {
+    if (cachedPosition != null && mounted && _userPosition == null) {
       setState(() => _userPosition = cachedPosition);
     }
 
     final serviceEnabled = await _locationService.isServiceEnabled();
+    if (!mounted) return;
     if (!serviceEnabled) {
       setState(() {
         _permissionChecked = true;
-        _locationPermission = null; // service disabled
+        _locationPermission = null;
       });
       return;
     }
 
     final permission = await _locationService.requestPermission();
+    if (!mounted) return;
 
     setState(() {
       _permissionChecked = true;
@@ -328,6 +372,12 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      return;
+    }
+
+    if (_positionSubscription != null) {
+      // Already subscribed; service was re-enabled or screen resumed.
+      await _locationService.refresh();
       return;
     }
 
@@ -350,13 +400,17 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
+    _serviceStatusSubscription?.cancel();
+    _headingSubscription?.cancel();
     _closureHitNotifier.removeListener(_onClosureLayerHit);
     _closureHitNotifier.dispose();
+    _drawerController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    _syncDrawerToRouteDetails();
     final vectorStyle = _vectorStyle;
     return Scaffold(
       body: Stack(
@@ -383,6 +437,9 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
                   userPosition: _userPosition == null
                       ? null
                       : LatLng(_userPosition!.latitude, _userPosition!.longitude),
+                  userHeading: _compassHeading,
+                  userSpeedMps: _userPosition?.speed,
+                  userAccuracyMeters: _userPosition?.accuracy,
                   osmTileUrl: _osmTileUrl,
                   userAgentPackageName: _userAgentPackageName,
                 ),
@@ -395,6 +452,11 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
             mapController: _mapController,
           ),
           MapBottomDrawer(
+            controller: _drawerController,
+            initialChildSize: _drawerDefaultSize,
+            minChildSize: _drawerCollapsedSize,
+            maxChildSize: _drawerMaxSize,
+            snapSizes: _drawerSnapSizes,
             showingClosureDetails:
                 _uiState.panelMode == RoutesPanelMode.closureDetails,
             showingRouteDetails:
@@ -634,6 +696,12 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
 
   List<JeepneyRoute> get _visibleRoutes {
     final routes = _routesData?.routes ?? const <JeepneyRoute>[];
+    if (_uiState.panelMode == RoutesPanelMode.overlap) {
+      final overlap = _uiState.overlappingRoutes;
+      if (overlap.isEmpty) return const <JeepneyRoute>[];
+      final overlapIds = overlap.map((r) => r.id).toSet();
+      return routes.where((r) => overlapIds.contains(r.id)).toList();
+    }
     if (!_uiState.isFocusedMode) return routes;
     if (_uiState.selectedRouteIds.isEmpty) return const <JeepneyRoute>[];
     return routes.where((r) => _uiState.selectedRouteIds.contains(r.id)).toList();
@@ -794,6 +862,12 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       return;
     }
     _fitRoutesBounds(routesToFit);
+
+    if (_uiState.isFocusedMode &&
+        !_uiState.isCompareMode &&
+        _uiState.selectedRouteIds.length == 1) {
+      _snapDrawerToMiddle();
+    }
   }
 
   void _setMultiSelectMode(bool enabled) {
@@ -843,14 +917,14 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
         returnToOverlappingRoutesAfterDetails: false,
       );
     });
+    _snapDrawerToMiddle();
   }
 
   void _closeRouteDetails() {
     final resumeOverlap = _uiState.returnToOverlappingRoutesAfterDetails &&
         _uiState.overlappingRoutes.isNotEmpty;
-    final allIds = (_routesData?.routes ?? const <JeepneyRoute>[])
-        .map((r) => r.id)
-        .toSet();
+    final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
+    final allIds = allRoutes.map((r) => r.id).toSet();
     setState(() {
       if (resumeOverlap) {
         _setPanelMode(
@@ -858,21 +932,26 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
           clearSelectedRoute: true,
           returnToOverlappingRoutesAfterDetails: false,
         );
-        _uiState = _uiState.copyWith(
-          isFocusedMode: false,
-          selectedRouteIds: allIds,
-        );
       } else {
         _setPanelMode(
           RoutesPanelMode.routes,
           clearSelectedRoute: true,
+          overlappingRoutes: const <JeepneyRoute>[],
           returnToOverlappingRoutesAfterDetails: false,
         );
+        _uiState = _uiState.copyWith(
+          isFocusedMode: false,
+          selectedRouteIds: allIds,
+        );
+        _clearOverlapTapVisuals();
       }
     });
     if (resumeOverlap) {
       _fitRoutesBounds(_uiState.overlappingRoutes);
+    } else {
+      _fitRoutesBounds(allRoutes);
     }
+    _expandDrawerToDefault();
   }
 
   /// Fits routes-map camera to route geometry (decoded/Valhalla polylines when present).
@@ -909,11 +988,22 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       _overlapThresholdMetersMin,
       _overlapThresholdMetersMax,
     );
-    final matchIds = routeIdsNearPolylines(point, _hitTestPolylines, threshold);
+    final distanceByRoute = <String, double>{};
+    for (final pl in _hitTestPolylines) {
+      if (pl.points.length < 2) continue;
+      final distance = minDistanceMetersPointToPolyline(point, pl.points);
+      final current = distanceByRoute[pl.routeId];
+      if (current == null || distance < current) {
+        distanceByRoute[pl.routeId] = distance;
+      }
+    }
+    final nearEntries = distanceByRoute.entries
+        .where((entry) => entry.value <= threshold)
+        .toList();
 
     _mapController.move(point, math.max(cam.zoom, _overlapTapMinZoom));
 
-    if (matchIds.isEmpty) {
+    if (nearEntries.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -924,9 +1014,24 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       return;
     }
 
+    var minDistance = nearEntries.first.value;
+    for (final entry in nearEntries.skip(1)) {
+      if (entry.value < minDistance) minDistance = entry.value;
+    }
+    final exactTolerance = math.min(12.0, threshold * 0.35);
+    final exactIds = <String>{
+      for (final entry in nearEntries)
+        if (entry.value <= minDistance + exactTolerance) entry.key,
+    };
+
     final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
-    final matched = allRoutes.where((r) => matchIds.contains(r.id)).toList()
+    final matched = allRoutes.where((r) => exactIds.contains(r.id)).toList()
       ..sort(compareRouteNumbersAsc);
+
+    if (matched.length == 1) {
+      _openRouteFromMapTap(matched.first);
+      return;
+    }
 
     setState(() {
       _setPanelMode(
@@ -942,14 +1047,22 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
   }
 
   void _closeOverlappingRoutes() {
+    final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
+    final allIds = allRoutes.map((r) => r.id).toSet();
     setState(() {
       _setPanelMode(
         RoutesPanelMode.routes,
         overlappingRoutes: const <JeepneyRoute>[],
         returnToOverlappingRoutesAfterDetails: false,
       );
+      _uiState = _uiState.copyWith(
+        isFocusedMode: false,
+        selectedRouteIds: allIds,
+      );
       _clearOverlapTapVisuals();
     });
+    _fitRoutesBounds(allRoutes);
+    _expandDrawerToDefault();
   }
 
   void _openRouteFromOverlap(JeepneyRoute route) {
@@ -968,6 +1081,55 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       _clearOverlapTapVisuals();
     });
     _fitRoutesBounds([route]);
+    _snapDrawerToMiddle();
+  }
+
+  void _openRouteFromMapTap(JeepneyRoute route) {
+    setState(() {
+      _setPanelMode(
+        RoutesPanelMode.routeDetails,
+        selectedRoute: route,
+        clearSelectedClosure: true,
+        overlappingRoutes: const <JeepneyRoute>[],
+        returnToOverlappingRoutesAfterDetails: false,
+      );
+      _uiState = _uiState.copyWith(
+        isFocusedMode: true,
+        selectedRouteIds: <String>{route.id},
+      );
+      _clearOverlapTapVisuals();
+    });
+    _fitRoutesBounds([route]);
+    _snapDrawerToMiddle();
+  }
+
+  void _snapDrawerToMiddle() {
+    _animateDrawerTo(_drawerDefaultSize);
+  }
+
+  void _syncDrawerToRouteDetails() {
+    if (_uiState.panelMode != RoutesPanelMode.routeDetails) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final currentSize = _drawerController.size;
+        if ((currentSize - _drawerDefaultSize).abs() < 0.01) return;
+        _animateDrawerTo(_drawerDefaultSize);
+      } catch (_) {}
+    });
+  }
+
+  void _expandDrawerToDefault() {
+    _animateDrawerTo(_drawerDefaultSize);
+  }
+
+  void _animateDrawerTo(double size) {
+    try {
+      _drawerController.animateTo(
+        size,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    } catch (_) {}
   }
 
   /// Tricycle station markers (white circle, purple border, tricycle icon).
