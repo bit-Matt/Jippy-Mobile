@@ -5,6 +5,11 @@ import 'package:jippy_mobile/core/theme/map_colors.dart';
 class MapBottomDrawer extends StatelessWidget {
   const MapBottomDrawer({
     super.key,
+    required this.controller,
+    required this.initialChildSize,
+    required this.minChildSize,
+    required this.maxChildSize,
+    required this.snapSizes,
     required this.showingClosureDetails,
     required this.showingRouteDetails,
     required this.showingOverlappingRoutes,
@@ -14,6 +19,11 @@ class MapBottomDrawer extends StatelessWidget {
     required this.routesListViewBuilder,
   });
 
+  final DraggableScrollableController controller;
+  final double initialChildSize;
+  final double minChildSize;
+  final double maxChildSize;
+  final List<double> snapSizes;
   final bool showingClosureDetails;
   final bool showingRouteDetails;
   final bool showingOverlappingRoutes;
@@ -25,9 +35,12 @@ class MapBottomDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.38,
-      minChildSize: 0.34,
-      maxChildSize: 0.74,
+      controller: controller,
+      initialChildSize: initialChildSize,
+      minChildSize: minChildSize,
+      maxChildSize: maxChildSize,
+      snap: true,
+      snapSizes: snapSizes,
       builder: (BuildContext context, ScrollController scrollController) {
         return Container(
           decoration: BoxDecoration(
@@ -49,12 +62,7 @@ class MapBottomDrawer extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  child: _buildActivePanel(scrollController),
-                ),
+                child: _buildActivePanel(scrollController),
               ),
             ],
           ),
