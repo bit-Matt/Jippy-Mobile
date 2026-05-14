@@ -56,7 +56,11 @@ class GoMapCanvas extends StatelessWidget {
           width: 36,
           height: 36,
           alignment: Alignment.center,
-          child: Icon(Icons.trip_origin, color: MapColors.primary, size: 32),
+          child: Icon(
+            Icons.place_rounded,
+            color: MapColors.primary,
+            size: 34,
+          ),
         ),
       );
     }
