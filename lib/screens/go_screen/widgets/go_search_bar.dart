@@ -204,7 +204,7 @@ class _RoutingHeaderPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _RoutingInputRow(
-              icon: Icons.trip_origin,
+              icon: Icons.place_rounded,
               iconColor: MapColors.primary,
               controller: startController,
               focusNode: startFocusNode,

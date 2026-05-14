@@ -1355,13 +1355,16 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     // the sharp point (not the box bottom) matches the map center.
     const tipInsetFromBoxBottom = 3.0;
     const lift = pinSize / 2 - tipInsetFromBoxBottom;
+    final pinColor = _pinTarget == GoPinTarget.destination
+        ? MapColors.secondary
+        : MapColors.primary;
     return IgnorePointer(
       child: Center(
         child: Transform.translate(
           offset: const Offset(0, -lift),
           child: Icon(
             Icons.place_rounded,
-            color: MapColors.primary,
+            color: pinColor,
             size: pinSize,
             shadows: const [
               Shadow(color: Colors.white, blurRadius: 4),
