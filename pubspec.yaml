@@ -50,6 +50,9 @@ dependencies:
   vector_tile_renderer: ^6.0.0
   connectivity_plus: ^7.1.1
   collection: ^1.19.1
+  flutter_local_notifications: ^21.0.0
+  permission_handler: ^12.0.1
+  vibration: ^3.1.8
 
 dev_dependencies:
   flutter_test:
