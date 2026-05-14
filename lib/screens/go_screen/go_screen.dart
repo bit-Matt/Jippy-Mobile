@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:permission_handler/permission_handler.dart' hide ServiceStatus;
 import 'package:vector_map_tiles/vector_map_tiles.dart';
+import 'package:vibration/vibration.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/navigate_client.dart';
@@ -16,6 +18,8 @@ import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
+import 'package:jippy_mobile/services/navigation_tracker.dart';
+import 'package:jippy_mobile/services/notification_service.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 
@@ -61,6 +65,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
   StreamSubscription<double?>? _headingSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription<ProximityEvent>? _trackerSubscription;
 
   GoNavigationFlow _flow = GoNavigationFlow.explore;
   GoPinTarget? _pinTarget;
@@ -82,6 +87,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   List<NavigateSuggestion> _routeSuggestions = const [];
   int _selectedSuggestionIndex = 0;
   int? _isolatedLegIndex;
+  NavigationTracker? _navigationTracker;
+  int _currentStopIndex = 0;
 
   Position? _userPosition;
   double? _compassHeading;
@@ -103,7 +110,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   bool get _showRoutingHeader {
     return _flow == GoNavigationFlow.routingInput ||
         _flow == GoNavigationFlow.routeSelection ||
-        _flow == GoNavigationFlow.routeDetails;
+        _flow == GoNavigationFlow.routeDetails ||
+        _flow == GoNavigationFlow.navigating;
   }
 
   GoSearchBarMode get _searchMode {
@@ -136,9 +144,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   int? get _activeLegIsolationIndex {
-    if (_flow != GoNavigationFlow.routeDetails) return null;
-
-    final isolated = _isolatedLegIndex;
+    final isolated = switch (_flow) {
+      GoNavigationFlow.routeDetails => _isolatedLegIndex,
+      GoNavigationFlow.navigating => _currentNavigationLegIndex,
+      _ => null,
+    };
     if (isolated == null) return null;
 
     final selected = _selectedSuggestion;
@@ -150,9 +160,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return isolated;
   }
 
+  int? get _currentNavigationLegIndex {
+    final tracker = _navigationTracker;
+    if (tracker == null) return null;
+    if (tracker.stops.isEmpty) return null;
+    final index = _currentStopIndex.clamp(0, tracker.stops.length - 1);
+    return tracker.stops[index].legIndex;
+  }
+
   List<Polyline<Object>> get _selectedRoutePolylines {
     if (_flow != GoNavigationFlow.routeSelection &&
-        _flow != GoNavigationFlow.routeDetails) {
+        _flow != GoNavigationFlow.routeDetails &&
+        _flow != GoNavigationFlow.navigating) {
       return const <Polyline<Object>>[];
     }
 
@@ -182,7 +201,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   List<LatLng> get _selectedRideStopPoints {
     if (_flow != GoNavigationFlow.routeSelection &&
-        _flow != GoNavigationFlow.routeDetails) {
+        _flow != GoNavigationFlow.routeDetails &&
+        _flow != GoNavigationFlow.navigating) {
       return const <LatLng>[];
     }
 
@@ -247,6 +267,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _serviceStatusSubscription?.cancel();
     _headingSubscription?.cancel();
     _connectivitySubscription?.cancel();
+    _trackerSubscription?.cancel();
+    _navigationTracker?.stop();
     _startFocus.removeListener(_handleStartFocusChange);
     _endFocus.removeListener(_handleEndFocusChange);
     _startController.dispose();
@@ -501,6 +523,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _resetToExplore() {
+    _trackerSubscription?.cancel();
+    _trackerSubscription = null;
+    _navigationTracker?.stop();
+    _navigationTracker = null;
+
     setState(() {
       _flow = GoNavigationFlow.explore;
       _pinTarget = null;
@@ -523,6 +550,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _routeSuggestions = const [];
       _selectedSuggestionIndex = 0;
       _isolatedLegIndex = null;
+      _currentStopIndex = 0;
     });
 
     _startFocus.unfocus();
@@ -899,12 +927,123 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _fitRouteOrStartEnd();
   }
 
-  void _startTurnByTurn() {
-    if (_selectedSuggestion == null) return;
+  Future<void> _startNavigating() async {
+    final selected = _selectedSuggestion;
+    if (selected == null) return;
+
+    final permission = await _locationService.requestPermission();
+    if (!mounted) return;
     setState(() {
+      _permissionChecked = true;
+      _locationPermission = permission;
+    });
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      _showTopSnackBar(
+        'Location permission is required to start trip notifications.',
+      );
+      return;
+    }
+
+    final locationAlways = await Permission.locationAlways.request();
+    if (!mounted) return;
+    if (!locationAlways.isGranted) {
+      _showTopSnackBar(
+        'Background alerts are limited until "Allow all the time" is granted.',
+      );
+    }
+
+    await NotificationService.instance.requestPermissions();
+
+    await _trackerSubscription?.cancel();
+    _trackerSubscription = null;
+    await _navigationTracker?.stop();
+    _navigationTracker = null;
+
+    final tracker = NavigationTracker(suggestion: selected, thresholdMeters: 100);
+    _trackerSubscription = tracker.events.listen((event) {
+      _onProximityEvent(event);
+    });
+    tracker.start();
+
+    if (!mounted) return;
+    setState(() {
+      _navigationTracker = tracker;
+      _currentStopIndex = 0;
+      _flow = GoNavigationFlow.navigating;
+      _isolatedLegIndex = null;
+    });
+  }
+
+  Future<void> _onProximityEvent(ProximityEvent event) async {
+    if (!mounted) return;
+
+    final title = event.stop.kind == TripStopKind.dropOff
+        ? 'Arriving at your destination'
+        : 'Transfer ahead - get ready to alight';
+    final body =
+        '${event.distanceMeters.round()}m to ${event.stop.label.trim().isEmpty ? 'next stop' : event.stop.label}';
+
+    _showTopSnackBar(body, title: title);
+    await NotificationService.instance.showProximityNotification(
+      title: title,
+      body: body,
+    );
+
+    final hasVibrator = await Vibration.hasVibrator();
+    if (hasVibrator) {
+      await Vibration.vibrate(pattern: const [0, 400, 200, 400]);
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _currentStopIndex = _navigationTracker?.currentStopIndex ?? _currentStopIndex;
+    });
+
+    if (event.tripComplete) {
+      await _endNavigating(showCompletedMessage: true);
+    }
+  }
+
+  Future<void> _endNavigating({bool showCompletedMessage = false}) async {
+    await _trackerSubscription?.cancel();
+    _trackerSubscription = null;
+    await _navigationTracker?.stop();
+    _navigationTracker = null;
+    if (!mounted) return;
+    setState(() {
+      _currentStopIndex = 0;
       _flow = GoNavigationFlow.routeDetails;
       _isolatedLegIndex = null;
     });
+    if (showCompletedMessage) {
+      _showTopSnackBar('You are at your destination. Trip finished.');
+    }
+  }
+
+  void _showTopSnackBar(String message, {String? title}) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: MapColors.text,
+        content: Text(
+          title == null ? message : '$title\n$message',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+          ),
+        ),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: MapColors.secondary,
+          onPressed: () {},
+        ),
+      ),
+    );
   }
 
   void _onLegTimelineStepTapped(int legIndex) {
@@ -1327,13 +1466,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             activeRoutingField: _activeRoutingField,
             onActiveRoutingFieldChanged: _setActiveRoutingField,
           ),
-          if (_pinTarget != null)
+          if (_flow != GoNavigationFlow.navigating && _pinTarget != null)
             _buildPinModeSheet()
           else if (_flow == GoNavigationFlow.locationDetail)
             _buildLocationDetailSheet(),
-          if (_pinTarget == null && _flow == GoNavigationFlow.routeSelection)
+          if (_flow == GoNavigationFlow.navigating) _buildNavigatingSheet(),
+          if (_flow != GoNavigationFlow.navigating &&
+              _pinTarget == null &&
+              _flow == GoNavigationFlow.routeSelection)
             _buildRouteSelectionSheet(context),
-          if (_pinTarget == null && _flow == GoNavigationFlow.routeDetails)
+          if (_flow != GoNavigationFlow.navigating &&
+              _pinTarget == null &&
+              _flow == GoNavigationFlow.routeDetails)
             _buildRouteDetailsSheet(),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
@@ -1449,6 +1593,92 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNavigatingSheet() {
+    final tracker = _navigationTracker;
+    if (tracker == null || tracker.stops.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final clampedIndex = _currentStopIndex.clamp(0, tracker.stops.length - 1);
+    final nextStop = tracker.stops[clampedIndex];
+    final userPosition = _userPosition;
+    final hasLiveFix = userPosition != null && _gpsOriginAvailable;
+
+    double? distanceMeters;
+    if (hasLiveFix) {
+      const distance = Distance();
+      distanceMeters = distance.as(
+        LengthUnit.Meter,
+        LatLng(userPosition.latitude, userPosition.longitude),
+        nextStop.point,
+      );
+    }
+
+    final nextLabel = nextStop.kind == TripStopKind.dropOff
+        ? 'Destination'
+        : nextStop.label;
+
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: 0.22,
+      minChildSize: 0.18,
+      maxChildSize: 0.5,
+      snap: true,
+      snapSizes: const <double>[0.22, 0.38],
+      builder: (context, scrollController) {
+        return _SheetSurface(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 20),
+            children: [
+              const Text(
+                'Navigating',
+                style: TextStyle(
+                  color: MapColors.text,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Next stop: $nextLabel',
+                style: TextStyle(
+                  color: MapColors.text.withValues(alpha: 0.86),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                distanceMeters == null
+                    ? 'Waiting for GPS...'
+                    : '${distanceMeters.round()}m away',
+                style: TextStyle(
+                  color: MapColors.text.withValues(alpha: 0.7),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _endNavigating,
+                style: FilledButton.styleFrom(
+                  backgroundColor: MapColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(46),
+                ),
+                icon: const Icon(Icons.stop_circle_outlined),
+                label: const Text(
+                  'End trip',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             ],
           ),
@@ -1673,7 +1903,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: _startTurnByTurn,
+                  onPressed: _startNavigating,
                   icon: const Icon(Icons.play_arrow_rounded),
                   label: const Text(
                     'Start',
