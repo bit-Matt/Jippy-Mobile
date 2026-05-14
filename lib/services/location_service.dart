@@ -162,6 +162,16 @@ class LocationService {
         distanceFilter: _distanceFilterMeters,
         intervalDuration: const Duration(seconds: 1),
         forceLocationManager: false,
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Jippy is following your trip',
+          notificationText:
+              'Tracking your location to alert you near transfer points.',
+          enableWakeLock: true,
+          notificationIcon: AndroidResource(
+            name: 'ic_launcher',
+            defType: 'mipmap',
+          ),
+        ),
       );
     }
     if (Platform.isIOS || Platform.isMacOS) {
