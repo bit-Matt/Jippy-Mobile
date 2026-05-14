@@ -1350,30 +1350,27 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildCenterPinCrosshair() {
+    const pinSize = 34.0;
+    // place_rounded tip sits slightly above the bottom of the icon box; lift so
+    // the sharp point (not the box bottom) matches the map center.
+    const tipInsetFromBoxBottom = 3.0;
+    const lift = pinSize / 2 - tipInsetFromBoxBottom;
     return IgnorePointer(
       child: Center(
-        child: Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.85),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: MapColors.primary.withValues(alpha: 0.7),
-              width: 1.4,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black26,
+        child: Transform.translate(
+          offset: const Offset(0, -lift),
+          child: Icon(
+            Icons.place_rounded,
+            color: MapColors.primary,
+            size: pinSize,
+            shadows: const [
+              Shadow(color: Colors.white, blurRadius: 4),
+              Shadow(
+                color: Colors.black38,
                 blurRadius: 8,
-                spreadRadius: 0.3,
+                offset: Offset(0, 2),
               ),
             ],
-          ),
-          child: const Icon(
-            Icons.add_location_alt_outlined,
-            color: MapColors.primary,
-            size: 30,
           ),
         ),
       ),
