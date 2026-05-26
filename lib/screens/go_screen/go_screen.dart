@@ -561,12 +561,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     setState(() => _pinTarget = null);
   }
 
-  void _handleMapTap(TapPosition _, LatLng point) {
+  LatLng _currentMapCenter() {
+    return _mapController.camera.center;
+  }
+
+  Future<void> _confirmMapPinFromCenter() async {
     final target = _pinTarget;
-    if (target != null) {
-      _applyMapPinTarget(target, point);
-      return;
-    }
+    if (target == null) return;
+    await _applyMapPinTarget(target, _currentMapCenter());
+  }
+
+  void _handleMapTap(TapPosition _, LatLng point) {
+    if (_pinTarget != null) return;
 
     if (_flow == GoNavigationFlow.explore ||
         _flow == GoNavigationFlow.locationDetail) {
@@ -1291,6 +1297,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               onPositionChanged: _onMapPositionChanged,
             ),
           ),
+          if (_pinTarget != null) _buildCenterPinCrosshair(),
           GoRecenterButton(
             userPosition: _userPosition,
             mapController: _mapController,
@@ -1317,16 +1324,17 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               _flow == GoNavigationFlow.routeSelection ? null : _searchError,
             showOutOfAreaDisclaimer: _destinationOutOfArea,
             isSearchingNominatim: _nominatimBusy,
-            mapPinAwaitingTap: _pinTarget,
-            onCancelMapPinMode: _cancelMapPinMode,
             activeRoutingField: _activeRoutingField,
             onActiveRoutingFieldChanged: _setActiveRoutingField,
           ),
-          if (_flow == GoNavigationFlow.locationDetail)
+          if (_pinTarget != null)
+            _buildPinModeSheet()
+          else if (_flow == GoNavigationFlow.locationDetail)
             _buildLocationDetailSheet(),
-          if (_flow == GoNavigationFlow.routeSelection)
+          if (_pinTarget == null && _flow == GoNavigationFlow.routeSelection)
             _buildRouteSelectionSheet(context),
-          if (_flow == GoNavigationFlow.routeDetails) _buildRouteDetailsSheet(),
+          if (_pinTarget == null && _flow == GoNavigationFlow.routeDetails)
+            _buildRouteDetailsSheet(),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
@@ -1338,6 +1346,114 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCenterPinCrosshair() {
+    const pinSize = 34.0;
+    // place_rounded tip sits slightly above the bottom of the icon box; lift so
+    // the sharp point (not the box bottom) matches the map center.
+    const tipInsetFromBoxBottom = 3.0;
+    const lift = pinSize / 2 - tipInsetFromBoxBottom;
+    final pinColor = _pinTarget == GoPinTarget.destination
+        ? MapColors.secondary
+        : MapColors.primary;
+    return IgnorePointer(
+      child: Center(
+        child: Transform.translate(
+          offset: const Offset(0, -lift),
+          child: Icon(
+            Icons.place_rounded,
+            color: pinColor,
+            size: pinSize,
+            shadows: const [
+              Shadow(color: Colors.white, blurRadius: 4),
+              Shadow(
+                color: Colors.black38,
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPinModeSheet() {
+    final isOrigin = _pinTarget == GoPinTarget.origin;
+    final title = isOrigin ? 'Pin starting point' : 'Pin destination';
+    final body = isOrigin
+        ? 'Move the map so the crosshair points to your starting location.'
+        : 'Move the map so the crosshair points to your destination.';
+
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: 0.23,
+      minChildSize: 0.2,
+      maxChildSize: 0.27,
+      snap: true,
+      snapSizes: const <double>[0.23],
+      builder: (context, scrollController) {
+        return _SheetSurface(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: MapColors.text,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                body,
+                style: TextStyle(
+                  color: MapColors.text.withValues(alpha: 0.78),
+                  fontSize: 14,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _cancelMapPinMode,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                        side: BorderSide(
+                          color: MapColors.text.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _confirmMapPinFromCenter,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: MapColors.primary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                      child: const Text(
+                        'Confirm pin',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
