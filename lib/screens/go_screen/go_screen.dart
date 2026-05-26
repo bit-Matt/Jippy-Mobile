@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -20,6 +21,7 @@ import 'package:jippy_mobile/services/geocoding_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
 import 'package:jippy_mobile/services/navigation_tracker.dart';
 import 'package:jippy_mobile/services/notification_service.dart';
+import 'package:jippy_mobile/services/trip_simulator_service.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 
@@ -66,6 +68,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   StreamSubscription<double?>? _headingSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   StreamSubscription<ProximityEvent>? _trackerSubscription;
+  StreamSubscription<TripSimulatorState>? _simulatorStateSubscription;
 
   GoNavigationFlow _flow = GoNavigationFlow.explore;
   GoPinTarget? _pinTarget;
@@ -89,6 +92,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   int? _isolatedLegIndex;
   NavigationTracker? _navigationTracker;
   int _currentStopIndex = 0;
+  TripSimulatorService? _tripSimulator;
+  TripSimulatorState _tripSimulatorState = TripSimulatorState.idle;
+  bool _debugTripSimulatorEnabled = false;
+  DateTime? _lastProximityAlertAt;
 
   Position? _userPosition;
   double? _compassHeading;
@@ -268,7 +275,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _headingSubscription?.cancel();
     _connectivitySubscription?.cancel();
     _trackerSubscription?.cancel();
+    _simulatorStateSubscription?.cancel();
     _navigationTracker?.stop();
+    unawaited(_locationService.detachTripSimulator());
+    unawaited(_tripSimulator?.dispose() ?? Future<void>.value());
     _startFocus.removeListener(_handleStartFocusChange);
     _endFocus.removeListener(_handleEndFocusChange);
     _startController.dispose();
@@ -312,20 +322,20 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _subscribeToServiceStatus() {
-    _serviceStatusSubscription = _locationService.serviceStatusStream.listen(
-      (ServiceStatus status) {
-        if (!mounted) return;
-        if (status == ServiceStatus.enabled) {
-          _initLocation();
-        } else if (status == ServiceStatus.disabled) {
-          setState(() {
-            _permissionChecked = true;
-            _locationPermission = null;
-            _userPosition = null;
-          });
-        }
-      },
-    );
+    _serviceStatusSubscription = _locationService.serviceStatusStream.listen((
+      ServiceStatus status,
+    ) {
+      if (!mounted) return;
+      if (status == ServiceStatus.enabled) {
+        _initLocation();
+      } else if (status == ServiceStatus.disabled) {
+        setState(() {
+          _permissionChecked = true;
+          _locationPermission = null;
+          _userPosition = null;
+        });
+      }
+    });
   }
 
   void _subscribeToHeading() {
@@ -527,6 +537,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _trackerSubscription = null;
     _navigationTracker?.stop();
     _navigationTracker = null;
+    unawaited(_stopTripSimulator());
 
     setState(() {
       _flow = GoNavigationFlow.explore;
@@ -551,6 +562,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _selectedSuggestionIndex = 0;
       _isolatedLegIndex = null;
       _currentStopIndex = 0;
+      _lastProximityAlertAt = null;
     });
 
     _startFocus.unfocus();
@@ -960,11 +972,20 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     await _navigationTracker?.stop();
     _navigationTracker = null;
 
-    final tracker = NavigationTracker(suggestion: selected, thresholdMeters: 100);
+    final tracker = NavigationTracker(
+      suggestion: selected,
+      thresholdMeters: 100,
+    );
     _trackerSubscription = tracker.events.listen((event) {
       _onProximityEvent(event);
     });
     tracker.start();
+
+    if (kDebugMode && _debugTripSimulatorEnabled) {
+      await _startTripSimulator(selected);
+    } else {
+      await _stopTripSimulator();
+    }
 
     if (!mounted) return;
     setState(() {
@@ -972,7 +993,72 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _currentStopIndex = 0;
       _flow = GoNavigationFlow.navigating;
       _isolatedLegIndex = null;
+      _lastProximityAlertAt = null;
     });
+  }
+
+  Future<void> _startTripSimulator(NavigateSuggestion suggestion) async {
+    if (!kDebugMode || !_debugTripSimulatorEnabled) return;
+
+    await _stopTripSimulator();
+    final simulator = TripSimulatorService.fromSuggestion(
+      suggestion: suggestion,
+    );
+    if (simulator.totalPoints < 2) {
+      await simulator.dispose();
+      if (mounted) {
+        _showTopSnackBar('Trip simulator unavailable for this route.');
+      }
+      return;
+    }
+
+    _simulatorStateSubscription = simulator.stateStream.listen((state) {
+      if (!mounted) return;
+      setState(() => _tripSimulatorState = state);
+    });
+    await _locationService.attachTripSimulator(simulator);
+    _tripSimulator = simulator;
+    if (mounted) {
+      setState(() => _tripSimulatorState = simulator.snapshot);
+    }
+  }
+
+  Future<void> _stopTripSimulator() async {
+    await _locationService.detachTripSimulator();
+    await _simulatorStateSubscription?.cancel();
+    _simulatorStateSubscription = null;
+    await _tripSimulator?.dispose();
+    _tripSimulator = null;
+    if (!mounted) return;
+    setState(() => _tripSimulatorState = TripSimulatorState.idle);
+  }
+
+  void _onDebugSimulatorToggled(bool enabled) {
+    if (!kDebugMode) return;
+    setState(() {
+      _debugTripSimulatorEnabled = enabled;
+      if (!enabled) {
+        _tripSimulatorState = TripSimulatorState.idle;
+      }
+    });
+    if (!enabled) {
+      unawaited(_stopTripSimulator());
+      return;
+    }
+    final selected = _selectedSuggestion;
+    if (selected == null) return;
+    if (_flow == GoNavigationFlow.navigating) {
+      unawaited(_startTripSimulator(selected));
+    }
+  }
+
+  void _jumpSimulatorToNextStop() {
+    final simulator = _tripSimulator;
+    final tracker = _navigationTracker;
+    if (simulator == null || tracker == null || tracker.stops.isEmpty) return;
+    final stopIndex = _currentStopIndex.clamp(0, tracker.stops.length - 1);
+    simulator.jumpNearStop(tracker.stops[stopIndex]);
+    setState(() => _tripSimulatorState = simulator.snapshot);
   }
 
   Future<void> _onProximityEvent(ProximityEvent event) async {
@@ -984,20 +1070,34 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final body =
         '${event.distanceMeters.round()}m to ${event.stop.label.trim().isEmpty ? 'next stop' : event.stop.label}';
 
-    _showTopSnackBar(body, title: title);
-    await NotificationService.instance.showProximityNotification(
-      title: title,
-      body: body,
-    );
+    var shouldNotify = true;
+    if (kDebugMode && _debugTripSimulatorEnabled) {
+      final now = DateTime.now();
+      final last = _lastProximityAlertAt;
+      if (last != null && now.difference(last) < const Duration(seconds: 2)) {
+        shouldNotify = false;
+      } else {
+        _lastProximityAlertAt = now;
+      }
+    }
 
-    final hasVibrator = await Vibration.hasVibrator();
-    if (hasVibrator) {
-      await Vibration.vibrate(pattern: const [0, 400, 200, 400]);
+    if (shouldNotify) {
+      _showTopSnackBar(body, title: title);
+      await NotificationService.instance.showProximityNotification(
+        title: title,
+        body: body,
+      );
+
+      final hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator) {
+        await Vibration.vibrate(pattern: const [0, 400, 200, 400]);
+      }
     }
 
     if (!mounted) return;
     setState(() {
-      _currentStopIndex = _navigationTracker?.currentStopIndex ?? _currentStopIndex;
+      _currentStopIndex =
+          _navigationTracker?.currentStopIndex ?? _currentStopIndex;
     });
 
     if (event.tripComplete) {
@@ -1006,6 +1106,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _endNavigating({bool showCompletedMessage = false}) async {
+    await _stopTripSimulator();
     await _trackerSubscription?.cancel();
     _trackerSubscription = null;
     await _navigationTracker?.stop();
@@ -1015,6 +1116,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _currentStopIndex = 0;
       _flow = GoNavigationFlow.routeDetails;
       _isolatedLegIndex = null;
+      _lastProximityAlertAt = null;
     });
     if (showCompletedMessage) {
       _showTopSnackBar('You are at your destination. Trip finished.');
@@ -1459,8 +1561,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             onUseCurrentLocationTap: _useCurrentLocationForStart,
             suggestions: _suggestions,
             onSuggestionTap: _onPickSuggestion,
-            searchError:
-              _flow == GoNavigationFlow.routeSelection ? null : _searchError,
+            searchError: _flow == GoNavigationFlow.routeSelection
+                ? null
+                : _searchError,
             showOutOfAreaDisclaimer: _destinationOutOfArea,
             isSearchingNominatim: _nominatimBusy,
             activeRoutingField: _activeRoutingField,
@@ -1680,10 +1783,165 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
+              if (kDebugMode && _debugTripSimulatorEnabled) ...[
+                const SizedBox(height: 12),
+                _buildSimulatorControlsSection(),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildDebugSimulatorToggleTile() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 4, 6, 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: MapColors.text.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.bug_report_outlined,
+            size: 18,
+            color: MapColors.text,
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Enable Trip Simulator (debug)',
+              style: TextStyle(
+                color: MapColors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Switch(
+            value: _debugTripSimulatorEnabled,
+            onChanged: _onDebugSimulatorToggled,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimulatorControlsSection() {
+    final simulator = _tripSimulator;
+    final enabled = simulator != null;
+
+    Widget speedChip(double speed) {
+      final selected =
+          (_tripSimulatorState.speedMultiplier - speed).abs() < 0.01;
+      return ChoiceChip(
+        label: Text('${speed.toInt()}x'),
+        selected: selected,
+        onSelected: enabled
+            ? (_) {
+                simulator.setSpeedMultiplier(speed);
+                setState(() => _tripSimulatorState = simulator.snapshot);
+              }
+            : null,
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: MapColors.text.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: MapColors.text.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Trip Simulator',
+            style: TextStyle(
+              color: MapColors.text,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            enabled
+                ? 'Point ${_tripSimulatorState.currentPointIndex + 1} of ${_tripSimulatorState.totalPoints}'
+                : 'No simulator route loaded.',
+            style: TextStyle(
+              color: MapColors.text.withValues(alpha: 0.72),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: enabled
+                    ? () {
+                        if (_tripSimulatorState.isPlaying) {
+                          simulator.pause();
+                        } else {
+                          simulator.play();
+                        }
+                        setState(
+                          () => _tripSimulatorState = simulator.snapshot,
+                        );
+                      }
+                    : null,
+                icon: Icon(
+                  _tripSimulatorState.isPlaying
+                      ? Icons.pause
+                      : Icons.play_arrow,
+                  size: 18,
+                ),
+                label: Text(
+                  _tripSimulatorState.isPlaying ? 'Pause' : 'Play route',
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: enabled
+                    ? () {
+                        simulator.stepForward();
+                        setState(
+                          () => _tripSimulatorState = simulator.snapshot,
+                        );
+                      }
+                    : null,
+                icon: const Icon(Icons.skip_next_rounded, size: 18),
+                label: const Text('Step'),
+              ),
+              OutlinedButton.icon(
+                onPressed: enabled ? _jumpSimulatorToNextStop : null,
+                icon: const Icon(Icons.location_searching_rounded, size: 18),
+                label: const Text('Jump to next stop'),
+              ),
+              OutlinedButton.icon(
+                onPressed: enabled
+                    ? () {
+                        simulator.stop();
+                        setState(
+                          () => _tripSimulatorState = simulator.snapshot,
+                        );
+                      }
+                    : null,
+                icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                label: const Text('Stop simulator'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            children: [speedChip(1), speedChip(5), speedChip(20)],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1843,13 +2101,16 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         label: const Text('Retry'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: MapColors.primary,
-                          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ] else if (_routeSuggestions.isEmpty && !_routePreviewLoading) ...[
+              ] else if (_routeSuggestions.isEmpty &&
+                  !_routePreviewLoading) ...[
                 const SizedBox(height: 10),
                 Text(
                   'No route suggestions available yet.',
@@ -1910,6 +2171,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
+                if (kDebugMode) ...[
+                  const SizedBox(height: 10),
+                  _buildDebugSimulatorToggleTile(),
+                ],
                 const SizedBox(height: 14),
                 Text(
                   'Preview instructions',
@@ -2168,7 +2433,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       case NavigateLegType.tricycle:
       case NavigateLegType.unknown:
         final routeName = leg.routeName.trim();
-        final base = routeName.isNotEmpty ? routeName : _labelForLegType(leg.type);
+        final base = routeName.isNotEmpty
+            ? routeName
+            : _labelForLegType(leg.type);
         return '$base - $distance';
     }
   }
@@ -2199,18 +2466,22 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   String? _extractRouteNumberFromName(String name) {
-    final parenMatch =
-        RegExp(r'\(\s*Route\s*([^)]+)\)', caseSensitive: false)
-            .firstMatch(name);
+    final parenMatch = RegExp(
+      r'\(\s*Route\s*([^)]+)\)',
+      caseSensitive: false,
+    ).firstMatch(name);
     if (parenMatch != null) return parenMatch.group(1)?.trim();
 
-    final routeMatch =
-        RegExp(r'\bRoute\s*([A-Za-z0-9-]+)\b', caseSensitive: false)
-            .firstMatch(name);
+    final routeMatch = RegExp(
+      r'\bRoute\s*([A-Za-z0-9-]+)\b',
+      caseSensitive: false,
+    ).firstMatch(name);
     if (routeMatch != null) return routeMatch.group(1)?.trim();
 
-    final rMatch =
-        RegExp(r'\bR\s*\d+\b', caseSensitive: false).firstMatch(name);
+    final rMatch = RegExp(
+      r'\bR\s*\d+\b',
+      caseSensitive: false,
+    ).firstMatch(name);
     if (rMatch != null) return rMatch.group(0)?.replaceAll(' ', '');
 
     return null;
@@ -2218,11 +2489,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   String _normalizeRouteNumber(String raw) {
     final trimmed = raw.trim();
-    final prefixed =
-        RegExp(r'^Route\s*(.+)$', caseSensitive: false).firstMatch(trimmed);
+    final prefixed = RegExp(
+      r'^Route\s*(.+)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
     if (prefixed != null) return prefixed.group(1)?.trim() ?? trimmed;
-    final match =
-        RegExp(r'^R\s*(\d+)$', caseSensitive: false).firstMatch(trimmed);
+    final match = RegExp(
+      r'^R\s*(\d+)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
     if (match != null) return match.group(1) ?? trimmed;
     return trimmed;
   }
@@ -2233,7 +2508,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       return const SizedBox.shrink();
     }
 
-    final selectedIndex = _selectedSuggestionIndex < 0 ||
+    final selectedIndex =
+        _selectedSuggestionIndex < 0 ||
             _selectedSuggestionIndex >= _routeSuggestions.length
         ? 0
         : _selectedSuggestionIndex;
