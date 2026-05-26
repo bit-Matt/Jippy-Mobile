@@ -40,12 +40,18 @@ class NavigationTracker {
     required this.suggestion,
     this.thresholdMeters = 100,
     LocationService? locationService,
-  }) : _locationService = locationService ?? LocationService.instance,
+    Stream<Position>? positionStream,
+    Position? Function()? lastKnownPosition,
+  }) : _locationService = locationService,
+       _positionStream = positionStream,
+       _lastKnownPosition = lastKnownPosition,
        _stops = _buildStops(suggestion);
 
   final NavigateSuggestion suggestion;
   final double thresholdMeters;
-  final LocationService _locationService;
+  final LocationService? _locationService;
+  final Stream<Position>? _positionStream;
+  final Position? Function()? _lastKnownPosition;
   final List<TripStop> _stops;
   final Distance _distance = const Distance();
 
@@ -61,8 +67,20 @@ class NavigationTracker {
 
   void start() {
     if (_positionSub != null || isComplete) return;
-    _positionSub = _locationService.stream.listen(_onPosition);
-    final known = _locationService.lastKnown;
+    final streamSource =
+        _positionStream ??
+        _locationService?.stream ??
+        LocationService.instance.stream;
+    _positionSub = streamSource.listen(_onPosition);
+
+    Position? known;
+    if (_lastKnownPosition != null) {
+      known = _lastKnownPosition.call();
+    } else if (_locationService != null) {
+      known = _locationService.lastKnown;
+    } else if (_positionStream == null) {
+      known = LocationService.instance.lastKnown;
+    }
     if (known != null) {
       _onPosition(known);
     }
@@ -126,7 +144,9 @@ class NavigationTracker {
     if (kind == TripStopKind.dropOff) {
       return 'Destination';
     }
-    final nextLeg = stopLegIndex + 1 < legs.length ? legs[stopLegIndex + 1] : null;
+    final nextLeg = stopLegIndex + 1 < legs.length
+        ? legs[stopLegIndex + 1]
+        : null;
     if (nextLeg == null) return 'Transfer point';
 
     final routeName = nextLeg.routeName.trim();
