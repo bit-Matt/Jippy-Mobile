@@ -5,6 +5,16 @@
          resolves cleanly on newer Android versions; also lets service-status
          detection report accurate state when the user toggles location. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Required so proximity alerts can continue while app is backgrounded. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Required for Android 13+ local notification prompts. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Used by haptic proximity alerts. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Required for active background location foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Required for OSM map tiles and dashboard/Valhalla API in all build types (including release APK). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <application
