@@ -14,6 +14,7 @@ import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/navigate_client.dart';
 import 'package:jippy_mobile/models/navigate_suggestion.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
+import 'package:jippy_mobile/screens/go_screen/widgets/debug_trip_simulator_overlay.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_map_canvas.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
@@ -96,6 +97,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   TripSimulatorState _tripSimulatorState = TripSimulatorState.idle;
   bool _debugTripSimulatorEnabled = false;
   DateTime? _lastProximityAlertAt;
+  Offset _simOverlayOffset = const Offset(0, 120);
 
   Position? _userPosition;
   double? _compassHeading;
@@ -1061,6 +1063,47 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     setState(() => _tripSimulatorState = simulator.snapshot);
   }
 
+  void _moveSimulatorOverlay(Offset delta) {
+    setState(() {
+      _simOverlayOffset = Offset(
+        _simOverlayOffset.dx + delta.dx,
+        (_simOverlayOffset.dy + delta.dy).clamp(72.0, 520.0),
+      );
+    });
+  }
+
+  void _toggleSimulatorPlayback() {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    if (_tripSimulatorState.isPlaying) {
+      simulator.pause();
+    } else {
+      simulator.play();
+    }
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _stepTripSimulator() {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    simulator.stepForward();
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _stopTripSimulatorPlayback() {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    simulator.stop();
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _setTripSimulatorSpeed(double speed) {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    simulator.setSpeedMultiplier(speed);
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
   Future<void> _onProximityEvent(ProximityEvent event) async {
     if (!mounted) return;
 
@@ -1591,6 +1634,23 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   ? 'Location service is disabled.'
                   : 'Location permission denied. Enable it to see your position on the Go map.',
             ),
+          if (kDebugMode &&
+              _flow == GoNavigationFlow.navigating &&
+              _debugTripSimulatorEnabled)
+            Positioned(
+              top: _simOverlayOffset.dy,
+              right: 12 - _simOverlayOffset.dx,
+              child: DebugTripSimulatorOverlay(
+                state: _tripSimulatorState,
+                simulatorAvailable: _tripSimulator != null,
+                onPlayPause: _toggleSimulatorPlayback,
+                onStep: _stepTripSimulator,
+                onJumpToNextStop: _jumpSimulatorToNextStop,
+                onStop: _stopTripSimulatorPlayback,
+                onSpeedChanged: _setTripSimulatorSpeed,
+                onDragDelta: _moveSimulatorOverlay,
+              ),
+            ),
         ],
       ),
     );
@@ -1732,9 +1792,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       controller: _sheetController,
       initialChildSize: 0.22,
       minChildSize: 0.18,
-      maxChildSize: 0.5,
+      maxChildSize: 0.88,
       snap: true,
-      snapSizes: const <double>[0.22, 0.38],
+      snapSizes: const <double>[0.22, 0.38, 0.65],
       builder: (context, scrollController) {
         return _SheetSurface(
           child: ListView(
@@ -1770,6 +1830,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 14),
+              _buildStopProgressIndicator(tracker),
+              const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: _endNavigating,
                 style: FilledButton.styleFrom(
@@ -1783,14 +1845,69 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-              if (kDebugMode && _debugTripSimulatorEnabled) ...[
-                const SizedBox(height: 12),
-                _buildSimulatorControlsSection(),
-              ],
+              const SizedBox(height: 18),
+              Divider(color: MapColors.text.withValues(alpha: 0.12)),
+              const SizedBox(height: 12),
+              const Text(
+                'Itinerary',
+                style: TextStyle(
+                  color: MapColors.text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ..._buildLegBlocks(withCompletedState: true),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildStopProgressIndicator(NavigationTracker tracker) {
+    final totalStops = tracker.stops.length;
+    if (totalStops == 0) return const SizedBox.shrink();
+
+    final completedStops = _currentStopIndex.clamp(0, totalStops);
+    final progress = completedStops / totalStops;
+    final label = completedStops >= totalStops
+        ? 'Arrived'
+        : 'Stop ${(completedStops + 1).clamp(1, totalStops)} of $totalStops';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _sheetSurfaceColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: MapColors.text.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: MapColors.text.withValues(alpha: 0.1),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  MapColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: TextStyle(
+              color: MapColors.text.withValues(alpha: 0.78),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1822,123 +1939,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           Switch(
             value: _debugTripSimulatorEnabled,
             onChanged: _onDebugSimulatorToggled,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSimulatorControlsSection() {
-    final simulator = _tripSimulator;
-    final enabled = simulator != null;
-
-    Widget speedChip(double speed) {
-      final selected =
-          (_tripSimulatorState.speedMultiplier - speed).abs() < 0.01;
-      return ChoiceChip(
-        label: Text('${speed.toInt()}x'),
-        selected: selected,
-        onSelected: enabled
-            ? (_) {
-                simulator.setSpeedMultiplier(speed);
-                setState(() => _tripSimulatorState = simulator.snapshot);
-              }
-            : null,
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: MapColors.text.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MapColors.text.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Trip Simulator',
-            style: TextStyle(
-              color: MapColors.text,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            enabled
-                ? 'Point ${_tripSimulatorState.currentPointIndex + 1} of ${_tripSimulatorState.totalPoints}'
-                : 'No simulator route loaded.',
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.72),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: enabled
-                    ? () {
-                        if (_tripSimulatorState.isPlaying) {
-                          simulator.pause();
-                        } else {
-                          simulator.play();
-                        }
-                        setState(
-                          () => _tripSimulatorState = simulator.snapshot,
-                        );
-                      }
-                    : null,
-                icon: Icon(
-                  _tripSimulatorState.isPlaying
-                      ? Icons.pause
-                      : Icons.play_arrow,
-                  size: 18,
-                ),
-                label: Text(
-                  _tripSimulatorState.isPlaying ? 'Pause' : 'Play route',
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: enabled
-                    ? () {
-                        simulator.stepForward();
-                        setState(
-                          () => _tripSimulatorState = simulator.snapshot,
-                        );
-                      }
-                    : null,
-                icon: const Icon(Icons.skip_next_rounded, size: 18),
-                label: const Text('Step'),
-              ),
-              OutlinedButton.icon(
-                onPressed: enabled ? _jumpSimulatorToNextStop : null,
-                icon: const Icon(Icons.location_searching_rounded, size: 18),
-                label: const Text('Jump to next stop'),
-              ),
-              OutlinedButton.icon(
-                onPressed: enabled
-                    ? () {
-                        simulator.stop();
-                        setState(
-                          () => _tripSimulatorState = simulator.snapshot,
-                        );
-                      }
-                    : null,
-                icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                label: const Text('Stop simulator'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            children: [speedChip(1), speedChip(5), speedChip(20)],
           ),
         ],
       ),
@@ -2514,35 +2514,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ? 0
         : _selectedSuggestionIndex;
 
-    final legTimelineBlocks = <Widget>[];
-    var boardCountBeforeLeg = 0;
-    var jeepStepNumber = 0;
-    for (int i = 0; i < selected.route.legs.length; i++) {
-      final leg = selected.route.legs[i];
-      int? jeepNumber;
-      if (leg.type == NavigateLegType.jeepney) {
-        jeepStepNumber += 1;
-        jeepNumber = jeepStepNumber;
-      }
-      legTimelineBlocks.add(
-        _buildLegTimelineBlock(
-          leg,
-          index: i,
-          isLast: i == selected.route.legs.length - 1,
-          boardCountBeforeLeg: boardCountBeforeLeg,
-          jeepStepNumber: jeepNumber,
-          isIsolated: _activeLegIsolationIndex == i,
-          onTap: () => _onLegTimelineStepTapped(i),
-        ),
-      );
-
-      boardCountBeforeLeg += leg.instructions
-          .where(
-            (instruction) =>
-                instruction.maneuverType == NavigateManeuverType.board,
-          )
-          .length;
-    }
+    final legTimelineBlocks = _buildLegBlocks();
 
     return DraggableScrollableSheet(
       controller: _sheetController,
@@ -2608,6 +2580,47 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
+  List<Widget> _buildLegBlocks({bool withCompletedState = false}) {
+    final selected = _selectedSuggestion;
+    if (selected == null) return const <Widget>[];
+
+    final legTimelineBlocks = <Widget>[];
+    final currentNavigationLegIndex = _currentNavigationLegIndex;
+    var boardCountBeforeLeg = 0;
+    var jeepStepNumber = 0;
+    for (int i = 0; i < selected.route.legs.length; i++) {
+      final leg = selected.route.legs[i];
+      int? jeepNumber;
+      if (leg.type == NavigateLegType.jeepney) {
+        jeepStepNumber += 1;
+        jeepNumber = jeepStepNumber;
+      }
+      legTimelineBlocks.add(
+        _buildLegTimelineBlock(
+          leg,
+          index: i,
+          isLast: i == selected.route.legs.length - 1,
+          boardCountBeforeLeg: boardCountBeforeLeg,
+          jeepStepNumber: jeepNumber,
+          isIsolated: _activeLegIsolationIndex == i,
+          isCompleted:
+              withCompletedState &&
+              currentNavigationLegIndex != null &&
+              i < currentNavigationLegIndex,
+          onTap: () => _onLegTimelineStepTapped(i),
+        ),
+      );
+
+      boardCountBeforeLeg += leg.instructions
+          .where(
+            (instruction) =>
+                instruction.maneuverType == NavigateManeuverType.board,
+          )
+          .length;
+    }
+    return legTimelineBlocks;
+  }
+
   Widget _buildLegTimelineBlock(
     NavigateLeg leg, {
     required int index,
@@ -2615,6 +2628,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     required int boardCountBeforeLeg,
     required int? jeepStepNumber,
     required bool isIsolated,
+    bool isCompleted = false,
     required VoidCallback onTap,
   }) {
     var boardCount = boardCountBeforeLeg;
@@ -2624,6 +2638,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final stepLabel = jeepStepNumber == null
         ? baseLabel
         : '$baseLabel $jeepStepNumber';
+    final timelineColor = isCompleted
+        ? MapColors.text.withValues(alpha: 0.26)
+        : _timelineSubtleLineColor;
+    final iconColor = isCompleted
+        ? MapColors.text.withValues(alpha: 0.44)
+        : MapColors.text;
+    final titleColor = isCompleted
+        ? MapColors.text.withValues(alpha: 0.48)
+        : MapColors.text;
+    final bodyColor = isCompleted
+        ? MapColors.text.withValues(alpha: 0.42)
+        : MapColors.text;
 
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
@@ -2639,13 +2665,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     width: 30,
                     height: 30,
                     decoration: BoxDecoration(
-                      color: _colorForLeg(leg).withValues(alpha: 0.2),
+                      color: isCompleted
+                          ? MapColors.text.withValues(alpha: 0.08)
+                          : _colorForLeg(leg).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(99),
                     ),
                     child: Icon(
                       _iconForLegType(leg.type),
                       size: 18,
-                      color: MapColors.text,
+                      color: iconColor,
                     ),
                   ),
                   if (!isLast)
@@ -2654,7 +2682,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         width: 2,
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         decoration: BoxDecoration(
-                          color: _timelineSubtleLineColor,
+                          color: timelineColor,
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -2689,17 +2717,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             Expanded(
                               child: Text(
                                 stepLabel,
-                                style: const TextStyle(
-                                  color: MapColors.text,
+                                style: TextStyle(
+                                  color: titleColor,
                                   fontSize: 15,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: isCompleted
+                                      ? FontWeight.w700
+                                      : FontWeight.w800,
                                 ),
                               ),
                             ),
                             Text(
                               _formatMinutes(leg.durationMinutes),
                               style: TextStyle(
-                                color: MapColors.text.withValues(alpha: 0.74),
+                                color: bodyColor.withValues(alpha: 0.74),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -2711,7 +2741,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                           Text(
                             leg.routeName,
                             style: TextStyle(
-                              color: MapColors.text.withValues(alpha: 0.84),
+                              color: bodyColor.withValues(alpha: 0.84),
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -2721,76 +2751,88 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         Text(
                           _formatDistance(leg.distanceMeters),
                           style: TextStyle(
-                            color: MapColors.text.withValues(alpha: 0.65),
+                            color: bodyColor.withValues(alpha: 0.65),
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        if (leg.instructions.isEmpty)
+                        if (isCompleted) ...[
+                          const SizedBox(height: 8),
                           Text(
-                            'No detailed instructions for this leg.',
+                            'Completed',
                             style: TextStyle(
-                              color: MapColors.text.withValues(alpha: 0.68),
+                              color: MapColors.text.withValues(alpha: 0.46),
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
-                          )
-                        else
-                          for (int i = 0; i < leg.instructions.length; i++)
-                            Builder(
-                              builder: (context) {
-                                final instruction = leg.instructions[i];
-                                final isBoard =
-                                    instruction.maneuverType ==
-                                    NavigateManeuverType.board;
-                                final isTransferBoard =
-                                    isBoard && boardCount > 0;
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 10),
+                          if (leg.instructions.isEmpty)
+                            Text(
+                              'No detailed instructions for this leg.',
+                              style: TextStyle(
+                                color: MapColors.text.withValues(alpha: 0.68),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else
+                            for (int i = 0; i < leg.instructions.length; i++)
+                              Builder(
+                                builder: (context) {
+                                  final instruction = leg.instructions[i];
+                                  final isBoard =
+                                      instruction.maneuverType ==
+                                      NavigateManeuverType.board;
+                                  final isTransferBoard =
+                                      isBoard && boardCount > 0;
 
-                                if (isBoard) {
-                                  boardCount += 1;
-                                }
+                                  if (isBoard) {
+                                    boardCount += 1;
+                                  }
 
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    bottom: i == leg.instructions.length - 1
-                                        ? 0
-                                        : 8,
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Icon(
-                                        _iconForInstruction(
-                                          leg: leg,
-                                          instruction: instruction,
-                                          isTransferBoard: isTransferBoard,
-                                        ),
-                                        size: 15,
-                                        color: _colorForManeuver(
-                                          instruction.maneuverType,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 7),
-                                      Expanded(
-                                        child: Text(
-                                          instruction.text,
-                                          style: TextStyle(
-                                            color: MapColors.text.withValues(
-                                              alpha: 0.8,
-                                            ),
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            height: 1.33,
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: i == leg.instructions.length - 1
+                                          ? 0
+                                          : 8,
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          _iconForInstruction(
+                                            leg: leg,
+                                            instruction: instruction,
+                                            isTransferBoard: isTransferBoard,
+                                          ),
+                                          size: 15,
+                                          color: _colorForManeuver(
+                                            instruction.maneuverType,
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
+                                        const SizedBox(width: 7),
+                                        Expanded(
+                                          child: Text(
+                                            instruction.text,
+                                            style: TextStyle(
+                                              color: bodyColor.withValues(
+                                                alpha: 0.8,
+                                              ),
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              height: 1.33,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                        ],
                       ],
                     ),
                   ),
