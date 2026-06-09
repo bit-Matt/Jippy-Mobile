@@ -7,7 +7,9 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Show your position on the route map so you can see your progress along the path.</string>
+	<string>Show your position on the route map and alert you when you are near transfer points or your destination.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Jippy uses your location while traveling to alert you when you are approaching a transfer point or your destination, even when the app is in the background.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Jippy Mobile</string>
 	<key>CFBundleExecutable</key>
@@ -51,6 +53,10 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

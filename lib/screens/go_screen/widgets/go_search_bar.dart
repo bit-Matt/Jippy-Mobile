@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
-import 'package:jippy_mobile/screens/go_screen/widgets/go_map_pin_instruction_banner.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 
 /// Go screen search: collapsed explore prompt or expanded routing header.
@@ -27,8 +26,6 @@ class GoSearchBar extends StatelessWidget {
     required this.searchError,
     required this.showOutOfAreaDisclaimer,
     required this.isSearchingNominatim,
-    required this.mapPinAwaitingTap,
-    required this.onCancelMapPinMode,
     required this.activeRoutingField,
     required this.onActiveRoutingFieldChanged,
   });
@@ -51,8 +48,6 @@ class GoSearchBar extends StatelessWidget {
   final String? searchError;
   final bool showOutOfAreaDisclaimer;
   final bool isSearchingNominatim;
-  final GoPinTarget? mapPinAwaitingTap;
-  final VoidCallback onCancelMapPinMode;
   final GoRoutingField activeRoutingField;
   final ValueChanged<GoRoutingField> onActiveRoutingFieldChanged;
 
@@ -93,13 +88,6 @@ class GoSearchBar extends StatelessWidget {
                     activeRoutingField: activeRoutingField,
                     onActiveRoutingFieldChanged: onActiveRoutingFieldChanged,
                   ),
-            if (mapPinAwaitingTap != null) ...[
-              const SizedBox(height: 8),
-              GoMapPinInstructionBanner(
-                forOrigin: mapPinAwaitingTap == GoPinTarget.origin,
-                onCancel: onCancelMapPinMode,
-              ),
-            ],
           ],
         ),
       ),
@@ -216,7 +204,7 @@ class _RoutingHeaderPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _RoutingInputRow(
-              icon: Icons.trip_origin,
+              icon: Icons.place_rounded,
               iconColor: MapColors.primary,
               controller: startController,
               focusNode: startFocusNode,

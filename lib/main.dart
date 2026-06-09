@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'core/theme/map_colors.dart';
 import 'screens/app_shell.dart';
+import 'services/notification_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.instance.init();
   runApp(const JippyApp());
 }
 

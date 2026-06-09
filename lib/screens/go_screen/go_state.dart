@@ -11,6 +11,7 @@ enum GoNavigationFlow {
   routingInput,
   routeSelection,
   routeDetails,
+  navigating,
 }
 
 /// Active input field in the routing header.
