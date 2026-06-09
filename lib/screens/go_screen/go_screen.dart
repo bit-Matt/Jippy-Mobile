@@ -14,6 +14,7 @@ import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/navigate_client.dart';
 import 'package:jippy_mobile/models/navigate_suggestion.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
+import 'package:jippy_mobile/screens/go_screen/widgets/debug_trip_simulator_overlay.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_map_canvas.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
@@ -96,6 +97,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   TripSimulatorState _tripSimulatorState = TripSimulatorState.idle;
   bool _debugTripSimulatorEnabled = false;
   DateTime? _lastProximityAlertAt;
+  Offset _simOverlayOffset = const Offset(0, 120);
 
   Position? _userPosition;
   double? _compassHeading;
@@ -1061,6 +1063,47 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     setState(() => _tripSimulatorState = simulator.snapshot);
   }
 
+  void _moveSimulatorOverlay(Offset delta) {
+    setState(() {
+      _simOverlayOffset = Offset(
+        _simOverlayOffset.dx + delta.dx,
+        (_simOverlayOffset.dy + delta.dy).clamp(72.0, 520.0),
+      );
+    });
+  }
+
+  void _toggleSimulatorPlayback() {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    if (_tripSimulatorState.isPlaying) {
+      simulator.pause();
+    } else {
+      simulator.play();
+    }
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _stepTripSimulator() {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    simulator.stepForward();
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _stopTripSimulatorPlayback() {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    simulator.stop();
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _setTripSimulatorSpeed(double speed) {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    simulator.setSpeedMultiplier(speed);
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
   Future<void> _onProximityEvent(ProximityEvent event) async {
     if (!mounted) return;
 
@@ -1591,6 +1634,23 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   ? 'Location service is disabled.'
                   : 'Location permission denied. Enable it to see your position on the Go map.',
             ),
+          if (kDebugMode &&
+              _flow == GoNavigationFlow.navigating &&
+              _debugTripSimulatorEnabled)
+            Positioned(
+              top: _simOverlayOffset.dy,
+              right: 12 - _simOverlayOffset.dx,
+              child: DebugTripSimulatorOverlay(
+                state: _tripSimulatorState,
+                simulatorAvailable: _tripSimulator != null,
+                onPlayPause: _toggleSimulatorPlayback,
+                onStep: _stepTripSimulator,
+                onJumpToNextStop: _jumpSimulatorToNextStop,
+                onStop: _stopTripSimulatorPlayback,
+                onSpeedChanged: _setTripSimulatorSpeed,
+                onDragDelta: _moveSimulatorOverlay,
+              ),
+            ),
         ],
       ),
     );
@@ -1783,10 +1843,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-              if (kDebugMode && _debugTripSimulatorEnabled) ...[
-                const SizedBox(height: 12),
-                _buildSimulatorControlsSection(),
-              ],
             ],
           ),
         );
@@ -1822,123 +1878,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           Switch(
             value: _debugTripSimulatorEnabled,
             onChanged: _onDebugSimulatorToggled,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSimulatorControlsSection() {
-    final simulator = _tripSimulator;
-    final enabled = simulator != null;
-
-    Widget speedChip(double speed) {
-      final selected =
-          (_tripSimulatorState.speedMultiplier - speed).abs() < 0.01;
-      return ChoiceChip(
-        label: Text('${speed.toInt()}x'),
-        selected: selected,
-        onSelected: enabled
-            ? (_) {
-                simulator.setSpeedMultiplier(speed);
-                setState(() => _tripSimulatorState = simulator.snapshot);
-              }
-            : null,
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: MapColors.text.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MapColors.text.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Trip Simulator',
-            style: TextStyle(
-              color: MapColors.text,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            enabled
-                ? 'Point ${_tripSimulatorState.currentPointIndex + 1} of ${_tripSimulatorState.totalPoints}'
-                : 'No simulator route loaded.',
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.72),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: enabled
-                    ? () {
-                        if (_tripSimulatorState.isPlaying) {
-                          simulator.pause();
-                        } else {
-                          simulator.play();
-                        }
-                        setState(
-                          () => _tripSimulatorState = simulator.snapshot,
-                        );
-                      }
-                    : null,
-                icon: Icon(
-                  _tripSimulatorState.isPlaying
-                      ? Icons.pause
-                      : Icons.play_arrow,
-                  size: 18,
-                ),
-                label: Text(
-                  _tripSimulatorState.isPlaying ? 'Pause' : 'Play route',
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: enabled
-                    ? () {
-                        simulator.stepForward();
-                        setState(
-                          () => _tripSimulatorState = simulator.snapshot,
-                        );
-                      }
-                    : null,
-                icon: const Icon(Icons.skip_next_rounded, size: 18),
-                label: const Text('Step'),
-              ),
-              OutlinedButton.icon(
-                onPressed: enabled ? _jumpSimulatorToNextStop : null,
-                icon: const Icon(Icons.location_searching_rounded, size: 18),
-                label: const Text('Jump to next stop'),
-              ),
-              OutlinedButton.icon(
-                onPressed: enabled
-                    ? () {
-                        simulator.stop();
-                        setState(
-                          () => _tripSimulatorState = simulator.snapshot,
-                        );
-                      }
-                    : null,
-                icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                label: const Text('Stop simulator'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            children: [speedChip(1), speedChip(5), speedChip(20)],
           ),
         ],
       ),
