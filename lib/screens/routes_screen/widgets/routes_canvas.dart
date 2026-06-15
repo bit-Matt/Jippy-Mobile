@@ -15,6 +15,7 @@ class RoutesCanvas extends StatelessWidget {
     required this.initialZoom,
     required this.onMapTap,
     required this.routePolylines,
+    required this.arrowMarkers,
     required this.showOverlapRadius,
     required this.overlapTapCenter,
     required this.overlapTapRadiusMeters,
@@ -37,6 +38,7 @@ class RoutesCanvas extends StatelessWidget {
   final double initialZoom;
   final TapCallback onMapTap;
   final List<Polyline<Object>> routePolylines;
+  final List<Marker> arrowMarkers;
   final bool showOverlapRadius;
   final LatLng? overlapTapCenter;
   final double? overlapTapRadiusMeters;
@@ -81,6 +83,7 @@ class RoutesCanvas extends StatelessWidget {
             ),
           ),
         PolylineLayer<Object>(polylines: routePolylines),
+        if (arrowMarkers.isNotEmpty) MarkerLayer(markers: arrowMarkers),
         if (showOverlapRadius &&
             overlapTapCenter != null &&
             overlapTapRadiusMeters != null)
