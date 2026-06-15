@@ -9,10 +9,11 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.paddingOf(context).top + 16;
+
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.fromLTRB(16, topPadding, 16, 8),
       children: [
-        const SizedBox(height: 8),
         const Text(
           'Settings',
           style: TextStyle(
