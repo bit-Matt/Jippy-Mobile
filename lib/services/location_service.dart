@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'package:jippy_mobile/services/trip_simulator_service.dart';
+
 /// Shared location stream for screens that need live GPS updates.
 ///
 /// Responsibilities:
@@ -25,9 +27,11 @@ class LocationService {
 
   StreamController<Position>? _controller;
   StreamSubscription<Position>? _geoSub;
+  StreamSubscription<Position>? _simulatedSub;
   StreamSubscription<ServiceStatus>? _serviceStatusSub;
   final StreamController<ServiceStatus> _statusController =
       StreamController<ServiceStatus>.broadcast();
+  TripSimulatorService? _activeSimulator;
 
   Position? _lastKnown;
   LocationPermission? _lastPermission;
@@ -36,6 +40,7 @@ class LocationService {
   Position? get lastKnown => _lastKnown;
   LocationPermission? get lastPermission => _lastPermission;
   ServiceStatus? get lastServiceStatus => _lastServiceStatus;
+  bool get isUsingSimulatedPositions => _activeSimulator != null;
 
   /// Broadcast stream that mirrors [Geolocator.getServiceStatusStream].
   /// Subscribed for the entire app lifetime.
@@ -84,8 +89,11 @@ class LocationService {
   ///
   /// Safe to call repeatedly; does nothing harmful if the stream is already up.
   Future<void> refresh() async {
+    if (isUsingSimulatedPositions) return;
     final enabled = await Geolocator.isLocationServiceEnabled();
-    _lastServiceStatus = enabled ? ServiceStatus.enabled : ServiceStatus.disabled;
+    _lastServiceStatus = enabled
+        ? ServiceStatus.enabled
+        : ServiceStatus.disabled;
 
     if (!enabled) return;
 
@@ -162,6 +170,16 @@ class LocationService {
         distanceFilter: _distanceFilterMeters,
         intervalDuration: const Duration(seconds: 1),
         forceLocationManager: false,
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Jippy is following your trip',
+          notificationText:
+              'Tracking your location to alert you near transfer points.',
+          enableWakeLock: true,
+          notificationIcon: AndroidResource(
+            name: 'ic_launcher',
+            defType: 'mipmap',
+          ),
+        ),
       );
     }
     if (Platform.isIOS || Platform.isMacOS) {
@@ -180,10 +198,46 @@ class LocationService {
   }
 
   void _startStream() {
+    if (isUsingSimulatedPositions) return;
     if (_geoSub != null) return;
-    _geoSub = Geolocator.getPositionStream(
-      locationSettings: _buildLocationSettings(),
-    ).listen(
+    _geoSub =
+        Geolocator.getPositionStream(
+          locationSettings: _buildLocationSettings(),
+        ).listen(
+          (Position pos) {
+            _lastKnown = pos;
+            _controller?.add(pos);
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            _controller?.addError(error, stackTrace);
+          },
+        );
+  }
+
+  void _stopStreamIfIdle() {
+    if (_controller?.hasListener == true) return;
+    _geoSub?.cancel();
+    _geoSub = null;
+    _simulatedSub?.cancel();
+    _simulatedSub = null;
+    _controller?.close();
+    _controller = null;
+  }
+
+  /// Debug-only hook: route synthetic positions through the shared stream.
+  Future<void> attachTripSimulator(
+    TripSimulatorService simulator, {
+    bool initialize = true,
+  }) async {
+    if (!kDebugMode) return;
+
+    await detachTripSimulator(resumeRealStream: false);
+
+    await _geoSub?.cancel();
+    _geoSub = null;
+
+    _activeSimulator = simulator;
+    _simulatedSub = simulator.positions.listen(
       (Position pos) {
         _lastKnown = pos;
         _controller?.add(pos);
@@ -192,14 +246,23 @@ class LocationService {
         _controller?.addError(error, stackTrace);
       },
     );
+
+    if (initialize) {
+      simulator.initialize();
+    }
   }
 
-  void _stopStreamIfIdle() {
-    if (_controller?.hasListener == true) return;
-    _geoSub?.cancel();
-    _geoSub = null;
-    _controller?.close();
-    _controller = null;
+  /// Stops synthetic position routing and optionally restores GPS streaming.
+  Future<void> detachTripSimulator({bool resumeRealStream = true}) async {
+    await _simulatedSub?.cancel();
+    _simulatedSub = null;
+    _activeSimulator = null;
+    if (!resumeRealStream) return;
+
+    if (_controller != null && _controller!.hasListener) {
+      _startStream();
+      await refresh();
+    }
   }
 
   /// Dispose resources. Only intended for tests or app shutdown; the singleton
@@ -207,10 +270,12 @@ class LocationService {
   @visibleForTesting
   Future<void> disposeForTests() async {
     await _geoSub?.cancel();
+    await _simulatedSub?.cancel();
     await _serviceStatusSub?.cancel();
     await _controller?.close();
     await _statusController.close();
     _geoSub = null;
+    _simulatedSub = null;
     _serviceStatusSub = null;
     _controller = null;
   }

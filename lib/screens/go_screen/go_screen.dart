@@ -1,21 +1,28 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:permission_handler/permission_handler.dart' hide ServiceStatus;
 import 'package:vector_map_tiles/vector_map_tiles.dart';
+import 'package:vibration/vibration.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/navigate_client.dart';
 import 'package:jippy_mobile/models/navigate_suggestion.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
+import 'package:jippy_mobile/screens/go_screen/widgets/debug_trip_simulator_overlay.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_map_canvas.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
+import 'package:jippy_mobile/services/navigation_tracker.dart';
+import 'package:jippy_mobile/services/notification_service.dart';
+import 'package:jippy_mobile/services/trip_simulator_service.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 
@@ -61,6 +68,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
   StreamSubscription<double?>? _headingSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  StreamSubscription<ProximityEvent>? _trackerSubscription;
+  StreamSubscription<TripSimulatorState>? _simulatorStateSubscription;
 
   GoNavigationFlow _flow = GoNavigationFlow.explore;
   GoPinTarget? _pinTarget;
@@ -82,6 +91,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   List<NavigateSuggestion> _routeSuggestions = const [];
   int _selectedSuggestionIndex = 0;
   int? _isolatedLegIndex;
+  NavigationTracker? _navigationTracker;
+  int _currentStopIndex = 0;
+  TripSimulatorService? _tripSimulator;
+  TripSimulatorState _tripSimulatorState = TripSimulatorState.idle;
+  bool _debugTripSimulatorEnabled = false;
+  DateTime? _lastProximityAlertAt;
+  Offset _simOverlayOffset = const Offset(0, 120);
 
   Position? _userPosition;
   double? _compassHeading;
@@ -103,7 +119,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   bool get _showRoutingHeader {
     return _flow == GoNavigationFlow.routingInput ||
         _flow == GoNavigationFlow.routeSelection ||
-        _flow == GoNavigationFlow.routeDetails;
+        _flow == GoNavigationFlow.routeDetails ||
+        _flow == GoNavigationFlow.navigating;
   }
 
   GoSearchBarMode get _searchMode {
@@ -136,9 +153,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   int? get _activeLegIsolationIndex {
-    if (_flow != GoNavigationFlow.routeDetails) return null;
-
-    final isolated = _isolatedLegIndex;
+    final isolated = switch (_flow) {
+      GoNavigationFlow.routeDetails => _isolatedLegIndex,
+      GoNavigationFlow.navigating => _currentNavigationLegIndex,
+      _ => null,
+    };
     if (isolated == null) return null;
 
     final selected = _selectedSuggestion;
@@ -150,9 +169,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return isolated;
   }
 
+  int? get _currentNavigationLegIndex {
+    final tracker = _navigationTracker;
+    if (tracker == null) return null;
+    if (tracker.stops.isEmpty) return null;
+    final index = _currentStopIndex.clamp(0, tracker.stops.length - 1);
+    return tracker.stops[index].legIndex;
+  }
+
   List<Polyline<Object>> get _selectedRoutePolylines {
     if (_flow != GoNavigationFlow.routeSelection &&
-        _flow != GoNavigationFlow.routeDetails) {
+        _flow != GoNavigationFlow.routeDetails &&
+        _flow != GoNavigationFlow.navigating) {
       return const <Polyline<Object>>[];
     }
 
@@ -182,7 +210,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   List<LatLng> get _selectedRideStopPoints {
     if (_flow != GoNavigationFlow.routeSelection &&
-        _flow != GoNavigationFlow.routeDetails) {
+        _flow != GoNavigationFlow.routeDetails &&
+        _flow != GoNavigationFlow.navigating) {
       return const <LatLng>[];
     }
 
@@ -247,6 +276,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _serviceStatusSubscription?.cancel();
     _headingSubscription?.cancel();
     _connectivitySubscription?.cancel();
+    _trackerSubscription?.cancel();
+    _simulatorStateSubscription?.cancel();
+    _navigationTracker?.stop();
+    unawaited(_locationService.detachTripSimulator());
+    unawaited(_tripSimulator?.dispose() ?? Future<void>.value());
     _startFocus.removeListener(_handleStartFocusChange);
     _endFocus.removeListener(_handleEndFocusChange);
     _startController.dispose();
@@ -290,20 +324,20 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _subscribeToServiceStatus() {
-    _serviceStatusSubscription = _locationService.serviceStatusStream.listen(
-      (ServiceStatus status) {
-        if (!mounted) return;
-        if (status == ServiceStatus.enabled) {
-          _initLocation();
-        } else if (status == ServiceStatus.disabled) {
-          setState(() {
-            _permissionChecked = true;
-            _locationPermission = null;
-            _userPosition = null;
-          });
-        }
-      },
-    );
+    _serviceStatusSubscription = _locationService.serviceStatusStream.listen((
+      ServiceStatus status,
+    ) {
+      if (!mounted) return;
+      if (status == ServiceStatus.enabled) {
+        _initLocation();
+      } else if (status == ServiceStatus.disabled) {
+        setState(() {
+          _permissionChecked = true;
+          _locationPermission = null;
+          _userPosition = null;
+        });
+      }
+    });
   }
 
   void _subscribeToHeading() {
@@ -501,6 +535,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _resetToExplore() {
+    _trackerSubscription?.cancel();
+    _trackerSubscription = null;
+    _navigationTracker?.stop();
+    _navigationTracker = null;
+    unawaited(_stopTripSimulator());
+
     setState(() {
       _flow = GoNavigationFlow.explore;
       _pinTarget = null;
@@ -523,6 +563,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _routeSuggestions = const [];
       _selectedSuggestionIndex = 0;
       _isolatedLegIndex = null;
+      _currentStopIndex = 0;
+      _lastProximityAlertAt = null;
     });
 
     _startFocus.unfocus();
@@ -561,12 +603,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     setState(() => _pinTarget = null);
   }
 
-  void _handleMapTap(TapPosition _, LatLng point) {
+  LatLng _currentMapCenter() {
+    return _mapController.camera.center;
+  }
+
+  Future<void> _confirmMapPinFromCenter() async {
     final target = _pinTarget;
-    if (target != null) {
-      _applyMapPinTarget(target, point);
-      return;
-    }
+    if (target == null) return;
+    await _applyMapPinTarget(target, _currentMapCenter());
+  }
+
+  void _handleMapTap(TapPosition _, LatLng point) {
+    if (_pinTarget != null) return;
 
     if (_flow == GoNavigationFlow.explore ||
         _flow == GoNavigationFlow.locationDetail) {
@@ -893,12 +941,254 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _fitRouteOrStartEnd();
   }
 
-  void _startTurnByTurn() {
-    if (_selectedSuggestion == null) return;
+  Future<void> _startNavigating() async {
+    final selected = _selectedSuggestion;
+    if (selected == null) return;
+
+    final permission = await _locationService.requestPermission();
+    if (!mounted) return;
     setState(() {
+      _permissionChecked = true;
+      _locationPermission = permission;
+    });
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      _showTopSnackBar(
+        'Location permission is required to start trip notifications.',
+      );
+      return;
+    }
+
+    final locationAlways = await Permission.locationAlways.request();
+    if (!mounted) return;
+    if (!locationAlways.isGranted) {
+      _showTopSnackBar(
+        'Background alerts are limited until "Allow all the time" is granted.',
+      );
+    }
+
+    await NotificationService.instance.requestPermissions();
+
+    await _trackerSubscription?.cancel();
+    _trackerSubscription = null;
+    await _navigationTracker?.stop();
+    _navigationTracker = null;
+
+    final tracker = NavigationTracker(
+      suggestion: selected,
+      thresholdMeters: 100,
+    );
+    _trackerSubscription = tracker.events.listen((event) {
+      _onProximityEvent(event);
+    });
+    tracker.start();
+
+    if (kDebugMode && _debugTripSimulatorEnabled) {
+      await _startTripSimulator(selected);
+    } else {
+      await _stopTripSimulator();
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _navigationTracker = tracker;
+      _currentStopIndex = 0;
+      _flow = GoNavigationFlow.navigating;
+      _isolatedLegIndex = null;
+      _lastProximityAlertAt = null;
+    });
+  }
+
+  Future<void> _startTripSimulator(NavigateSuggestion suggestion) async {
+    if (!kDebugMode || !_debugTripSimulatorEnabled) return;
+
+    await _stopTripSimulator();
+    final simulator = TripSimulatorService.fromSuggestion(
+      suggestion: suggestion,
+    );
+    if (simulator.totalPoints < 2) {
+      await simulator.dispose();
+      if (mounted) {
+        _showTopSnackBar('Trip simulator unavailable for this route.');
+      }
+      return;
+    }
+
+    _simulatorStateSubscription = simulator.stateStream.listen((state) {
+      if (!mounted) return;
+      setState(() => _tripSimulatorState = state);
+    });
+    await _locationService.attachTripSimulator(simulator);
+    _tripSimulator = simulator;
+    if (mounted) {
+      setState(() => _tripSimulatorState = simulator.snapshot);
+    }
+  }
+
+  Future<void> _stopTripSimulator() async {
+    await _locationService.detachTripSimulator();
+    await _simulatorStateSubscription?.cancel();
+    _simulatorStateSubscription = null;
+    await _tripSimulator?.dispose();
+    _tripSimulator = null;
+    if (!mounted) return;
+    setState(() => _tripSimulatorState = TripSimulatorState.idle);
+  }
+
+  void _onDebugSimulatorToggled(bool enabled) {
+    if (!kDebugMode) return;
+    setState(() {
+      _debugTripSimulatorEnabled = enabled;
+      if (!enabled) {
+        _tripSimulatorState = TripSimulatorState.idle;
+      }
+    });
+    if (!enabled) {
+      unawaited(_stopTripSimulator());
+      return;
+    }
+    final selected = _selectedSuggestion;
+    if (selected == null) return;
+    if (_flow == GoNavigationFlow.navigating) {
+      unawaited(_startTripSimulator(selected));
+    }
+  }
+
+  void _jumpSimulatorToNextStop() {
+    final simulator = _tripSimulator;
+    final tracker = _navigationTracker;
+    if (simulator == null || tracker == null || tracker.stops.isEmpty) return;
+    final stopIndex = _currentStopIndex.clamp(0, tracker.stops.length - 1);
+    simulator.jumpNearStop(tracker.stops[stopIndex]);
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _moveSimulatorOverlay(Offset delta) {
+    setState(() {
+      _simOverlayOffset = Offset(
+        _simOverlayOffset.dx + delta.dx,
+        (_simOverlayOffset.dy + delta.dy).clamp(72.0, 520.0),
+      );
+    });
+  }
+
+  void _toggleSimulatorPlayback() {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    if (_tripSimulatorState.isPlaying) {
+      simulator.pause();
+    } else {
+      simulator.play();
+    }
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _stepTripSimulator() {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    simulator.stepForward();
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _stopTripSimulatorPlayback() {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    simulator.stop();
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  void _setTripSimulatorSpeed(double speed) {
+    final simulator = _tripSimulator;
+    if (simulator == null) return;
+    simulator.setSpeedMultiplier(speed);
+    setState(() => _tripSimulatorState = simulator.snapshot);
+  }
+
+  Future<void> _onProximityEvent(ProximityEvent event) async {
+    if (!mounted) return;
+
+    final title = event.stop.kind == TripStopKind.dropOff
+        ? 'Arriving at your destination'
+        : 'Transfer ahead - get ready to alight';
+    final body =
+        '${event.distanceMeters.round()}m to ${event.stop.label.trim().isEmpty ? 'next stop' : event.stop.label}';
+
+    var shouldNotify = true;
+    if (kDebugMode && _debugTripSimulatorEnabled) {
+      final now = DateTime.now();
+      final last = _lastProximityAlertAt;
+      if (last != null && now.difference(last) < const Duration(seconds: 2)) {
+        shouldNotify = false;
+      } else {
+        _lastProximityAlertAt = now;
+      }
+    }
+
+    if (shouldNotify) {
+      _showTopSnackBar(body, title: title);
+      await NotificationService.instance.showProximityNotification(
+        title: title,
+        body: body,
+      );
+
+      final hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator) {
+        await Vibration.vibrate(pattern: const [0, 400, 200, 400]);
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _currentStopIndex =
+          _navigationTracker?.currentStopIndex ?? _currentStopIndex;
+    });
+
+    if (event.tripComplete) {
+      await _endNavigating(showCompletedMessage: true);
+    }
+  }
+
+  Future<void> _endNavigating({bool showCompletedMessage = false}) async {
+    await _stopTripSimulator();
+    await _trackerSubscription?.cancel();
+    _trackerSubscription = null;
+    await _navigationTracker?.stop();
+    _navigationTracker = null;
+    if (!mounted) return;
+    setState(() {
+      _currentStopIndex = 0;
       _flow = GoNavigationFlow.routeDetails;
       _isolatedLegIndex = null;
+      _lastProximityAlertAt = null;
     });
+    if (showCompletedMessage) {
+      _showTopSnackBar('You are at your destination. Trip finished.');
+    }
+  }
+
+  void _showTopSnackBar(String message, {String? title}) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: MapColors.text,
+        content: Text(
+          title == null ? message : '$title\n$message',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+          ),
+        ),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: MapColors.secondary,
+          onPressed: () {},
+        ),
+      ),
+    );
   }
 
   void _onLegTimelineStepTapped(int legIndex) {
@@ -1291,6 +1581,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               onPositionChanged: _onMapPositionChanged,
             ),
           ),
+          if (_pinTarget != null) _buildCenterPinCrosshair(),
           GoRecenterButton(
             userPosition: _userPosition,
             mapController: _mapController,
@@ -1313,20 +1604,27 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             onUseCurrentLocationTap: _useCurrentLocationForStart,
             suggestions: _suggestions,
             onSuggestionTap: _onPickSuggestion,
-            searchError:
-              _flow == GoNavigationFlow.routeSelection ? null : _searchError,
+            searchError: _flow == GoNavigationFlow.routeSelection
+                ? null
+                : _searchError,
             showOutOfAreaDisclaimer: _destinationOutOfArea,
             isSearchingNominatim: _nominatimBusy,
-            mapPinAwaitingTap: _pinTarget,
-            onCancelMapPinMode: _cancelMapPinMode,
             activeRoutingField: _activeRoutingField,
             onActiveRoutingFieldChanged: _setActiveRoutingField,
           ),
-          if (_flow == GoNavigationFlow.locationDetail)
+          if (_flow != GoNavigationFlow.navigating && _pinTarget != null)
+            _buildPinModeSheet()
+          else if (_flow == GoNavigationFlow.locationDetail)
             _buildLocationDetailSheet(),
-          if (_flow == GoNavigationFlow.routeSelection)
+          if (_flow == GoNavigationFlow.navigating) _buildNavigatingSheet(),
+          if (_flow != GoNavigationFlow.navigating &&
+              _pinTarget == null &&
+              _flow == GoNavigationFlow.routeSelection)
             _buildRouteSelectionSheet(context),
-          if (_flow == GoNavigationFlow.routeDetails) _buildRouteDetailsSheet(),
+          if (_flow != GoNavigationFlow.navigating &&
+              _pinTarget == null &&
+              _flow == GoNavigationFlow.routeDetails)
+            _buildRouteDetailsSheet(),
           if (_permissionChecked &&
               (_locationPermission == LocationPermission.denied ||
                   _locationPermission == LocationPermission.deniedForever ||
@@ -1336,6 +1634,312 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   ? 'Location service is disabled.'
                   : 'Location permission denied. Enable it to see your position on the Go map.',
             ),
+          if (kDebugMode &&
+              _flow == GoNavigationFlow.navigating &&
+              _debugTripSimulatorEnabled)
+            Positioned(
+              top: _simOverlayOffset.dy,
+              right: 12 - _simOverlayOffset.dx,
+              child: DebugTripSimulatorOverlay(
+                state: _tripSimulatorState,
+                simulatorAvailable: _tripSimulator != null,
+                onPlayPause: _toggleSimulatorPlayback,
+                onStep: _stepTripSimulator,
+                onJumpToNextStop: _jumpSimulatorToNextStop,
+                onStop: _stopTripSimulatorPlayback,
+                onSpeedChanged: _setTripSimulatorSpeed,
+                onDragDelta: _moveSimulatorOverlay,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCenterPinCrosshair() {
+    const pinSize = 34.0;
+    // place_rounded tip sits slightly above the bottom of the icon box; lift so
+    // the sharp point (not the box bottom) matches the map center.
+    const tipInsetFromBoxBottom = 3.0;
+    const lift = pinSize / 2 - tipInsetFromBoxBottom;
+    final pinColor = _pinTarget == GoPinTarget.destination
+        ? MapColors.secondary
+        : MapColors.primary;
+    return IgnorePointer(
+      child: Center(
+        child: Transform.translate(
+          offset: const Offset(0, -lift),
+          child: Icon(
+            Icons.place_rounded,
+            color: pinColor,
+            size: pinSize,
+            shadows: const [
+              Shadow(color: Colors.white, blurRadius: 4),
+              Shadow(
+                color: Colors.black38,
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPinModeSheet() {
+    final isOrigin = _pinTarget == GoPinTarget.origin;
+    final title = isOrigin ? 'Pin starting point' : 'Pin destination';
+    final body = isOrigin
+        ? 'Move the map so the crosshair points to your starting location.'
+        : 'Move the map so the crosshair points to your destination.';
+
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: 0.23,
+      minChildSize: 0.2,
+      maxChildSize: 0.27,
+      snap: true,
+      snapSizes: const <double>[0.23],
+      builder: (context, scrollController) {
+        return _SheetSurface(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: MapColors.text,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                body,
+                style: TextStyle(
+                  color: MapColors.text.withValues(alpha: 0.78),
+                  fontSize: 14,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _cancelMapPinMode,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                        side: BorderSide(
+                          color: MapColors.text.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _confirmMapPinFromCenter,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: MapColors.primary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                      child: const Text(
+                        'Confirm pin',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNavigatingSheet() {
+    final tracker = _navigationTracker;
+    if (tracker == null || tracker.stops.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final clampedIndex = _currentStopIndex.clamp(0, tracker.stops.length - 1);
+    final nextStop = tracker.stops[clampedIndex];
+    final userPosition = _userPosition;
+    final hasLiveFix = userPosition != null && _gpsOriginAvailable;
+
+    double? distanceMeters;
+    if (hasLiveFix) {
+      const distance = Distance();
+      distanceMeters = distance.as(
+        LengthUnit.Meter,
+        LatLng(userPosition.latitude, userPosition.longitude),
+        nextStop.point,
+      );
+    }
+
+    final nextLabel = nextStop.kind == TripStopKind.dropOff
+        ? 'Destination'
+        : nextStop.label;
+
+    return DraggableScrollableSheet(
+      controller: _sheetController,
+      initialChildSize: 0.22,
+      minChildSize: 0.18,
+      maxChildSize: 0.88,
+      snap: true,
+      snapSizes: const <double>[0.22, 0.38, 0.65],
+      builder: (context, scrollController) {
+        return _SheetSurface(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 20),
+            children: [
+              const Text(
+                'Navigating',
+                style: TextStyle(
+                  color: MapColors.text,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Next stop: $nextLabel',
+                style: TextStyle(
+                  color: MapColors.text.withValues(alpha: 0.86),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                distanceMeters == null
+                    ? 'Waiting for GPS...'
+                    : '${distanceMeters.round()}m away',
+                style: TextStyle(
+                  color: MapColors.text.withValues(alpha: 0.7),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _buildStopProgressIndicator(tracker),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _endNavigating,
+                style: FilledButton.styleFrom(
+                  backgroundColor: MapColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(46),
+                ),
+                icon: const Icon(Icons.stop_circle_outlined),
+                label: const Text(
+                  'End trip',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Divider(color: MapColors.text.withValues(alpha: 0.12)),
+              const SizedBox(height: 12),
+              const Text(
+                'Itinerary',
+                style: TextStyle(
+                  color: MapColors.text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ..._buildLegBlocks(withCompletedState: true),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStopProgressIndicator(NavigationTracker tracker) {
+    final totalStops = tracker.stops.length;
+    if (totalStops == 0) return const SizedBox.shrink();
+
+    final completedStops = _currentStopIndex.clamp(0, totalStops);
+    final progress = completedStops / totalStops;
+    final label = completedStops >= totalStops
+        ? 'Arrived'
+        : 'Stop ${(completedStops + 1).clamp(1, totalStops)} of $totalStops';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _sheetSurfaceColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: MapColors.text.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: MapColors.text.withValues(alpha: 0.1),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  MapColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: TextStyle(
+              color: MapColors.text.withValues(alpha: 0.78),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebugSimulatorToggleTile() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 4, 6, 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: MapColors.text.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.bug_report_outlined,
+            size: 18,
+            color: MapColors.text,
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Enable Trip Simulator (debug)',
+              style: TextStyle(
+                color: MapColors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Switch(
+            value: _debugTripSimulatorEnabled,
+            onChanged: _onDebugSimulatorToggled,
+          ),
         ],
       ),
     );
@@ -1497,13 +2101,16 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         label: const Text('Retry'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: MapColors.primary,
-                          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ] else if (_routeSuggestions.isEmpty && !_routePreviewLoading) ...[
+              ] else if (_routeSuggestions.isEmpty &&
+                  !_routePreviewLoading) ...[
                 const SizedBox(height: 10),
                 Text(
                   'No route suggestions available yet.',
@@ -1557,13 +2164,17 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: _startTurnByTurn,
+                  onPressed: _startNavigating,
                   icon: const Icon(Icons.play_arrow_rounded),
                   label: const Text(
                     'Start',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
+                if (kDebugMode) ...[
+                  const SizedBox(height: 10),
+                  _buildDebugSimulatorToggleTile(),
+                ],
                 const SizedBox(height: 14),
                 Text(
                   'Preview instructions',
@@ -1822,7 +2433,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       case NavigateLegType.tricycle:
       case NavigateLegType.unknown:
         final routeName = leg.routeName.trim();
-        final base = routeName.isNotEmpty ? routeName : _labelForLegType(leg.type);
+        final base = routeName.isNotEmpty
+            ? routeName
+            : _labelForLegType(leg.type);
         return '$base - $distance';
     }
   }
@@ -1853,18 +2466,22 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   String? _extractRouteNumberFromName(String name) {
-    final parenMatch =
-        RegExp(r'\(\s*Route\s*([^)]+)\)', caseSensitive: false)
-            .firstMatch(name);
+    final parenMatch = RegExp(
+      r'\(\s*Route\s*([^)]+)\)',
+      caseSensitive: false,
+    ).firstMatch(name);
     if (parenMatch != null) return parenMatch.group(1)?.trim();
 
-    final routeMatch =
-        RegExp(r'\bRoute\s*([A-Za-z0-9-]+)\b', caseSensitive: false)
-            .firstMatch(name);
+    final routeMatch = RegExp(
+      r'\bRoute\s*([A-Za-z0-9-]+)\b',
+      caseSensitive: false,
+    ).firstMatch(name);
     if (routeMatch != null) return routeMatch.group(1)?.trim();
 
-    final rMatch =
-        RegExp(r'\bR\s*\d+\b', caseSensitive: false).firstMatch(name);
+    final rMatch = RegExp(
+      r'\bR\s*\d+\b',
+      caseSensitive: false,
+    ).firstMatch(name);
     if (rMatch != null) return rMatch.group(0)?.replaceAll(' ', '');
 
     return null;
@@ -1872,11 +2489,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   String _normalizeRouteNumber(String raw) {
     final trimmed = raw.trim();
-    final prefixed =
-        RegExp(r'^Route\s*(.+)$', caseSensitive: false).firstMatch(trimmed);
+    final prefixed = RegExp(
+      r'^Route\s*(.+)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
     if (prefixed != null) return prefixed.group(1)?.trim() ?? trimmed;
-    final match =
-        RegExp(r'^R\s*(\d+)$', caseSensitive: false).firstMatch(trimmed);
+    final match = RegExp(
+      r'^R\s*(\d+)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
     if (match != null) return match.group(1) ?? trimmed;
     return trimmed;
   }
@@ -1887,40 +2508,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       return const SizedBox.shrink();
     }
 
-    final selectedIndex = _selectedSuggestionIndex < 0 ||
+    final selectedIndex =
+        _selectedSuggestionIndex < 0 ||
             _selectedSuggestionIndex >= _routeSuggestions.length
         ? 0
         : _selectedSuggestionIndex;
 
-    final legTimelineBlocks = <Widget>[];
-    var boardCountBeforeLeg = 0;
-    var jeepStepNumber = 0;
-    for (int i = 0; i < selected.route.legs.length; i++) {
-      final leg = selected.route.legs[i];
-      int? jeepNumber;
-      if (leg.type == NavigateLegType.jeepney) {
-        jeepStepNumber += 1;
-        jeepNumber = jeepStepNumber;
-      }
-      legTimelineBlocks.add(
-        _buildLegTimelineBlock(
-          leg,
-          index: i,
-          isLast: i == selected.route.legs.length - 1,
-          boardCountBeforeLeg: boardCountBeforeLeg,
-          jeepStepNumber: jeepNumber,
-          isIsolated: _activeLegIsolationIndex == i,
-          onTap: () => _onLegTimelineStepTapped(i),
-        ),
-      );
-
-      boardCountBeforeLeg += leg.instructions
-          .where(
-            (instruction) =>
-                instruction.maneuverType == NavigateManeuverType.board,
-          )
-          .length;
-    }
+    final legTimelineBlocks = _buildLegBlocks();
 
     return DraggableScrollableSheet(
       controller: _sheetController,
@@ -1986,6 +2580,47 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
+  List<Widget> _buildLegBlocks({bool withCompletedState = false}) {
+    final selected = _selectedSuggestion;
+    if (selected == null) return const <Widget>[];
+
+    final legTimelineBlocks = <Widget>[];
+    final currentNavigationLegIndex = _currentNavigationLegIndex;
+    var boardCountBeforeLeg = 0;
+    var jeepStepNumber = 0;
+    for (int i = 0; i < selected.route.legs.length; i++) {
+      final leg = selected.route.legs[i];
+      int? jeepNumber;
+      if (leg.type == NavigateLegType.jeepney) {
+        jeepStepNumber += 1;
+        jeepNumber = jeepStepNumber;
+      }
+      legTimelineBlocks.add(
+        _buildLegTimelineBlock(
+          leg,
+          index: i,
+          isLast: i == selected.route.legs.length - 1,
+          boardCountBeforeLeg: boardCountBeforeLeg,
+          jeepStepNumber: jeepNumber,
+          isIsolated: _activeLegIsolationIndex == i,
+          isCompleted:
+              withCompletedState &&
+              currentNavigationLegIndex != null &&
+              i < currentNavigationLegIndex,
+          onTap: () => _onLegTimelineStepTapped(i),
+        ),
+      );
+
+      boardCountBeforeLeg += leg.instructions
+          .where(
+            (instruction) =>
+                instruction.maneuverType == NavigateManeuverType.board,
+          )
+          .length;
+    }
+    return legTimelineBlocks;
+  }
+
   Widget _buildLegTimelineBlock(
     NavigateLeg leg, {
     required int index,
@@ -1993,6 +2628,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     required int boardCountBeforeLeg,
     required int? jeepStepNumber,
     required bool isIsolated,
+    bool isCompleted = false,
     required VoidCallback onTap,
   }) {
     var boardCount = boardCountBeforeLeg;
@@ -2002,6 +2638,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final stepLabel = jeepStepNumber == null
         ? baseLabel
         : '$baseLabel $jeepStepNumber';
+    final timelineColor = isCompleted
+        ? MapColors.text.withValues(alpha: 0.26)
+        : _timelineSubtleLineColor;
+    final iconColor = isCompleted
+        ? MapColors.text.withValues(alpha: 0.44)
+        : MapColors.text;
+    final titleColor = isCompleted
+        ? MapColors.text.withValues(alpha: 0.48)
+        : MapColors.text;
+    final bodyColor = isCompleted
+        ? MapColors.text.withValues(alpha: 0.42)
+        : MapColors.text;
 
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
@@ -2017,13 +2665,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     width: 30,
                     height: 30,
                     decoration: BoxDecoration(
-                      color: _colorForLeg(leg).withValues(alpha: 0.2),
+                      color: isCompleted
+                          ? MapColors.text.withValues(alpha: 0.08)
+                          : _colorForLeg(leg).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(99),
                     ),
                     child: Icon(
                       _iconForLegType(leg.type),
                       size: 18,
-                      color: MapColors.text,
+                      color: iconColor,
                     ),
                   ),
                   if (!isLast)
@@ -2032,7 +2682,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         width: 2,
                         margin: const EdgeInsets.symmetric(vertical: 6),
                         decoration: BoxDecoration(
-                          color: _timelineSubtleLineColor,
+                          color: timelineColor,
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -2067,17 +2717,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             Expanded(
                               child: Text(
                                 stepLabel,
-                                style: const TextStyle(
-                                  color: MapColors.text,
+                                style: TextStyle(
+                                  color: titleColor,
                                   fontSize: 15,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: isCompleted
+                                      ? FontWeight.w700
+                                      : FontWeight.w800,
                                 ),
                               ),
                             ),
                             Text(
                               _formatMinutes(leg.durationMinutes),
                               style: TextStyle(
-                                color: MapColors.text.withValues(alpha: 0.74),
+                                color: bodyColor.withValues(alpha: 0.74),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -2089,7 +2741,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                           Text(
                             leg.routeName,
                             style: TextStyle(
-                              color: MapColors.text.withValues(alpha: 0.84),
+                              color: bodyColor.withValues(alpha: 0.84),
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -2099,76 +2751,88 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         Text(
                           _formatDistance(leg.distanceMeters),
                           style: TextStyle(
-                            color: MapColors.text.withValues(alpha: 0.65),
+                            color: bodyColor.withValues(alpha: 0.65),
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        if (leg.instructions.isEmpty)
+                        if (isCompleted) ...[
+                          const SizedBox(height: 8),
                           Text(
-                            'No detailed instructions for this leg.',
+                            'Completed',
                             style: TextStyle(
-                              color: MapColors.text.withValues(alpha: 0.68),
+                              color: MapColors.text.withValues(alpha: 0.46),
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
-                          )
-                        else
-                          for (int i = 0; i < leg.instructions.length; i++)
-                            Builder(
-                              builder: (context) {
-                                final instruction = leg.instructions[i];
-                                final isBoard =
-                                    instruction.maneuverType ==
-                                    NavigateManeuverType.board;
-                                final isTransferBoard =
-                                    isBoard && boardCount > 0;
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 10),
+                          if (leg.instructions.isEmpty)
+                            Text(
+                              'No detailed instructions for this leg.',
+                              style: TextStyle(
+                                color: MapColors.text.withValues(alpha: 0.68),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else
+                            for (int i = 0; i < leg.instructions.length; i++)
+                              Builder(
+                                builder: (context) {
+                                  final instruction = leg.instructions[i];
+                                  final isBoard =
+                                      instruction.maneuverType ==
+                                      NavigateManeuverType.board;
+                                  final isTransferBoard =
+                                      isBoard && boardCount > 0;
 
-                                if (isBoard) {
-                                  boardCount += 1;
-                                }
+                                  if (isBoard) {
+                                    boardCount += 1;
+                                  }
 
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    bottom: i == leg.instructions.length - 1
-                                        ? 0
-                                        : 8,
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Icon(
-                                        _iconForInstruction(
-                                          leg: leg,
-                                          instruction: instruction,
-                                          isTransferBoard: isTransferBoard,
-                                        ),
-                                        size: 15,
-                                        color: _colorForManeuver(
-                                          instruction.maneuverType,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 7),
-                                      Expanded(
-                                        child: Text(
-                                          instruction.text,
-                                          style: TextStyle(
-                                            color: MapColors.text.withValues(
-                                              alpha: 0.8,
-                                            ),
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            height: 1.33,
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: i == leg.instructions.length - 1
+                                          ? 0
+                                          : 8,
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          _iconForInstruction(
+                                            leg: leg,
+                                            instruction: instruction,
+                                            isTransferBoard: isTransferBoard,
+                                          ),
+                                          size: 15,
+                                          color: _colorForManeuver(
+                                            instruction.maneuverType,
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
+                                        const SizedBox(width: 7),
+                                        Expanded(
+                                          child: Text(
+                                            instruction.text,
+                                            style: TextStyle(
+                                              color: bodyColor.withValues(
+                                                alpha: 0.8,
+                                              ),
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              height: 1.33,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                        ],
                       ],
                     ),
                   ),
