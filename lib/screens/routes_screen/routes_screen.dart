@@ -205,7 +205,7 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
         uri: mapVectorTile,
         httpHeaders: const {
           'User-Agent':
-              'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
+              'JippyMobile/1.0 (https://github.com/bit-matt/jippy-mobile)',
         },
       ).read().timeout(const Duration(seconds: 6));
 

@@ -77,7 +77,7 @@ class RoutesCanvas extends StatelessWidget {
             tileProvider: NetworkTileProvider(
               headers: {
                 'User-Agent':
-                    'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
+                    'JippyMobile/1.0 (https://github.com/bit-matt/jippy-mobile)',
               },
             ),
           ),
