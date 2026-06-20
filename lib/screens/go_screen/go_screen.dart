@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart' hide ServiceStatus;
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 import 'package:vibration/vibration.dart';
 
+import 'package:jippy_mobile/core/config/api_config.dart';
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/navigate_client.dart';
 import 'package:jippy_mobile/models/navigate_suggestion.dart';
@@ -29,10 +30,6 @@ import 'package:jippy_mobile/utils/route_color_parser.dart';
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
 
 const double _initialZoom = 14.0;
-const String _osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const String _vectorStyleUrl =
-    'https://jippy.shinosawa-laboratories.dev/tileserver/liberty.json';
-const String _userAgentPackageName = 'com.example.jippy_mobile';
 
 const Color _sheetSurfaceColor = Colors.white;
 const Color _timelineSubtleLineColor = Color(0xFFCFD4DB);
@@ -41,6 +38,7 @@ bool _hasNetworkInterface(List<ConnectivityResult> results) {
   if (results.length == 1 && results.single == ConnectivityResult.none) {
     return false;
   }
+
   return true;
 }
 
@@ -362,7 +360,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   Future<void> _loadVectorStyle() async {
     try {
       final style = await StyleReader(
-        uri: _vectorStyleUrl,
+        uri: mapVectorTile,
         httpHeaders: const {
           'User-Agent':
               'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
@@ -1576,8 +1574,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               userAccuracyMeters: _userPosition?.accuracy,
               origin: _mapOrigin,
               destination: _mapDestination,
-              osmTileUrl: _osmTileUrl,
-              userAgentPackageName: _userAgentPackageName,
+              osmTileUrl: mapRasterFallback,
+              userAgentPackageName: packageName,
               onPositionChanged: _onMapPositionChanged,
             ),
           ),

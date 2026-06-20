@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+import 'package:jippy_mobile/core/config/api_config.dart';
+
 /// Nominatim search / reverse-geocode client with light caching and request spacing.
 ///
 /// See [secrets/docs/searchbar-step-by-step.md] for policy (User-Agent, rate limits).
@@ -12,10 +14,6 @@ class GeocodingService {
       : _client = httpClient ?? http.Client();
 
   final http.Client _client;
-
-  static const String _baseHost = 'nominatim.openstreetmap.org';
-  static const String userAgent =
-      'Jippy-Mobile/1.0.0 (capstone; contact: https://jippy.shinosawa-laboratories.dev)';
 
   /// Iloilo bounded search area: min_lon, max_lat, max_lon, min_lat.
   static const String iloiloViewBox = '122.019,11.628,123.336,10.407';
@@ -56,7 +54,7 @@ class GeocodingService {
     if (cached != null) return cached;
 
     await _respectRateLimit();
-    final uri = Uri.https(_baseHost, '/search', {
+    final uri = Uri.parse('$nominatimUrl/search').replace(queryParameters: {
       'q': trimmed,
       'format': 'json',
       'countrycodes': 'ph',
@@ -67,7 +65,10 @@ class GeocodingService {
 
     final response = await _client.get(
       uri,
-      headers: {'User-Agent': userAgent, 'Accept': 'application/json'},
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US',
+      },
     );
 
     if (response.statusCode != 200) {
@@ -108,19 +109,21 @@ class GeocodingService {
     if (cached != null) return cached;
 
     await _respectRateLimit();
-    final uri = Uri.https(_baseHost, '/reverse', {
+    final uri = Uri.parse('$nominatimUrl/reverse').replace(queryParameters: {
       'lat': point.latitude.toString(),
       'lon': point.longitude.toString(),
       'format': 'jsonv2',
       'countrycodes': 'ph',
-      'viewbox': iloiloViewBox,
       'bounded': '1',
       'zoom': '18',
     });
 
     final response = await _client.get(
       uri,
-      headers: {'User-Agent': userAgent, 'Accept': 'application/json'},
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US',
+      },
     );
 
     if (response.statusCode != 200) {

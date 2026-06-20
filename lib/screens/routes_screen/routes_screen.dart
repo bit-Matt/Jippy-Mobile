@@ -20,6 +20,7 @@ import 'package:jippy_mobile/screens/routes_screen/widgets/route_details_view.da
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_header.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_list_view.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_loading_state.dart';
+import 'package:jippy_mobile/core/config/api_config.dart';
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/map_data_loader.dart';
 import 'package:jippy_mobile/data/valhalla_route_client.dart';
@@ -39,17 +40,6 @@ enum _RouteDirection { goingTo, goingBack }
 
 /// Initial zoom level so the city and jeepney routes are visible.
 const double _initialZoom = 14.0;
-
-/// OSM tile layer URL. Use [userAgentPackageName] to comply with OSM tile usage policy.
-/// For production, consider switching to a dedicated tile provider (MapTiler, Stadia, etc.).
-const String _osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-/// Vector tile style (MapLibre/Mapbox style.json) served by our tile server.
-const String _vectorStyleUrl =
-    'https://jippy.shinosawa-laboratories.dev/tileserver/style.json';
-
-/// App package name for OSM User-Agent (required to avoid tile request blocks).
-const String _userAgentPackageName = 'com.example.jippy_mobile';
 
 /// Debug-only diagnostics for route polylines (decoded vs fallback).
 const bool _debugPolylineDiagnostics = kDebugMode;
@@ -212,7 +202,7 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
     // default raster OSM layer.
     try {
       final style = await StyleReader(
-        uri: _vectorStyleUrl,
+        uri: mapVectorTile,
         httpHeaders: const {
           'User-Agent':
               'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
@@ -440,8 +430,8 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
                   userHeading: _compassHeading,
                   userSpeedMps: _userPosition?.speed,
                   userAccuracyMeters: _userPosition?.accuracy,
-                  osmTileUrl: _osmTileUrl,
-                  userAgentPackageName: _userAgentPackageName,
+                  osmTileUrl: mapRasterFallback,
+                  userAgentPackageName: packageName,
                 ),
                 if (_loadingRoutes) const LoadingOverlay(),
               ],
