@@ -103,6 +103,7 @@ class GoMapCanvas extends StatelessWidget {
             ? null
             : (MapCamera camera, bool hasGesture) =>
                 onPositionChanged!(camera, hasGesture),
+        maxZoom: 18,
       ),
       children: [
         if (vectorStyle != null)

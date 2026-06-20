@@ -61,6 +61,7 @@ class RoutesCanvas extends StatelessWidget {
         initialZoom: initialZoom,
         backgroundColor: MapColors.background,
         onTap: onMapTap,
+        maxZoom: 18,
       ),
       children: [
         if (vectorStyle != null)
