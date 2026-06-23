@@ -28,6 +28,7 @@ import 'package:jippy_mobile/models/road_closure.dart';
 import 'package:jippy_mobile/models/routes_and_stations_data.dart';
 import 'package:jippy_mobile/services/location_service.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
+import 'package:jippy_mobile/utils/route_arrow_utils.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 import 'package:jippy_mobile/utils/route_polyline_hit.dart';
 import 'package:jippy_mobile/utils/route_sort.dart';
@@ -425,6 +426,7 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
                   initialZoom: _initialZoom,
                   onMapTap: _onMapTapForOverlappingRoutes,
                   routePolylines: _routePolylines,
+                  arrowMarkers: _arrowMarkers,
                   showOverlapRadius:
                       _uiState.panelMode == RoutesPanelMode.overlap,
                   overlapTapCenter: _overlapTapCenter,
@@ -639,6 +641,18 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
     return built;
   }
 
+  /// Direction arrows and polyline offset when 1–3 routes are selected.
+  bool get _shouldShowArrows {
+    if (!_uiState.isFocusedMode) return false;
+    final count = _uiState.selectedRouteIds.length;
+    return count >= 1 && count <= 3;
+  }
+
+  List<LatLng> _displayPointsForDirection(List<LatLng> points) {
+    if (!_shouldShowArrows || points.length < 2) return points;
+    return offsetPolyline(points, routePolylineOffsetMeters);
+  }
+
   /// Polylines to draw (jeepney routes: goingTo and goingBack).
   ///
   /// Prefers encoded polylines from the API (`polylineGoingTo` / `polylineGoingBack`).
@@ -652,7 +666,7 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       for (final direction in _RouteDirection.values) {
         final g = _resolveDirectionGeometry(route, direction);
         if (g.points.length < 2) continue;
-        final points = g.points;
+        final points = _displayPointsForDirection(g.points);
         final usedDecoded = g.usedDecoded;
         final usedValhalla = g.usedValhalla;
         final shouldUseOfflineTranslucency = _isUsingFallbackRoutesData;
@@ -692,6 +706,22 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
       }
     }
     return polylines;
+  }
+
+  List<Marker> get _arrowMarkers {
+    if (!_shouldShowArrows) return const <Marker>[];
+
+    final markers = <Marker>[];
+    for (final route in _visibleRoutes) {
+      final routeColor = parseRouteColor(route.routeColor);
+      for (final direction in _RouteDirection.values) {
+        final g = _resolveDirectionGeometry(route, direction);
+        if (g.points.length < 2) continue;
+        final offsetPoints = _displayPointsForDirection(g.points);
+        markers.addAll(buildArrowMarkers(offsetPoints, routeColor));
+      }
+    }
+    return markers;
   }
 
   List<JeepneyRoute> get _visibleRoutes {
