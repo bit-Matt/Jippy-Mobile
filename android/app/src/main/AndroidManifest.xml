@@ -18,7 +18,7 @@
     <!-- Required for OSM map tiles and dashboard/Valhalla API in all build types (including release APK). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="jippy_mobile"
+        android:label="Jippy"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
