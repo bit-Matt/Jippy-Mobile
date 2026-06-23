@@ -50,7 +50,7 @@ const String _vectorStyleUrl =
     'https://jippy.shinosawa-laboratories.dev/tileserver/style.json';
 
 /// App package name for OSM User-Agent (required to avoid tile request blocks).
-const String _userAgentPackageName = 'com.example.jippy_mobile';
+const String _userAgentPackageName = 'com.jippy.mobile';
 
 /// Debug-only diagnostics for route polylines (decoded vs fallback).
 const bool _debugPolylineDiagnostics = kDebugMode;
