@@ -9,7 +9,7 @@ import 'package:latlong2/latlong.dart';
 const double routePolylineOffsetMeters = 7.0;
 
 /// Default spacing between direction arrows along a route strand.
-const double routeArrowSpacingMeters = 100.0;
+const double routeArrowSpacingMeters = 250.0;
 
 const double _arrowSizePx = 14.0;
 const Distance _distance = Distance();
