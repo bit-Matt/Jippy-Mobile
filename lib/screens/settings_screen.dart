@@ -1,7 +1,15 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../core/config/billing_config.dart';
 import '../core/theme/map_colors.dart';
+import '../models/entitlement.dart';
+import '../services/entitlement_service.dart';
+import '../services/subscription_service.dart';
 import 'report_screen.dart';
+import 'widgets/paywall_sheet.dart';
 
 /// Settings screen displaying app configuration and action options.
 class SettingsScreen extends StatelessWidget {
@@ -24,6 +32,8 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        const _PremiumSection(),
+        const SizedBox(height: 24),
         _buildSettingsSection(
           title: 'Support',
           children: [
@@ -45,12 +55,13 @@ class SettingsScreen extends StatelessWidget {
       ],
     );
   }
+}
 
-  Widget _buildSettingsSection({
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Column(
+Widget _buildSettingsSection({
+  required String title,
+  required List<Widget> children,
+}) {
+  return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
@@ -92,7 +103,6 @@ class SettingsScreen extends StatelessWidget {
       ],
     );
   }
-}
 
 /// Individual settings menu item with icon, title, and subtitle.
 class _SettingsTile extends StatelessWidget {
@@ -159,6 +169,130 @@ class _SettingsTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Premium subscription section: upgrade/restore when locked, status + manage
+/// when active. Listens to [EntitlementService] so it reflects purchases live.
+class _PremiumSection extends StatefulWidget {
+  const _PremiumSection();
+
+  @override
+  State<_PremiumSection> createState() => _PremiumSectionState();
+}
+
+class _PremiumSectionState extends State<_PremiumSection> {
+  StreamSubscription<String>? _messageSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageSub = SubscriptionService.instance.messages.listen(_showSnackBar);
+  }
+
+  @override
+  void dispose() {
+    _messageSub?.cancel();
+    super.dispose();
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Future<void> _openManageSubscription() async {
+    final uri = Uri.tryParse(premiumManageSubscriptionsUrl);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Entitlement>(
+      valueListenable: EntitlementService.instance.listenable,
+      builder: (context, _, _) {
+        final unlocked = EntitlementService.instance.premiumUnlocked;
+        return _buildSettingsSection(
+          title: 'Premium',
+          children: unlocked ? _activeChildren() : _inactiveChildren(),
+        );
+      },
+    );
+  }
+
+  List<Widget> _inactiveChildren() {
+    return [
+      _SettingsTile(
+        icon: Icons.workspace_premium_outlined,
+        title: 'Upgrade to Premium',
+        subtitle: 'Unlock offline routes and details',
+        onTap: () => showPaywallSheet(context),
+      ),
+      _SettingsTile(
+        icon: Icons.restore,
+        title: 'Restore purchases',
+        subtitle: 'Already subscribed? Restore on this device',
+        onTap: () => SubscriptionService.instance.restore(),
+      ),
+    ];
+  }
+
+  List<Widget> _activeChildren() {
+    return [
+      _buildStatusTile(),
+      _SettingsTile(
+        icon: Icons.manage_accounts_outlined,
+        title: 'Manage subscription',
+        subtitle: 'Change or cancel in Google Play',
+        onTap: _openManageSubscription,
+      ),
+      _SettingsTile(
+        icon: Icons.restore,
+        title: 'Restore purchases',
+        onTap: () => SubscriptionService.instance.restore(),
+      ),
+    ];
+  }
+
+  Widget _buildStatusTile() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Row(
+        children: [
+          Icon(Icons.verified, color: MapColors.primary, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Premium active',
+                  style: TextStyle(
+                    color: MapColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Offline routes are unlocked',
+                  style: TextStyle(
+                    color: MapColors.text.withValues(alpha: 0.65),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

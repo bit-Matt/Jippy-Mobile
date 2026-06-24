@@ -32,7 +32,7 @@ const double _initialZoom = 14.0;
 const String _osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const String _vectorStyleUrl =
     'https://jippy.shinosawa-laboratories.dev/tileserver/liberty.json';
-const String _userAgentPackageName = 'com.example.jippy_mobile';
+const String _userAgentPackageName = 'com.jippy.mobile';
 
 const Color _sheetSurfaceColor = Colors.white;
 const Color _timelineSubtleLineColor = Color(0xFFCFD4DB);
