@@ -73,7 +73,7 @@ const double _overlapTapMinZoom = 15;
 
 const double _drawerCollapsedSize = 0.16;
 const double _drawerDefaultSize = 0.38;
-const double _drawerMaxSize = 0.74;
+const double _drawerMaxSize = 0.85;
 const List<double> _drawerSnapSizes = <double>[
   _drawerCollapsedSize,
   _drawerDefaultSize,
