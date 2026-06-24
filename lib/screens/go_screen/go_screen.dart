@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -39,6 +40,11 @@ const String _userAgentPackageName = 'com.jippy.mobile';
 
 const Color _sheetSurfaceColor = Colors.white;
 const Color _timelineSubtleLineColor = Color(0xFFCFD4DB);
+const double _routeProgressSnapMaxMeters = 50.0;
+
+/// Progress along the selected route: leg index, segment start point index, and
+/// interpolation [t] in [0, 1] along that segment.
+typedef RouteProgress = ({int legIndex, int pointIndex, double t});
 
 bool _hasNetworkInterface(List<ConnectivityResult> results) {
   if (results.length == 1 && results.single == ConnectivityResult.none) {
@@ -105,6 +111,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   Offset _simOverlayOffset = const Offset(0, 120);
 
   Position? _userPosition;
+  RouteProgress? _routeProgress;
   double? _compassHeading;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
@@ -167,7 +174,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   int? get _activeLegIsolationIndex {
     final isolated = switch (_flow) {
       GoNavigationFlow.routeDetails => _isolatedLegIndex,
-      GoNavigationFlow.navigating => _currentNavigationLegIndex,
       _ => null,
     };
     if (isolated == null) return null;
@@ -199,6 +205,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final selected = _selectedSuggestion;
     if (selected == null) return const <Polyline<Object>>[];
     final isolatedIndex = _activeLegIsolationIndex;
+    final progress = _flow == GoNavigationFlow.navigating ? _routeProgress : null;
 
     final polylines = <Polyline<Object>>[];
     for (var i = 0; i < selected.route.legs.length; i++) {
@@ -208,14 +215,45 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       if (encoded.isEmpty) continue;
       final points = decodeApiRoutePolyline(encoded);
       if (points == null || points.length < 2) continue;
-      polylines.add(
-        Polyline<Object>(
-          points: points,
-          color: _mapColorForLeg(leg),
-          strokeWidth: _strokeWidthForLeg(leg),
-          pattern: _polylinePatternForLeg(leg),
-        ),
-      );
+
+      if (progress == null) {
+        polylines.add(_polylineForLegPoints(leg, points));
+        continue;
+      }
+
+      if (i < progress.legIndex) {
+        polylines.add(
+          _polylineForLegPoints(leg, points, color: _passedColorForLeg(leg)),
+        );
+      } else if (i > progress.legIndex) {
+        polylines.add(_polylineForLegPoints(leg, points));
+      } else {
+        final splitPoint = _interpolateRoutePoint(
+          points[progress.pointIndex],
+          points[progress.pointIndex + 1],
+          progress.t,
+        );
+        final passedPoints = <LatLng>[
+          ...points.sublist(0, progress.pointIndex + 1),
+          splitPoint,
+        ];
+        final remainingPoints = <LatLng>[
+          splitPoint,
+          ...points.sublist(progress.pointIndex + 1),
+        ];
+        if (passedPoints.length >= 2) {
+          polylines.add(
+            _polylineForLegPoints(
+              leg,
+              passedPoints,
+              color: _passedColorForLeg(leg),
+            ),
+          );
+        }
+        if (remainingPoints.length >= 2) {
+          polylines.add(_polylineForLegPoints(leg, remainingPoints));
+        }
+      }
     }
     return polylines;
   }
@@ -492,6 +530,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
         setState(() {
           _userPosition = position;
+          if (_flow == GoNavigationFlow.navigating) {
+            _updateRouteProgress(position);
+          }
         });
 
         if (shouldPrimeRoutingStart) {
@@ -524,7 +565,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   /// flows where we want bounds-fit camera to remain authoritative.
   void _maybeFollowUser(Position position) {
     if (!_followUser) return;
-    if (_flow != GoNavigationFlow.explore) return;
+    if (_flow != GoNavigationFlow.explore &&
+        _flow != GoNavigationFlow.navigating) {
+      return;
+    }
     _suppressNextGestureFollowBreak = true;
     _mapController.move(
       LatLng(position.latitude, position.longitude),
@@ -1062,6 +1106,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _flow = GoNavigationFlow.navigating;
       _isolatedLegIndex = null;
       _lastProximityAlertAt = null;
+      _routeProgress = null;
+      final position = _userPosition;
+      if (position != null) {
+        _updateRouteProgress(position);
+      }
     });
   }
 
@@ -1226,6 +1275,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _flow = GoNavigationFlow.routeDetails;
       _isolatedLegIndex = null;
       _lastProximityAlertAt = null;
+      _routeProgress = null;
     });
     if (showCompletedMessage) {
       _showTopSnackBar('You are at your destination. Trip finished.');
@@ -1480,6 +1530,134 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       NavigateLegType.tricycle => MapColors.accentStrokeWidth,
       NavigateLegType.unknown => MapColors.jeepneyRouteStrokeWidth,
     };
+  }
+
+  Polyline<Object> _polylineForLegPoints(
+    NavigateLeg leg,
+    List<LatLng> points, {
+    Color? color,
+  }) {
+    return Polyline<Object>(
+      points: points,
+      color: color ?? _mapColorForLeg(leg),
+      strokeWidth: _strokeWidthForLeg(leg),
+      pattern: _polylinePatternForLeg(leg),
+    );
+  }
+
+  Color _passedColorForLeg(NavigateLeg leg) {
+    return _mapColorForLeg(leg).withValues(alpha: 0.35);
+  }
+
+  LatLng _interpolateRoutePoint(LatLng start, LatLng end, double t) {
+    final clamped = t.clamp(0.0, 1.0);
+    return LatLng(
+      start.latitude + (end.latitude - start.latitude) * clamped,
+      start.longitude + (end.longitude - start.longitude) * clamped,
+    );
+  }
+
+  int _compareRouteProgress(RouteProgress a, RouteProgress b) {
+    if (a.legIndex != b.legIndex) {
+      return a.legIndex.compareTo(b.legIndex);
+    }
+    if (a.pointIndex != b.pointIndex) {
+      return a.pointIndex.compareTo(b.pointIndex);
+    }
+    return a.t.compareTo(b.t);
+  }
+
+  bool _isRouteProgressAhead(RouteProgress candidate, RouteProgress current) {
+    return _compareRouteProgress(candidate, current) > 0;
+  }
+
+  ({double t, double distanceMeters}) _projectOntoRouteSegment(
+    LatLng point,
+    LatLng start,
+    LatLng end,
+  ) {
+    final latScale = 111320.0;
+    final lonScale =
+        111320.0 * math.cos(start.latitude * math.pi / 180.0);
+
+    final segmentX = (end.longitude - start.longitude) * lonScale;
+    final segmentY = (end.latitude - start.latitude) * latScale;
+    final pointX = (point.longitude - start.longitude) * lonScale;
+    final pointY = (point.latitude - start.latitude) * latScale;
+
+    final segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
+    if (segmentLengthSquared == 0) {
+      final distance = const Distance().as(
+        LengthUnit.Meter,
+        start,
+        point,
+      );
+      return (t: 0.0, distanceMeters: distance);
+    }
+
+    final t = ((pointX * segmentX + pointY * segmentY) / segmentLengthSquared)
+        .clamp(0.0, 1.0);
+    final projected = _interpolateRoutePoint(start, end, t);
+    final distance = const Distance().as(
+      LengthUnit.Meter,
+      point,
+      projected,
+    );
+    return (t: t, distanceMeters: distance);
+  }
+
+  void _updateRouteProgress(Position position) {
+    final selected = _selectedSuggestion;
+    if (selected == null) return;
+
+    final userPoint = LatLng(position.latitude, position.longitude);
+    final legs = selected.route.legs;
+    if (legs.isEmpty) return;
+
+    final startLegIndex = _routeProgress?.legIndex ?? 0;
+    RouteProgress? bestCandidate;
+    var bestDistance = double.infinity;
+
+    for (var legIndex = startLegIndex; legIndex < legs.length; legIndex++) {
+      final encoded = legs[legIndex].polyline.trim();
+      if (encoded.isEmpty) continue;
+      final points = decodeApiRoutePolyline(encoded);
+      if (points == null || points.length < 2) continue;
+
+      final startPointIndex = legIndex == startLegIndex
+          ? (_routeProgress?.pointIndex ?? 0)
+          : 0;
+
+      for (var pointIndex = startPointIndex;
+          pointIndex < points.length - 1;
+          pointIndex++) {
+        final projection = _projectOntoRouteSegment(
+          userPoint,
+          points[pointIndex],
+          points[pointIndex + 1],
+        );
+        if (projection.distanceMeters >= bestDistance) continue;
+
+        bestDistance = projection.distanceMeters;
+        bestCandidate = (
+          legIndex: legIndex,
+          pointIndex: pointIndex,
+          t: projection.t,
+        );
+      }
+    }
+
+    if (bestCandidate == null ||
+        bestDistance > _routeProgressSnapMaxMeters) {
+      return;
+    }
+
+    final current = _routeProgress;
+    if (current != null && !_isRouteProgressAhead(bestCandidate, current)) {
+      return;
+    }
+
+    _routeProgress = bestCandidate;
   }
 
   String _formatDistance(double meters) {
@@ -2680,6 +2858,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           boardCountBeforeLeg: boardCountBeforeLeg,
           jeepStepNumber: jeepNumber,
           isIsolated: _activeLegIsolationIndex == i,
+          isCurrent:
+              withCompletedState &&
+              currentNavigationLegIndex != null &&
+              i == currentNavigationLegIndex,
           isCompleted:
               withCompletedState &&
               currentNavigationLegIndex != null &&
@@ -2705,6 +2887,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     required int boardCountBeforeLeg,
     required int? jeepStepNumber,
     required bool isIsolated,
+    bool isCurrent = false,
     bool isCompleted = false,
     required VoidCallback onTap,
   }) {
@@ -2780,10 +2963,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                       color: _sheetSurfaceColor,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isIsolated
+                        color: (isIsolated || isCurrent)
                             ? MapColors.primary.withValues(alpha: 0.55)
                             : MapColors.text.withValues(alpha: 0.1),
-                        width: isIsolated ? 1.6 : 1,
+                        width: (isIsolated || isCurrent) ? 1.6 : 1,
                       ),
                     ),
                     child: Column(
@@ -2851,6 +3034,17 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             ),
                           ),
                         ] else ...[
+                          if (isCurrent) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Current step',
+                              style: TextStyle(
+                                color: MapColors.primary.withValues(alpha: 0.82),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 10),
                           if (leg.instructions.isEmpty)
                             Text(
