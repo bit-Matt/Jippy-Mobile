@@ -27,6 +27,7 @@ class GoMapCanvas extends StatelessWidget {
     this.userSpeedMps,
     this.userAccuracyMeters,
     this.onPositionChanged,
+    this.onMapReady,
   });
 
   final MapController mapController;
@@ -45,6 +46,7 @@ class GoMapCanvas extends StatelessWidget {
   final double? userSpeedMps;
   final double? userAccuracyMeters;
   final void Function(MapCamera camera, bool hasGesture)? onPositionChanged;
+  final VoidCallback? onMapReady;
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +105,7 @@ class GoMapCanvas extends StatelessWidget {
             ? null
             : (MapCamera camera, bool hasGesture) =>
                 onPositionChanged!(camera, hasGesture),
+        onMapReady: onMapReady,
       ),
       children: [
         if (vectorStyle != null)

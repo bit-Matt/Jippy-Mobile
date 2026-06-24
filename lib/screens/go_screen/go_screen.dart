@@ -48,7 +48,9 @@ bool _hasNetworkInterface(List<ConnectivityResult> results) {
 }
 
 class GoScreen extends StatefulWidget {
-  const GoScreen({super.key});
+  const GoScreen({super.key, this.onReady});
+
+  final VoidCallback? onReady;
 
   @override
   State<GoScreen> createState() => _GoScreenState();
@@ -114,6 +116,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   Timer? _searchDebounce;
 
   Map<String, List<String>> _stickerUrlsByRouteId = const {};
+
+  bool _readinessSignaled = false;
+  bool _vectorStyleAttempted = false;
+  bool _mapFirstFrame = false;
+  bool _locationAttempted = false;
 
   bool get _gpsOriginAvailable {
     if (_userPosition == null) return false;
@@ -407,6 +414,30 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         setState(() => _vectorStyle = null);
       }
     }
+    if (!mounted) return;
+    _vectorStyleAttempted = true;
+    _checkReadiness();
+  }
+
+  void _markMapReady() {
+    if (_mapFirstFrame) return;
+    _mapFirstFrame = true;
+    _checkReadiness();
+  }
+
+  void _markLocationAttempted() {
+    if (_locationAttempted) return;
+    _locationAttempted = true;
+    _checkReadiness();
+  }
+
+  void _checkReadiness() {
+    if (_readinessSignaled) return;
+    if (!_vectorStyleAttempted || !_mapFirstFrame || !_locationAttempted) {
+      return;
+    }
+    _readinessSignaled = true;
+    widget.onReady?.call();
   }
 
   Future<void> _initLocation() async {
@@ -425,6 +456,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _permissionChecked = true;
         _locationPermission = null;
       });
+      _markLocationAttempted();
       return;
     }
 
@@ -438,12 +470,14 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      _markLocationAttempted();
       return;
     }
 
     if (_positionSubscription != null) {
       // Already subscribed; this is a re-entry after resume or service toggle.
       await _locationService.refresh();
+      _markLocationAttempted();
       return;
     }
 
@@ -471,6 +505,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         if (mounted) setState(() => _userPosition = null);
       },
     );
+    _markLocationAttempted();
   }
 
   void _centerToUserOnce(Position position) {
@@ -1610,6 +1645,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               osmTileUrl: _osmTileUrl,
               userAgentPackageName: _userAgentPackageName,
               onPositionChanged: _onMapPositionChanged,
+              onMapReady: _markMapReady,
             ),
           ),
           if (_pinTarget != null) _buildCenterPinCrosshair(),

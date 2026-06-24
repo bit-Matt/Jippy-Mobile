@@ -6,7 +6,9 @@ import 'routes_screen/routes_screen.dart';
 import 'settings_screen.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.onReady});
+
+  final VoidCallback? onReady;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -23,7 +25,7 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      const GoScreen(),
+      GoScreen(onReady: widget.onReady),
       const RoutesScreen(),
       const SettingsScreen(),
     ];
