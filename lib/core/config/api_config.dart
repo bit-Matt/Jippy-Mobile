@@ -17,3 +17,9 @@ const String valhallaStatusApiUrl =
 
 /// Valhalla route endpoint. Append encoded `json` query parameter when calling.
 const String valhallaRouteApiUrl = '$apiBaseUrl/api/public/osm/valhalla/route';
+
+/// Public endpoint that validates a Play subscription purchase token server-side
+/// and returns the canonical entitlement. Only used when server verification is
+/// enabled (see `billing_config.dart`); the client-only phase never calls it.
+const String subscriptionVerifyApiUrl =
+    '$apiBaseUrl/api/public/subscriptions/verify';
