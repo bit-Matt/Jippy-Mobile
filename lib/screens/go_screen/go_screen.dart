@@ -11,7 +11,9 @@ import 'package:vector_map_tiles/vector_map_tiles.dart';
 import 'package:vibration/vibration.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
+import 'package:jippy_mobile/data/map_data_loader.dart';
 import 'package:jippy_mobile/data/navigate_client.dart';
+import 'package:jippy_mobile/models/jeepney_route.dart';
 import 'package:jippy_mobile/models/navigate_suggestion.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/debug_trip_simulator_overlay.dart';
@@ -25,6 +27,7 @@ import 'package:jippy_mobile/services/notification_service.dart';
 import 'package:jippy_mobile/services/trip_simulator_service.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
+import 'package:jippy_mobile/widgets/sticker_gallery.dart';
 
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
 
@@ -109,6 +112,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   bool _online = true;
   Timer? _searchDebounce;
+
+  Map<String, List<String>> _stickerUrlsByRouteId = const {};
 
   bool get _gpsOriginAvailable {
     if (_userPosition == null) return false;
@@ -266,6 +271,32 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _subscribeToServiceStatus();
     _subscribeToHeading();
     _initConnectivity();
+    unawaited(_loadStickerUrls());
+  }
+
+  Future<void> _loadStickerUrls() async {
+    try {
+      final data = await loadRoutesFromApi();
+      if (!mounted) return;
+      setState(() => _stickerUrlsByRouteId = _buildStickerUrlMap(data.routes));
+    } catch (_) {
+      try {
+        final data = await loadSampleMapData();
+        if (!mounted) return;
+        setState(() => _stickerUrlsByRouteId = _buildStickerUrlMap(data.routes));
+      } catch (_) {
+        // Leave map empty; stickers simply won't appear.
+      }
+    }
+  }
+
+  Map<String, List<String>> _buildStickerUrlMap(List<JeepneyRoute> routes) {
+    final map = <String, List<String>>{};
+    for (final route in routes) {
+      if (route.id.isEmpty || route.imageUrls.isEmpty) continue;
+      map[route.id] = List<String>.from(route.imageUrls);
+    }
+    return map;
   }
 
   @override
@@ -2446,8 +2477,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     final routeNumber = leg.routeNumber.trim();
     if (routeNumber.isNotEmpty) {
-      final normalized = _normalizeRouteNumber(routeNumber);
-      return '$routeName (Route $normalized)';
+      final code = _formatRouteCode(routeNumber);
+      return '$routeName ($code)';
     }
 
     if (_hasRouteNumberInName(routeName)) {
@@ -2456,8 +2487,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     final extracted = _extractRouteNumberFromName(routeName);
     if (extracted == null || extracted.isEmpty) return routeName;
-    final normalized = _normalizeRouteNumber(extracted);
-    return '$routeName (Route $normalized)';
+    final code = _formatRouteCode(extracted);
+    return '$routeName ($code)';
   }
 
   bool _hasRouteNumberInName(String name) {
@@ -2487,18 +2518,28 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return null;
   }
 
-  String _normalizeRouteNumber(String raw) {
+  String _formatRouteCode(String raw) {
     final trimmed = raw.trim();
-    final prefixed = RegExp(
-      r'^Route\s*(.+)$',
-      caseSensitive: false,
-    ).firstMatch(trimmed);
-    if (prefixed != null) return prefixed.group(1)?.trim() ?? trimmed;
-    final match = RegExp(
+    if (trimmed.isEmpty) return '';
+
+    final rMatch = RegExp(
       r'^R\s*(\d+)$',
       caseSensitive: false,
     ).firstMatch(trimmed);
-    if (match != null) return match.group(1) ?? trimmed;
+    if (rMatch != null) return 'R${rMatch.group(1)}';
+
+    final routeMatch = RegExp(
+      r'^Route\s*(.+)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
+    if (routeMatch != null) {
+      return _formatRouteCode(routeMatch.group(1)?.trim() ?? trimmed);
+    }
+
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) {
+      return 'R$trimmed';
+    }
+
     return trimmed;
   }
 
@@ -2739,7 +2780,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         if (leg.routeName.trim().isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
-                            leg.routeName,
+                            _legRouteDisplayName(leg),
                             style: TextStyle(
                               color: bodyColor.withValues(alpha: 0.84),
                               fontSize: 13,
@@ -2747,6 +2788,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             ),
                           ),
                         ],
+                        if (leg.type == NavigateLegType.jeepney)
+                          StickerGallery(
+                            imageUrls:
+                                _stickerUrlsByRouteId[leg.routeId] ??
+                                const [],
+                            height: 64,
+                          ),
                         const SizedBox(height: 4),
                         Text(
                           _formatDistance(leg.distanceMeters),
@@ -2843,6 +2891,22 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  String _legRouteDisplayName(NavigateLeg leg) {
+    final routeName = leg.routeName.trim();
+    if (routeName.isEmpty) return '';
+
+    if (leg.type != NavigateLegType.jeepney) {
+      return routeName;
+    }
+
+    final routeNumber = leg.routeNumber.trim();
+    if (routeNumber.isNotEmpty) {
+      return '${_formatRouteCode(routeNumber)} - $routeName';
+    }
+
+    return routeName;
   }
 
   String _labelForLegType(NavigateLegType type) {

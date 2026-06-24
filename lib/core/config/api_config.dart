@@ -23,3 +23,18 @@ const String valhallaRouteApiUrl = '$apiBaseUrl/api/public/osm/valhalla/route';
 /// enabled (see `billing_config.dart`); the client-only phase never calls it.
 const String subscriptionVerifyApiUrl =
     '$apiBaseUrl/api/public/subscriptions/verify';
+
+/// Resolves a dashboard image path or URL to an absolute URL.
+/// Passes through [http/https] URLs; otherwise prefixes [apiBaseUrl].
+String resolveApiImageUrl(String pathOrUrl) {
+  final trimmed = pathOrUrl.trim();
+  if (trimmed.isEmpty) return '';
+  final lower = trimmed.toLowerCase();
+  if (lower.startsWith('http://') || lower.startsWith('https://')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('/')) {
+    return '$apiBaseUrl$trimmed';
+  }
+  return '$apiBaseUrl/$trimmed';
+}

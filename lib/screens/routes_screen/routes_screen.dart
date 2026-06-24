@@ -411,7 +411,6 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
-    _syncDrawerToRouteDetails();
     final vectorStyle = _vectorStyle;
     return Scaffold(
       body: Stack(
@@ -1135,17 +1134,6 @@ class _RoutesScreenState extends State<RoutesScreen> with WidgetsBindingObserver
 
   void _snapDrawerToMiddle() {
     _animateDrawerTo(_drawerDefaultSize);
-  }
-
-  void _syncDrawerToRouteDetails() {
-    if (_uiState.panelMode != RoutesPanelMode.routeDetails) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      try {
-        final currentSize = _drawerController.size;
-        if ((currentSize - _drawerDefaultSize).abs() < 0.01) return;
-        _animateDrawerTo(_drawerDefaultSize);
-      } catch (_) {}
-    });
   }
 
   void _expandDrawerToDefault() {
