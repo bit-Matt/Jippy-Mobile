@@ -520,10 +520,8 @@ class _RoutesScreenState extends State<RoutesScreen>
             routesListViewBuilder: (scrollController) => RoutesListView(
               scrollController: scrollController,
               header: RoutesHeader(
-                isFocusedMode: _uiState.isFocusedMode,
                 isCompareMode: _uiState.isCompareMode,
                 showStations: _uiState.showStations,
-                onShowAllRoutes: _showAllRoutes,
                 onCompareModeChanged: _setMultiSelectMode,
                 onShowStationsChanged: (selected) {
                   setState(() {
@@ -537,6 +535,7 @@ class _RoutesScreenState extends State<RoutesScreen>
                 isFocusedMode: _uiState.isFocusedMode,
                 isCompareMode: _uiState.isCompareMode,
                 selectedRouteIds: _uiState.selectedRouteIds,
+                onShowAllRoutes: _showAllRoutes,
                 onRouteTap: _onRouteTap,
                 onRouteDetailsTap: _openRouteDetails,
                 loadingState: const RoutesLoadingState(),
@@ -960,21 +959,30 @@ class _RoutesScreenState extends State<RoutesScreen>
 
     if (routesToFit.isEmpty) {
       _mapController.move(_routesDefaultCenter, _initialZoom);
-      return;
+    } else {
+      _fitRoutesBounds(routesToFit);
     }
-    _fitRoutesBounds(routesToFit);
+
+    if (enabled) {
+      _animateDrawerTo(_drawerMaxSize);
+    }
   }
 
   void _showAllRoutes() {
     final allRoutes = _routesData?.routes ?? const <JeepneyRoute>[];
     final allIds = allRoutes.map((r) => r.id).toSet();
+    final wasCompareMode = _uiState.isCompareMode;
     setState(() {
       _uiState = _uiState.copyWith(
         isFocusedMode: false,
+        isCompareMode: false,
         selectedRouteIds: allIds,
       );
     });
     _fitRoutesBounds(allRoutes);
+    if (wasCompareMode) {
+      _animateDrawerTo(_drawerDefaultSize);
+    }
   }
 
   void _openRouteDetails(JeepneyRoute route) {
