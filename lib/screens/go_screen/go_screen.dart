@@ -29,6 +29,7 @@ import 'package:jippy_mobile/services/trip_simulator_service.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 import 'package:jippy_mobile/widgets/sticker_gallery.dart';
+import 'package:jippy_mobile/widgets/sheet_drag_handle.dart';
 
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
 
@@ -1959,6 +1960,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
+          sheetController: _sheetController,
+          scrollController: scrollController,
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
@@ -2053,6 +2056,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
+          sheetController: _sheetController,
+          scrollController: scrollController,
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(18, 2, 18, 20),
@@ -2229,6 +2234,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
+          sheetController: _sheetController,
+          scrollController: scrollController,
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
@@ -2301,6 +2308,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
+          sheetController: _sheetController,
+          scrollController: scrollController,
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
@@ -2794,6 +2803,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
+          sheetController: _sheetController,
+          scrollController: scrollController,
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(18, 2, 18, 28),
@@ -3164,8 +3175,14 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 }
 
 class _SheetSurface extends StatelessWidget {
-  const _SheetSurface({required this.child});
+  const _SheetSurface({
+    required this.sheetController,
+    required this.scrollController,
+    required this.child,
+  });
 
+  final DraggableScrollableController sheetController;
+  final ScrollController scrollController;
   final Widget child;
 
   @override
@@ -3185,18 +3202,17 @@ class _SheetSurface extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: MapColors.text.withValues(alpha: 0.22),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
+          SheetDragHandle(
+            controller: sheetController,
+            scrollController: scrollController,
+            minChildSize: _sheetCollapsedSize,
+            maxChildSize: _sheetMaxSize,
+            snapSizes: _sheetSnapSizes,
+            barWidth: 44,
+            barHeight: 5,
+            barColor: MapColors.text.withValues(alpha: 0.22),
+            barBorderRadius: 999,
           ),
-          const SizedBox(height: 10),
           Expanded(child: child),
         ],
       ),
