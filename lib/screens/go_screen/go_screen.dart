@@ -257,11 +257,32 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   int? get _currentNavigationLegIndex {
+    final selected = _selectedSuggestion;
+    if (selected == null) return null;
+
+    // Prefer geometry-based progress to keep itinerary state aligned with
+    // the user's actual position along route segments.
+    final progressLegIndex = _routeProgress?.legIndex;
+    if (progressLegIndex != null) {
+      return progressLegIndex.clamp(0, selected.route.legs.length - 1);
+    }
+
     final tracker = _navigationTracker;
     if (tracker == null) return null;
     if (tracker.stops.isEmpty) return null;
-    final index = _currentStopIndex.clamp(0, tracker.stops.length - 1);
-    return tracker.stops[index].legIndex;
+
+    // `_currentStopIndex` points to the next stop to be reached.
+    // Convert that into a current leg index from already-completed stops.
+    final completedStops = _currentStopIndex.clamp(0, tracker.stops.length);
+    if (completedStops == 0) return 0;
+
+    if (completedStops >= tracker.stops.length) {
+      return tracker.stops.last.legIndex.clamp(0, selected.route.legs.length - 1);
+    }
+
+    final lastCompletedStop = tracker.stops[completedStops - 1];
+    final nextLegIndex = lastCompletedStop.legIndex + 1;
+    return nextLegIndex.clamp(0, selected.route.legs.length - 1);
   }
 
   List<Polyline<Object>> get _selectedRoutePolylines {
