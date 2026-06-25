@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/widgets/user_location_marker.dart';
 
-/// Lean routes-map style canvas for Go: vector or raster tiles, markers, recenter only.
+/// Lean routes-map style canvas for Go: vector or raster tiles and markers.
 class GoMapCanvas extends StatelessWidget {
   const GoMapCanvas({
     super.key,
@@ -27,6 +26,7 @@ class GoMapCanvas extends StatelessWidget {
     this.userSpeedMps,
     this.userAccuracyMeters,
     this.onPositionChanged,
+    this.onMapReady,
   });
 
   final MapController mapController;
@@ -45,6 +45,7 @@ class GoMapCanvas extends StatelessWidget {
   final double? userSpeedMps;
   final double? userAccuracyMeters;
   final void Function(MapCamera camera, bool hasGesture)? onPositionChanged;
+  final VoidCallback? onMapReady;
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +105,7 @@ class GoMapCanvas extends StatelessWidget {
             : (MapCamera camera, bool hasGesture) =>
                 onPositionChanged!(camera, hasGesture),
         maxZoom: 18,
+        onMapReady: onMapReady,
       ),
       children: [
         if (vectorStyle != null)
@@ -140,69 +142,6 @@ class GoMapCanvas extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-/// Single recenter control (Go screen does not use layer toggles).
-///
-/// When [isFollowing] is true, the button renders in its "locked" follow state
-/// (filled icon); otherwise it invites the user to re-enable follow mode.
-class GoRecenterButton extends StatelessWidget {
-  const GoRecenterButton({
-    super.key,
-    required this.userPosition,
-    required this.mapController,
-    this.isFollowing = false,
-    this.onRecenter,
-  });
-
-  final Position? userPosition;
-  final MapController mapController;
-  final bool isFollowing;
-  final VoidCallback? onRecenter;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasUserPosition = userPosition != null;
-    return Positioned(
-      right: 16,
-      top: MediaQuery.sizeOf(context).height * 0.34,
-      child: Material(
-        color: hasUserPosition
-            ? MapColors.background
-            : MapColors.background.withValues(alpha: 0.86),
-        borderRadius: BorderRadius.circular(14),
-        elevation: hasUserPosition ? 2 : 0,
-        child: InkWell(
-          onTap: hasUserPosition
-              ? () {
-                  if (onRecenter != null) {
-                    onRecenter!();
-                    return;
-                  }
-                  final position = userPosition;
-                  if (position == null) return;
-                  mapController.move(
-                    LatLng(position.latitude, position.longitude),
-                    mapController.camera.zoom,
-                  );
-                }
-              : null,
-          borderRadius: BorderRadius.circular(14),
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: Icon(
-              isFollowing ? Icons.gps_fixed : Icons.gps_not_fixed,
-              color: hasUserPosition
-                  ? MapColors.primary
-                  : MapColors.text.withValues(alpha: 0.35),
-              size: 24,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

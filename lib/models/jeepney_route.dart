@@ -1,3 +1,4 @@
+import '../core/config/api_config.dart';
 import 'route_point.dart';
 
 /// A jeepney route from the dashboard API (id, number, name, color, points by direction).
@@ -12,6 +13,7 @@ class JeepneyRoute {
     required this.goingBack,
     required this.polylineGoingTo,
     required this.polylineGoingBack,
+    this.imageUrls = const [],
   });
 
   final String id;
@@ -31,6 +33,8 @@ class JeepneyRoute {
   /// Encoded polyline for return direction (Valhalla-style, precision 1e6).
   /// Prefer this for rendering when present to avoid recomputing geometry.
   final String? polylineGoingBack;
+  /// Sticker image URLs from the dashboard API (absolute after parsing).
+  final List<String> imageUrls;
 
   /// Backward-compatible alias for older call sites.
   String get routeDetail => routeDetails;
@@ -93,7 +97,20 @@ class JeepneyRoute {
       goingBack: goingBack,
       polylineGoingTo: polylineGoingTo,
       polylineGoingBack: polylineGoingBack,
+      imageUrls: _parseImageUrls(json['imageUrls']),
     );
+  }
+
+  static List<String> _parseImageUrls(dynamic value) {
+    if (value is! List) return const [];
+    final urls = <String>[];
+    for (final item in value) {
+      final raw = item?.toString().trim() ?? '';
+      if (raw.isEmpty) continue;
+      final resolved = resolveApiImageUrl(raw);
+      if (resolved.isNotEmpty) urls.add(resolved);
+    }
+    return urls;
   }
 
   static List<RoutePoint> _parsePointList(dynamic value) {

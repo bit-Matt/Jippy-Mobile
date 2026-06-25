@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -12,13 +13,15 @@ import 'package:vibration/vibration.dart';
 
 import 'package:jippy_mobile/core/config/api_config.dart';
 import 'package:jippy_mobile/core/theme/map_colors.dart';
+import 'package:jippy_mobile/data/map_data_loader.dart';
 import 'package:jippy_mobile/data/navigate_client.dart';
+import 'package:jippy_mobile/models/jeepney_route.dart';
 import 'package:jippy_mobile/models/navigate_suggestion.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/debug_trip_simulator_overlay.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_map_canvas.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
-import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
+import 'package:jippy_mobile/widgets/map_location_control.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
 import 'package:jippy_mobile/services/navigation_tracker.dart';
@@ -26,6 +29,9 @@ import 'package:jippy_mobile/services/notification_service.dart';
 import 'package:jippy_mobile/services/trip_simulator_service.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
+import 'package:jippy_mobile/widgets/sheet_scroll_hint.dart';
+import 'package:jippy_mobile/widgets/sticker_gallery.dart';
+import 'package:jippy_mobile/widgets/sheet_drag_handle.dart';
 
 final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
 
@@ -33,6 +39,20 @@ const double _initialZoom = 14.0;
 
 const Color _sheetSurfaceColor = Colors.white;
 const Color _timelineSubtleLineColor = Color(0xFFCFD4DB);
+const double _routeProgressSnapMaxMeters = 50.0;
+
+const double _sheetCollapsedSize = 0.25;
+const double _sheetDefaultSize = 0.40;
+const double _sheetMaxSize = 0.85;
+const List<double> _sheetSnapSizes = <double>[
+  _sheetCollapsedSize,
+  _sheetDefaultSize,
+  _sheetMaxSize,
+];
+
+/// Progress along the selected route: leg index, segment start point index, and
+/// interpolation [t] in [0, 1] along that segment.
+typedef RouteProgress = ({int legIndex, int pointIndex, double t});
 
 bool _hasNetworkInterface(List<ConnectivityResult> results) {
   if (results.length == 1 && results.single == ConnectivityResult.none) {
@@ -43,7 +63,16 @@ bool _hasNetworkInterface(List<ConnectivityResult> results) {
 }
 
 class GoScreen extends StatefulWidget {
-  const GoScreen({super.key});
+  const GoScreen({
+    super.key,
+    this.isActive = true,
+    this.onReady,
+    this.onBottomNavVisibilityChanged,
+  });
+
+  final bool isActive;
+  final VoidCallback? onReady;
+  final ValueChanged<bool>? onBottomNavVisibilityChanged;
 
   @override
   State<GoScreen> createState() => _GoScreenState();
@@ -53,6 +82,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
+  final ValueNotifier<double> _sheetExtent = ValueNotifier<double>(0);
   final GeocodingService _geocoding = GeocodingService();
   final LocationService _locationService = LocationService.instance;
   final Connectivity _connectivity = Connectivity();
@@ -70,6 +100,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   StreamSubscription<TripSimulatorState>? _simulatorStateSubscription;
 
   GoNavigationFlow _flow = GoNavigationFlow.explore;
+  bool _bottomNavHidden = false;
   GoPinTarget? _pinTarget;
   GoRoutingField _activeRoutingField = GoRoutingField.end;
 
@@ -90,6 +121,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   int _selectedSuggestionIndex = 0;
   int? _isolatedLegIndex;
   NavigationTracker? _navigationTracker;
+  bool _navigationBusy = false;
   int _currentStopIndex = 0;
   TripSimulatorService? _tripSimulator;
   TripSimulatorState _tripSimulatorState = TripSimulatorState.idle;
@@ -98,6 +130,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   Offset _simOverlayOffset = const Offset(0, 120);
 
   Position? _userPosition;
+  RouteProgress? _routeProgress;
   double? _compassHeading;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
@@ -108,10 +141,65 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   bool _online = true;
   Timer? _searchDebounce;
 
+  Map<String, List<String>> _stickerUrlsByRouteId = const {};
+
+  bool _readinessSignaled = false;
+  bool _vectorStyleAttempted = false;
+  bool _mapFirstFrame = false;
+  bool _locationAttempted = false;
+
   bool get _gpsOriginAvailable {
     if (_userPosition == null) return false;
     final p = _locationPermission;
     return p == LocationPermission.whileInUse || p == LocationPermission.always;
+  }
+
+  bool get _hasActiveBottomSheet {
+    if (_flow == GoNavigationFlow.navigating) return true;
+    if (_flow == GoNavigationFlow.locationDetail) return true;
+    if (_pinTarget != null) return true;
+    if (_pinTarget == null && _flow == GoNavigationFlow.routeSelection) {
+      return true;
+    }
+    if (_pinTarget == null && _flow == GoNavigationFlow.routeDetails) {
+      return true;
+    }
+    return false;
+  }
+
+  bool get _locationControlOn {
+    if (!_permissionChecked) return true;
+    final permission = _locationPermission;
+    return permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always;
+  }
+
+  String get _locationOffMessage {
+    if (_locationPermission == null) {
+      return 'Location service is disabled.';
+    }
+    return 'Location permission denied. Enable it to see your position.';
+  }
+
+  void _syncSheetExtentForActiveSheet() {
+    if (_hasActiveBottomSheet) return;
+    if (_sheetExtent.value == 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _hasActiveBottomSheet) return;
+      _sheetExtent.value = 0;
+    });
+  }
+
+  Future<void> _enableLocation() async {
+    if (_locationPermission == null) {
+      await Geolocator.openLocationSettings();
+      return;
+    }
+    if (_locationPermission == LocationPermission.deniedForever) {
+      await openAppSettings();
+      return;
+    }
+    await _initLocation();
   }
 
   bool get _showRoutingHeader {
@@ -153,7 +241,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   int? get _activeLegIsolationIndex {
     final isolated = switch (_flow) {
       GoNavigationFlow.routeDetails => _isolatedLegIndex,
-      GoNavigationFlow.navigating => _currentNavigationLegIndex,
       _ => null,
     };
     if (isolated == null) return null;
@@ -168,11 +255,32 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   int? get _currentNavigationLegIndex {
+    final selected = _selectedSuggestion;
+    if (selected == null) return null;
+
+    // Prefer geometry-based progress to keep itinerary state aligned with
+    // the user's actual position along route segments.
+    final progressLegIndex = _routeProgress?.legIndex;
+    if (progressLegIndex != null) {
+      return progressLegIndex.clamp(0, selected.route.legs.length - 1);
+    }
+
     final tracker = _navigationTracker;
     if (tracker == null) return null;
     if (tracker.stops.isEmpty) return null;
-    final index = _currentStopIndex.clamp(0, tracker.stops.length - 1);
-    return tracker.stops[index].legIndex;
+
+    // `_currentStopIndex` points to the next stop to be reached.
+    // Convert that into a current leg index from already-completed stops.
+    final completedStops = _currentStopIndex.clamp(0, tracker.stops.length);
+    if (completedStops == 0) return 0;
+
+    if (completedStops >= tracker.stops.length) {
+      return tracker.stops.last.legIndex.clamp(0, selected.route.legs.length - 1);
+    }
+
+    final lastCompletedStop = tracker.stops[completedStops - 1];
+    final nextLegIndex = lastCompletedStop.legIndex + 1;
+    return nextLegIndex.clamp(0, selected.route.legs.length - 1);
   }
 
   List<Polyline<Object>> get _selectedRoutePolylines {
@@ -185,6 +293,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final selected = _selectedSuggestion;
     if (selected == null) return const <Polyline<Object>>[];
     final isolatedIndex = _activeLegIsolationIndex;
+    final progress = _flow == GoNavigationFlow.navigating
+        ? _routeProgress
+        : null;
 
     final polylines = <Polyline<Object>>[];
     for (var i = 0; i < selected.route.legs.length; i++) {
@@ -194,14 +305,45 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       if (encoded.isEmpty) continue;
       final points = decodeApiRoutePolyline(encoded);
       if (points == null || points.length < 2) continue;
-      polylines.add(
-        Polyline<Object>(
-          points: points,
-          color: _mapColorForLeg(leg),
-          strokeWidth: _strokeWidthForLeg(leg),
-          pattern: _polylinePatternForLeg(leg),
-        ),
-      );
+
+      if (progress == null) {
+        polylines.add(_polylineForLegPoints(leg, points));
+        continue;
+      }
+
+      if (i < progress.legIndex) {
+        polylines.add(
+          _polylineForLegPoints(leg, points, color: _passedColorForLeg(leg)),
+        );
+      } else if (i > progress.legIndex) {
+        polylines.add(_polylineForLegPoints(leg, points));
+      } else {
+        final splitPoint = _interpolateRoutePoint(
+          points[progress.pointIndex],
+          points[progress.pointIndex + 1],
+          progress.t,
+        );
+        final passedPoints = <LatLng>[
+          ...points.sublist(0, progress.pointIndex + 1),
+          splitPoint,
+        ];
+        final remainingPoints = <LatLng>[
+          splitPoint,
+          ...points.sublist(progress.pointIndex + 1),
+        ];
+        if (passedPoints.length >= 2) {
+          polylines.add(
+            _polylineForLegPoints(
+              leg,
+              passedPoints,
+              color: _passedColorForLeg(leg),
+            ),
+          );
+        }
+        if (remainingPoints.length >= 2) {
+          polylines.add(_polylineForLegPoints(leg, remainingPoints));
+        }
+      }
     }
     return polylines;
   }
@@ -264,6 +406,42 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _subscribeToServiceStatus();
     _subscribeToHeading();
     _initConnectivity();
+    unawaited(_loadStickerUrls());
+  }
+
+  @override
+  void didUpdateWidget(GoScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) {
+      _resetToExplore();
+    }
+  }
+
+  Future<void> _loadStickerUrls() async {
+    try {
+      final data = await loadRoutesFromApi();
+      if (!mounted) return;
+      setState(() => _stickerUrlsByRouteId = _buildStickerUrlMap(data.routes));
+    } catch (_) {
+      try {
+        final data = await loadSampleMapData();
+        if (!mounted) return;
+        setState(
+          () => _stickerUrlsByRouteId = _buildStickerUrlMap(data.routes),
+        );
+      } catch (_) {
+        // Leave map empty; stickers simply won't appear.
+      }
+    }
+  }
+
+  Map<String, List<String>> _buildStickerUrlMap(List<JeepneyRoute> routes) {
+    final map = <String, List<String>>{};
+    for (final route in routes) {
+      if (route.id.isEmpty || route.imageUrls.isEmpty) continue;
+      map[route.id] = List<String>.from(route.imageUrls);
+    }
+    return map;
   }
 
   @override
@@ -279,12 +457,16 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _navigationTracker?.stop();
     unawaited(_locationService.detachTripSimulator());
     unawaited(_tripSimulator?.dispose() ?? Future<void>.value());
+    if (_bottomNavHidden) {
+      widget.onBottomNavVisibilityChanged?.call(true);
+    }
     _startFocus.removeListener(_handleStartFocusChange);
     _endFocus.removeListener(_handleEndFocusChange);
     _startController.dispose();
     _endController.dispose();
     _startFocus.dispose();
     _endFocus.dispose();
+    _sheetExtent.dispose();
     super.dispose();
   }
 
@@ -374,6 +556,30 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         setState(() => _vectorStyle = null);
       }
     }
+    if (!mounted) return;
+    _vectorStyleAttempted = true;
+    _checkReadiness();
+  }
+
+  void _markMapReady() {
+    if (_mapFirstFrame) return;
+    _mapFirstFrame = true;
+    _checkReadiness();
+  }
+
+  void _markLocationAttempted() {
+    if (_locationAttempted) return;
+    _locationAttempted = true;
+    _checkReadiness();
+  }
+
+  void _checkReadiness() {
+    if (_readinessSignaled) return;
+    if (!_vectorStyleAttempted || !_mapFirstFrame || !_locationAttempted) {
+      return;
+    }
+    _readinessSignaled = true;
+    widget.onReady?.call();
   }
 
   Future<void> _initLocation() async {
@@ -392,6 +598,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _permissionChecked = true;
         _locationPermission = null;
       });
+      _markLocationAttempted();
       return;
     }
 
@@ -405,12 +612,14 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      _markLocationAttempted();
       return;
     }
 
     if (_positionSubscription != null) {
       // Already subscribed; this is a re-entry after resume or service toggle.
       await _locationService.refresh();
+      _markLocationAttempted();
       return;
     }
 
@@ -425,6 +634,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
         setState(() {
           _userPosition = position;
+          if (_flow == GoNavigationFlow.navigating) {
+            _updateRouteProgress(position);
+          }
         });
 
         if (shouldPrimeRoutingStart) {
@@ -438,6 +650,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         if (mounted) setState(() => _userPosition = null);
       },
     );
+    _markLocationAttempted();
   }
 
   void _centerToUserOnce(Position position) {
@@ -451,17 +664,39 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Fixed offset that keeps the user marker centered between the top of the
+  /// screen and the top of the navigating sheet at its default height.
+  Offset _followOffsetForNavigation() {
+    final mapHeight = _mapController.camera.nonRotatedSize.height;
+    if (mapHeight <= 0) return Offset.zero;
+    final defaultSheetHeight = mapHeight * _sheetCollapsedSize;
+    return Offset(0, -defaultSheetHeight / 2);
+  }
+
+  void _moveMapToFollowUser(Position position) {
+    _suppressNextGestureFollowBreak = true;
+    final latLng = LatLng(position.latitude, position.longitude);
+    if (_flow == GoNavigationFlow.navigating) {
+      _mapController.move(
+        latLng,
+        _mapController.camera.zoom,
+        offset: _followOffsetForNavigation(),
+      );
+      return;
+    }
+    _mapController.move(latLng, _mapController.camera.zoom);
+  }
+
   /// While in [_followUser] mode, re-center the camera on every new GPS fix
   /// so the blue dot stays glued to the viewport. Suppressed during routing
   /// flows where we want bounds-fit camera to remain authoritative.
   void _maybeFollowUser(Position position) {
     if (!_followUser) return;
-    if (_flow != GoNavigationFlow.explore) return;
-    _suppressNextGestureFollowBreak = true;
-    _mapController.move(
-      LatLng(position.latitude, position.longitude),
-      _mapController.camera.zoom,
-    );
+    if (_flow != GoNavigationFlow.explore &&
+        _flow != GoNavigationFlow.navigating) {
+      return;
+    }
+    _moveMapToFollowUser(position);
   }
 
   void _onMapPositionChanged(MapCamera camera, bool hasGesture) {
@@ -478,16 +713,24 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final pos = _userPosition;
     if (pos == null) return;
     setState(() => _followUser = true);
-    _suppressNextGestureFollowBreak = true;
-    _mapController.move(
-      LatLng(pos.latitude, pos.longitude),
-      _mapController.camera.zoom,
-    );
+    _moveMapToFollowUser(pos);
   }
 
   void _setActiveRoutingField(GoRoutingField field) {
     if (_activeRoutingField == field) return;
     setState(() => _activeRoutingField = field);
+  }
+
+  void _hideBottomNav() {
+    if (_bottomNavHidden) return;
+    _bottomNavHidden = true;
+    widget.onBottomNavVisibilityChanged?.call(false);
+  }
+
+  void _showBottomNav() {
+    if (!_bottomNavHidden) return;
+    _bottomNavHidden = false;
+    widget.onBottomNavVisibilityChanged?.call(true);
   }
 
   void _startRoutingSession({LatLng? endPoint, String? endLabel}) {
@@ -533,6 +776,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _resetToExplore() {
+    _searchDebounce?.cancel();
     _trackerSubscription?.cancel();
     _trackerSubscription = null;
     _navigationTracker?.stop();
@@ -563,10 +807,27 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _isolatedLegIndex = null;
       _currentStopIndex = 0;
       _lastProximityAlertAt = null;
+      _navigationBusy = false;
+      _routeProgress = null;
+      _followUser = true;
     });
 
     _startFocus.unfocus();
     _endFocus.unfocus();
+    _showBottomNav();
+    _resetMapToDefaultView();
+  }
+
+  void _resetMapToDefaultView() {
+    final pos = _userPosition;
+    if (pos != null && _gpsOriginAvailable) {
+      _suppressNextGestureFollowBreak = true;
+      _mapController.move(LatLng(pos.latitude, pos.longitude), _initialZoom);
+      return;
+    }
+
+    _suppressNextGestureFollowBreak = true;
+    _mapController.move(_iloiloCenter, _initialZoom);
   }
 
   void _onCollapsedTap() {
@@ -595,6 +856,14 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _pinTarget = GoPinTarget.destination;
       _activeRoutingField = GoRoutingField.end;
     });
+  }
+
+  void _openActiveFieldPinOnMap() {
+    if (_activeRoutingField == GoRoutingField.start) {
+      _openStartPinOnMap();
+      return;
+    }
+    _openEndPinOnMap();
   }
 
   void _cancelMapPinMode() {
@@ -843,6 +1112,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _selectedSuggestionIndex = 0;
       _isolatedLegIndex = null;
     });
+    _hideBottomNav();
 
     _collapseRouteSelectionSheetForLoading();
 
@@ -872,6 +1142,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       });
 
       _fitRouteOrStartEnd();
+      _snapRouteSelectionSheetToDefault();
     } on NavigateRequestException catch (e) {
       if (!mounted || requestToken != _navigateRequestToken) return;
       setState(() {
@@ -941,60 +1212,80 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   Future<void> _startNavigating() async {
     final selected = _selectedSuggestion;
-    if (selected == null) return;
+    if (selected == null || _navigationBusy) return;
 
-    final permission = await _locationService.requestPermission();
-    if (!mounted) return;
-    setState(() {
-      _permissionChecked = true;
-      _locationPermission = permission;
-    });
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      _showTopSnackBar(
-        'Location permission is required to start trip notifications.',
+    setState(() => _navigationBusy = true);
+    try {
+      final permission = await _locationService.requestPermission();
+      if (!mounted) return;
+      setState(() {
+        _permissionChecked = true;
+        _locationPermission = permission;
+      });
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showTopSnackBar(
+          'Location permission is required to start trip notifications.',
+        );
+        return;
+      }
+
+      final locationAlways = await Permission.locationAlways.request();
+      if (!mounted) return;
+      if (!locationAlways.isGranted) {
+        _showTopSnackBar(
+          'Background alerts are limited until "Allow all the time" is granted.',
+        );
+      }
+
+      await NotificationService.instance.requestPermissions();
+
+      await _trackerSubscription?.cancel();
+      _trackerSubscription = null;
+      await _navigationTracker?.stop();
+      _navigationTracker = null;
+
+      final tracker = NavigationTracker(
+        suggestion: selected,
+        thresholdMeters: 100,
       );
-      return;
+      _trackerSubscription = tracker.events.listen((event) {
+        _onProximityEvent(event);
+      });
+      tracker.start();
+
+      if (kDebugMode && _debugTripSimulatorEnabled) {
+        await _startTripSimulator(selected);
+      } else {
+        await _stopTripSimulator();
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _navigationTracker = tracker;
+        _currentStopIndex = 0;
+        _flow = GoNavigationFlow.navigating;
+        _isolatedLegIndex = null;
+        _lastProximityAlertAt = null;
+        _routeProgress = null;
+        _followUser = true;
+        final position = _userPosition;
+        if (position != null) {
+          _updateRouteProgress(position);
+        }
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _flow != GoNavigationFlow.navigating) return;
+        final position = _userPosition;
+        if (position != null) {
+          _moveMapToFollowUser(position);
+        }
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _navigationBusy = false);
+      }
     }
-
-    final locationAlways = await Permission.locationAlways.request();
-    if (!mounted) return;
-    if (!locationAlways.isGranted) {
-      _showTopSnackBar(
-        'Background alerts are limited until "Allow all the time" is granted.',
-      );
-    }
-
-    await NotificationService.instance.requestPermissions();
-
-    await _trackerSubscription?.cancel();
-    _trackerSubscription = null;
-    await _navigationTracker?.stop();
-    _navigationTracker = null;
-
-    final tracker = NavigationTracker(
-      suggestion: selected,
-      thresholdMeters: 100,
-    );
-    _trackerSubscription = tracker.events.listen((event) {
-      _onProximityEvent(event);
-    });
-    tracker.start();
-
-    if (kDebugMode && _debugTripSimulatorEnabled) {
-      await _startTripSimulator(selected);
-    } else {
-      await _stopTripSimulator();
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _navigationTracker = tracker;
-      _currentStopIndex = 0;
-      _flow = GoNavigationFlow.navigating;
-      _isolatedLegIndex = null;
-      _lastProximityAlertAt = null;
-    });
   }
 
   Future<void> _startTripSimulator(NavigateSuggestion suggestion) async {
@@ -1147,20 +1438,31 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _endNavigating({bool showCompletedMessage = false}) async {
-    await _stopTripSimulator();
-    await _trackerSubscription?.cancel();
-    _trackerSubscription = null;
-    await _navigationTracker?.stop();
-    _navigationTracker = null;
-    if (!mounted) return;
-    setState(() {
-      _currentStopIndex = 0;
-      _flow = GoNavigationFlow.routeDetails;
-      _isolatedLegIndex = null;
-      _lastProximityAlertAt = null;
-    });
-    if (showCompletedMessage) {
-      _showTopSnackBar('You are at your destination. Trip finished.');
+    if (_navigationBusy) return;
+
+    setState(() => _navigationBusy = true);
+    try {
+      await _stopTripSimulator();
+      await _trackerSubscription?.cancel();
+      _trackerSubscription = null;
+      await _navigationTracker?.stop();
+      _navigationTracker = null;
+      if (!mounted) return;
+      setState(() {
+        _currentStopIndex = 0;
+        _flow = GoNavigationFlow.routeDetails;
+        _isolatedLegIndex = null;
+        _lastProximityAlertAt = null;
+        _routeProgress = null;
+      });
+      _showBottomNav();
+      if (showCompletedMessage) {
+        _showTopSnackBar('You are at your destination. Trip finished.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _navigationBusy = false);
+      }
     }
   }
 
@@ -1240,7 +1542,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     if (_flow != GoNavigationFlow.routeDetails) return;
     try {
       _sheetController.animateTo(
-        0.32,
+        _sheetCollapsedSize,
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
       );
@@ -1258,10 +1560,28 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
       try {
         _sheetController.animateTo(
-          0.24,
+          _sheetCollapsedSize,
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
         );
+      } catch (_) {}
+    });
+  }
+
+  void _snapRouteSelectionSheetToDefault() {
+    if (_flow != GoNavigationFlow.routeSelection) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      if (_flow != GoNavigationFlow.routeSelection) return;
+
+      try {
+        await _sheetController.animateTo(
+          _sheetDefaultSize,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+        if (mounted) setState(() {});
       } catch (_) {}
     });
   }
@@ -1270,7 +1590,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     if (_flow != GoNavigationFlow.routeDetails) return;
     try {
       _sheetController.animateTo(
-        0.54,
+        _sheetDefaultSize,
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
       );
@@ -1324,10 +1644,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   bool _isBestSuggestionIndex(int index) => index == 0;
-
-  String _displayLabelForSuggestion(NavigateSuggestion suggestion, int index) {
-    return _isBestSuggestionIndex(index) ? 'Best' : suggestion.labelText;
-  }
 
   Color _badgeTextColor(Color background) {
     return background.computeLuminance() > 0.55 ? MapColors.text : Colors.white;
@@ -1414,6 +1730,126 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     };
   }
 
+  Polyline<Object> _polylineForLegPoints(
+    NavigateLeg leg,
+    List<LatLng> points, {
+    Color? color,
+  }) {
+    return Polyline<Object>(
+      points: points,
+      color: color ?? _mapColorForLeg(leg),
+      strokeWidth: _strokeWidthForLeg(leg),
+      pattern: _polylinePatternForLeg(leg),
+    );
+  }
+
+  Color _passedColorForLeg(NavigateLeg leg) {
+    return _mapColorForLeg(leg).withValues(alpha: 0.35);
+  }
+
+  LatLng _interpolateRoutePoint(LatLng start, LatLng end, double t) {
+    final clamped = t.clamp(0.0, 1.0);
+    return LatLng(
+      start.latitude + (end.latitude - start.latitude) * clamped,
+      start.longitude + (end.longitude - start.longitude) * clamped,
+    );
+  }
+
+  int _compareRouteProgress(RouteProgress a, RouteProgress b) {
+    if (a.legIndex != b.legIndex) {
+      return a.legIndex.compareTo(b.legIndex);
+    }
+    if (a.pointIndex != b.pointIndex) {
+      return a.pointIndex.compareTo(b.pointIndex);
+    }
+    return a.t.compareTo(b.t);
+  }
+
+  bool _isRouteProgressAhead(RouteProgress candidate, RouteProgress current) {
+    return _compareRouteProgress(candidate, current) > 0;
+  }
+
+  ({double t, double distanceMeters}) _projectOntoRouteSegment(
+    LatLng point,
+    LatLng start,
+    LatLng end,
+  ) {
+    final latScale = 111320.0;
+    final lonScale = 111320.0 * math.cos(start.latitude * math.pi / 180.0);
+
+    final segmentX = (end.longitude - start.longitude) * lonScale;
+    final segmentY = (end.latitude - start.latitude) * latScale;
+    final pointX = (point.longitude - start.longitude) * lonScale;
+    final pointY = (point.latitude - start.latitude) * latScale;
+
+    final segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
+    if (segmentLengthSquared == 0) {
+      final distance = const Distance().as(LengthUnit.Meter, start, point);
+      return (t: 0.0, distanceMeters: distance);
+    }
+
+    final t = ((pointX * segmentX + pointY * segmentY) / segmentLengthSquared)
+        .clamp(0.0, 1.0);
+    final projected = _interpolateRoutePoint(start, end, t);
+    final distance = const Distance().as(LengthUnit.Meter, point, projected);
+    return (t: t, distanceMeters: distance);
+  }
+
+  void _updateRouteProgress(Position position) {
+    final selected = _selectedSuggestion;
+    if (selected == null) return;
+
+    final userPoint = LatLng(position.latitude, position.longitude);
+    final legs = selected.route.legs;
+    if (legs.isEmpty) return;
+
+    final startLegIndex = _routeProgress?.legIndex ?? 0;
+    RouteProgress? bestCandidate;
+    var bestDistance = double.infinity;
+
+    for (var legIndex = startLegIndex; legIndex < legs.length; legIndex++) {
+      final encoded = legs[legIndex].polyline.trim();
+      if (encoded.isEmpty) continue;
+      final points = decodeApiRoutePolyline(encoded);
+      if (points == null || points.length < 2) continue;
+
+      final startPointIndex = legIndex == startLegIndex
+          ? (_routeProgress?.pointIndex ?? 0)
+          : 0;
+
+      for (
+        var pointIndex = startPointIndex;
+        pointIndex < points.length - 1;
+        pointIndex++
+      ) {
+        final projection = _projectOntoRouteSegment(
+          userPoint,
+          points[pointIndex],
+          points[pointIndex + 1],
+        );
+        if (projection.distanceMeters >= bestDistance) continue;
+
+        bestDistance = projection.distanceMeters;
+        bestCandidate = (
+          legIndex: legIndex,
+          pointIndex: pointIndex,
+          t: projection.t,
+        );
+      }
+    }
+
+    if (bestCandidate == null || bestDistance > _routeProgressSnapMaxMeters) {
+      return;
+    }
+
+    final current = _routeProgress;
+    if (current != null && !_isRouteProgressAhead(bestCandidate, current)) {
+      return;
+    }
+
+    _routeProgress = bestCandidate;
+  }
+
   String _formatDistance(double meters) {
     if (meters >= 1000) {
       return '${(meters / 1000).toStringAsFixed(1)} km';
@@ -1434,17 +1870,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final mins = roundedMinutes % 60;
     if (mins == 0) return '${hours}h';
     return '${hours}h ${mins}m';
-  }
-
-  String _etaText(BuildContext context, NavigateSuggestion suggestion) {
-    final arrival = DateTime.now().add(
-      Duration(minutes: suggestion.totalDurationMinutes.round()),
-    );
-    final time = TimeOfDay.fromDateTime(arrival);
-    final formattedTime = MaterialLocalizations.of(
-      context,
-    ).formatTimeOfDay(time, alwaysUse24HourFormat: false);
-    return 'Estimated arrival: $formattedTime';
   }
 
   int _previewInstructionCount(NavigateSuggestion suggestion) {
@@ -1556,8 +1981,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ? null
         : LatLng(_userPosition!.latitude, _userPosition!.longitude);
 
+    _syncSheetExtentForActiveSheet();
+
     return Scaffold(
-      body: Stack(
+      body: NotificationListener<DraggableScrollableNotification>(
+        onNotification: (notification) {
+          _sheetExtent.value = notification.extent;
+          return false;
+        },
+        child: Stack(
         children: [
           Positioned.fill(
             child: GoMapCanvas(
@@ -1577,38 +2009,68 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               osmTileUrl: mapRasterFallback,
               userAgentPackageName: packageName,
               onPositionChanged: _onMapPositionChanged,
+              onMapReady: _markMapReady,
             ),
           ),
           if (_pinTarget != null) _buildCenterPinCrosshair(),
-          GoRecenterButton(
-            userPosition: _userPosition,
-            mapController: _mapController,
+          MapLocationControl(
+            drawerExtent: _sheetExtent,
+            followClampExtent: _sheetDefaultSize,
+            locationOn: _locationControlOn,
             isFollowing: _followUser,
             onRecenter: _recenterOnUser,
+            onEnableLocation: _enableLocation,
+            offMessage: _locationOffMessage,
           ),
-          GoSearchBar(
-            mode: _searchMode,
-            onCollapsedTap: _onCollapsedTap,
-            startController: _startController,
-            startFocusNode: _startFocus,
-            endController: _endController,
-            endFocusNode: _endFocus,
-            onStartTextChanged: _onStartTextChanged,
-            onEndTextChanged: _onEndTextChanged,
-            onEndSubmitted: _onEndSearchSubmitted,
-            onStartMapPinTap: _openStartPinOnMap,
-            onEndMapPinTap: _openEndPinOnMap,
-            showUseCurrentLocation: _gpsOriginAvailable,
-            onUseCurrentLocationTap: _useCurrentLocationForStart,
-            suggestions: _suggestions,
-            onSuggestionTap: _onPickSuggestion,
-            searchError: _flow == GoNavigationFlow.routeSelection
-                ? null
-                : _searchError,
-            showOutOfAreaDisclaimer: _destinationOutOfArea,
-            isSearchingNominatim: _nominatimBusy,
-            activeRoutingField: _activeRoutingField,
-            onActiveRoutingFieldChanged: _setActiveRoutingField,
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: MediaQuery.paddingOf(context).top + 8,
+                left: 16,
+                right: 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  GoSearchBar(
+                    mode: _searchMode,
+                    onCollapsedTap: _onCollapsedTap,
+                    startController: _startController,
+                    startFocusNode: _startFocus,
+                    endController: _endController,
+                    endFocusNode: _endFocus,
+                    onStartTextChanged: _onStartTextChanged,
+                    onEndTextChanged: _onEndTextChanged,
+                    onEndSubmitted: _onEndSearchSubmitted,
+                    showUseCurrentLocation: _gpsOriginAvailable,
+                    onUseCurrentLocationTap: _useCurrentLocationForStart,
+                    suggestions: _suggestions,
+                    onSuggestionTap: _onPickSuggestion,
+                    searchError: _flow == GoNavigationFlow.routeSelection
+                        ? null
+                        : _searchError,
+                    showOutOfAreaDisclaimer: _destinationOutOfArea,
+                    isSearchingNominatim: _nominatimBusy,
+                    activeRoutingField: _activeRoutingField,
+                    onActiveRoutingFieldChanged: _setActiveRoutingField,
+                  ),
+                  if (_searchMode == GoSearchBarMode.expanded &&
+                      _flow != GoNavigationFlow.navigating &&
+                      _pinTarget == null) ...[
+                    const SizedBox(height: 10),
+                    Center(
+                      child: GoManualPinLocationButton(
+                        onTap: _openActiveFieldPinOnMap,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
           if (_flow != GoNavigationFlow.navigating && _pinTarget != null)
             _buildPinModeSheet()
@@ -1618,20 +2080,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           if (_flow != GoNavigationFlow.navigating &&
               _pinTarget == null &&
               _flow == GoNavigationFlow.routeSelection)
-            _buildRouteSelectionSheet(context),
+            _buildRouteSelectionSheet(),
           if (_flow != GoNavigationFlow.navigating &&
               _pinTarget == null &&
               _flow == GoNavigationFlow.routeDetails)
             _buildRouteDetailsSheet(),
-          if (_permissionChecked &&
-              (_locationPermission == LocationPermission.denied ||
-                  _locationPermission == LocationPermission.deniedForever ||
-                  _locationPermission == null))
-            MapLocationMessage(
-              message: _locationPermission == null
-                  ? 'Location service is disabled.'
-                  : 'Location permission denied. Enable it to see your position on the Go map.',
-            ),
           if (kDebugMode &&
               _flow == GoNavigationFlow.navigating &&
               _debugTripSimulatorEnabled)
@@ -1650,6 +2103,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               ),
             ),
         ],
+        ),
       ),
     );
   }
@@ -1694,13 +2148,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     return DraggableScrollableSheet(
       controller: _sheetController,
-      initialChildSize: 0.23,
-      minChildSize: 0.2,
-      maxChildSize: 0.27,
+      initialChildSize: _sheetCollapsedSize,
+      minChildSize: _sheetCollapsedSize,
+      maxChildSize: _sheetMaxSize,
       snap: true,
-      snapSizes: const <double>[0.23],
+      snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
+          sheetController: _sheetController,
+          scrollController: scrollController,
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
@@ -1788,13 +2244,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     return DraggableScrollableSheet(
       controller: _sheetController,
-      initialChildSize: 0.22,
-      minChildSize: 0.18,
-      maxChildSize: 0.88,
+      initialChildSize: _sheetCollapsedSize,
+      minChildSize: _sheetCollapsedSize,
+      maxChildSize: _sheetMaxSize,
       snap: true,
-      snapSizes: const <double>[0.22, 0.38, 0.65],
+      snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
+          sheetController: _sheetController,
+          scrollController: scrollController,
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(18, 2, 18, 20),
@@ -1831,16 +2289,25 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               _buildStopProgressIndicator(tracker),
               const SizedBox(height: 14),
               FilledButton.icon(
-                onPressed: _endNavigating,
+                onPressed: _navigationBusy ? null : _endNavigating,
                 style: FilledButton.styleFrom(
                   backgroundColor: MapColors.primary,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(46),
                 ),
-                icon: const Icon(Icons.stop_circle_outlined),
-                label: const Text(
-                  'End trip',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                icon: _navigationBusy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.stop_circle_outlined),
+                label: Text(
+                  _navigationBusy ? 'Ending…' : 'End trip',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 18),
@@ -1955,13 +2422,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     return DraggableScrollableSheet(
       controller: _sheetController,
-      initialChildSize: 0.28,
-      minChildSize: 0.22,
-      maxChildSize: 0.42,
+      initialChildSize: _sheetCollapsedSize,
+      minChildSize: _sheetCollapsedSize,
+      maxChildSize: _sheetMaxSize,
       snap: true,
-      snapSizes: const <double>[0.28, 0.4],
+      snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
+          sheetController: _sheetController,
+          scrollController: scrollController,
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
@@ -2020,182 +2489,200 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildRouteSelectionSheet(BuildContext context) {
+  Widget _buildRouteSelectionSheet() {
     final selected = _selectedSuggestion;
     final showRouteError = _searchError != null && !_routePreviewLoading;
     const errorColor = Color(0xFFB00020);
 
     return DraggableScrollableSheet(
       controller: _sheetController,
-      initialChildSize: 0.38,
-      minChildSize: 0.24,
-      maxChildSize: 0.88,
+      initialChildSize: _sheetDefaultSize,
+      minChildSize: _sheetCollapsedSize,
+      maxChildSize: _sheetMaxSize,
       snap: true,
-      snapSizes: const <double>[0.38, 0.82],
+      snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
+          sheetController: _sheetController,
+          scrollController: scrollController,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              Row(
+              ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'Route Suggestions',
-                      style: TextStyle(
-                        color: MapColors.text,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: 'Cancel route',
-                    onPressed: _resetToExplore,
-                  ),
-                ],
-              ),
-              if (showRouteError) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: errorColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: errorColor.withValues(alpha: 0.25),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
-                      Row(
+                      const Expanded(
+                        child: Text(
+                          'Route Suggestions',
+                          style: TextStyle(
+                            color: MapColors.text,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _resetToExplore,
+                        style: TextButton.styleFrom(
+                          foregroundColor: MapColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (showRouteError) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: errorColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: errorColor.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.error_outline_rounded,
-                            size: 18,
-                            color: errorColor,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _searchError!,
-                              style: const TextStyle(
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                size: 18,
                                 color: errorColor,
-                                fontSize: 13,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _searchError!,
+                                  style: const TextStyle(
+                                    color: errorColor,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: _requestNavigationIfComplete,
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Retry'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: MapColors.primary,
+                              textStyle: const TextStyle(
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        onPressed: _requestNavigationIfComplete,
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: const Text('Retry'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: MapColors.primary,
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.w700,
+                    ),
+                  ] else if (_routeSuggestions.isEmpty &&
+                      !_routePreviewLoading) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'No route suggestions available yet.',
+                      style: TextStyle(
+                        color: MapColors.text.withValues(alpha: 0.72),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ] else ...[
+                    SizedBox(height: 96, child: _buildSuggestedRoutesStrip()),
+                    if (_routeSuggestions.length > 1) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.swipe_left_rounded,
+                            size: 14,
+                            color: MapColors.text.withValues(alpha: 0.55),
                           ),
-                        ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Swipe to see more route options',
+                            style: TextStyle(
+                              color: MapColors.text.withValues(alpha: 0.6),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ),
-              ] else if (_routeSuggestions.isEmpty &&
-                  !_routePreviewLoading) ...[
-                const SizedBox(height: 10),
-                Text(
-                  'No route suggestions available yet.',
-                  style: TextStyle(
-                    color: MapColors.text.withValues(alpha: 0.72),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ] else ...[
-                SizedBox(height: 96, child: _buildSuggestedRoutesStrip()),
-                if (_routeSuggestions.length > 1) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.swipe_left_rounded,
-                        size: 14,
-                        color: MapColors.text.withValues(alpha: 0.55),
+                  ],
+                  if (selected != null) ...[
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: MapColors.primary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                      const SizedBox(width: 6),
+                      onPressed: _navigationBusy ? null : _startNavigating,
+                      icon: _navigationBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.play_arrow_rounded),
+                      label: Text(
+                        _navigationBusy ? 'Starting…' : 'Start',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    if (kDebugMode) ...[
+                      const SizedBox(height: 10),
+                      _buildDebugSimulatorToggleTile(),
+                    ],
+                    const SizedBox(height: 14),
+                    Text(
+                      'Preview instructions',
+                      style: TextStyle(
+                        color: MapColors.text.withValues(alpha: 0.82),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_previewInstructionCount(selected) == 0)
                       Text(
-                        'Swipe to see more route options',
+                        'No step previews available for this suggestion.',
                         style: TextStyle(
-                          color: MapColors.text.withValues(alpha: 0.6),
-                          fontSize: 11,
+                          color: MapColors.text.withValues(alpha: 0.72),
+                          fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
-                      ),
-                    ],
-                  ),
+                      )
+                    else
+                      ..._buildPreviewInstructionRows(selected),
+                  ],
                 ],
-              ],
-              if (selected != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  _etaText(context, selected),
-                  style: TextStyle(
-                    color: MapColors.text.withValues(alpha: 0.72),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: MapColors.primary,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(46),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: _startNavigating,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text(
-                    'Start',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-                if (kDebugMode) ...[
-                  const SizedBox(height: 10),
-                  _buildDebugSimulatorToggleTile(),
-                ],
-                const SizedBox(height: 14),
-                Text(
-                  'Preview instructions',
-                  style: TextStyle(
-                    color: MapColors.text.withValues(alpha: 0.82),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (_previewInstructionCount(selected) == 0)
-                  Text(
-                    'No step previews available for this suggestion.',
-                    style: TextStyle(
-                      color: MapColors.text.withValues(alpha: 0.72),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  )
-                else
-                  ..._buildPreviewInstructionRows(selected),
-              ],
+              ),
+              if (selected != null)
+                SheetScrollHint(scrollController: scrollController),
             ],
           ),
         );
@@ -2444,8 +2931,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     final routeNumber = leg.routeNumber.trim();
     if (routeNumber.isNotEmpty) {
-      final normalized = _normalizeRouteNumber(routeNumber);
-      return '$routeName (Route $normalized)';
+      final code = _formatRouteCode(routeNumber);
+      return '$routeName ($code)';
     }
 
     if (_hasRouteNumberInName(routeName)) {
@@ -2454,8 +2941,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     final extracted = _extractRouteNumberFromName(routeName);
     if (extracted == null || extracted.isEmpty) return routeName;
-    final normalized = _normalizeRouteNumber(extracted);
-    return '$routeName (Route $normalized)';
+    final code = _formatRouteCode(extracted);
+    return '$routeName ($code)';
   }
 
   bool _hasRouteNumberInName(String name) {
@@ -2485,18 +2972,28 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return null;
   }
 
-  String _normalizeRouteNumber(String raw) {
+  String _formatRouteCode(String raw) {
     final trimmed = raw.trim();
-    final prefixed = RegExp(
-      r'^Route\s*(.+)$',
-      caseSensitive: false,
-    ).firstMatch(trimmed);
-    if (prefixed != null) return prefixed.group(1)?.trim() ?? trimmed;
-    final match = RegExp(
+    if (trimmed.isEmpty) return '';
+
+    final rMatch = RegExp(
       r'^R\s*(\d+)$',
       caseSensitive: false,
     ).firstMatch(trimmed);
-    if (match != null) return match.group(1) ?? trimmed;
+    if (rMatch != null) return 'R${rMatch.group(1)}';
+
+    final routeMatch = RegExp(
+      r'^Route\s*(.+)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
+    if (routeMatch != null) {
+      return _formatRouteCode(routeMatch.group(1)?.trim() ?? trimmed);
+    }
+
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) {
+      return 'R$trimmed';
+    }
+
     return trimmed;
   }
 
@@ -2506,23 +3003,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       return const SizedBox.shrink();
     }
 
-    final selectedIndex =
-        _selectedSuggestionIndex < 0 ||
-            _selectedSuggestionIndex >= _routeSuggestions.length
-        ? 0
-        : _selectedSuggestionIndex;
-
     final legTimelineBlocks = _buildLegBlocks();
 
     return DraggableScrollableSheet(
       controller: _sheetController,
-      initialChildSize: 0.54,
-      minChildSize: 0.32,
-      maxChildSize: 0.92,
+      initialChildSize: _sheetDefaultSize,
+      minChildSize: _sheetCollapsedSize,
+      maxChildSize: _sheetMaxSize,
       snap: true,
-      snapSizes: const <double>[0.54, 0.88],
+      snapSizes: _sheetSnapSizes,
       builder: (context, scrollController) {
         return _SheetSurface(
+          sheetController: _sheetController,
+          scrollController: scrollController,
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(18, 2, 18, 28),
@@ -2531,7 +3024,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                 children: [
                   Expanded(
                     child: Text(
-                      '${_displayLabelForSuggestion(selected, selectedIndex)} Details',
+                      'Route Details',
                       style: const TextStyle(
                         color: MapColors.text,
                         fontSize: 24,
@@ -2601,6 +3094,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           boardCountBeforeLeg: boardCountBeforeLeg,
           jeepStepNumber: jeepNumber,
           isIsolated: _activeLegIsolationIndex == i,
+          isCurrent:
+              withCompletedState &&
+              currentNavigationLegIndex != null &&
+              i == currentNavigationLegIndex,
           isCompleted:
               withCompletedState &&
               currentNavigationLegIndex != null &&
@@ -2626,6 +3123,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     required int boardCountBeforeLeg,
     required int? jeepStepNumber,
     required bool isIsolated,
+    bool isCurrent = false,
     bool isCompleted = false,
     required VoidCallback onTap,
   }) {
@@ -2701,10 +3199,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                       color: _sheetSurfaceColor,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isIsolated
+                        color: (isIsolated || isCurrent)
                             ? MapColors.primary.withValues(alpha: 0.55)
                             : MapColors.text.withValues(alpha: 0.1),
-                        width: isIsolated ? 1.6 : 1,
+                        width: (isIsolated || isCurrent) ? 1.6 : 1,
                       ),
                     ),
                     child: Column(
@@ -2737,7 +3235,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         if (leg.routeName.trim().isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
-                            leg.routeName,
+                            _legRouteDisplayName(leg),
                             style: TextStyle(
                               color: bodyColor.withValues(alpha: 0.84),
                               fontSize: 13,
@@ -2745,6 +3243,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             ),
                           ),
                         ],
+                        if (leg.type == NavigateLegType.jeepney)
+                          StickerGallery(
+                            imageUrls:
+                                _stickerUrlsByRouteId[leg.routeId] ?? const [],
+                            height: 64,
+                          ),
                         const SizedBox(height: 4),
                         Text(
                           _formatDistance(leg.distanceMeters),
@@ -2765,6 +3269,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             ),
                           ),
                         ] else ...[
+                          if (isCurrent) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Current step',
+                              style: TextStyle(
+                                color: MapColors.primary.withValues(
+                                  alpha: 0.82,
+                                ),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 10),
                           if (leg.instructions.isEmpty)
                             Text(
@@ -2843,6 +3360,22 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
+  String _legRouteDisplayName(NavigateLeg leg) {
+    final routeName = leg.routeName.trim();
+    if (routeName.isEmpty) return '';
+
+    if (leg.type != NavigateLegType.jeepney) {
+      return routeName;
+    }
+
+    final routeNumber = leg.routeNumber.trim();
+    if (routeNumber.isNotEmpty) {
+      return '${_formatRouteCode(routeNumber)} - $routeName';
+    }
+
+    return routeName;
+  }
+
   String _labelForLegType(NavigateLegType type) {
     return switch (type) {
       NavigateLegType.walk => 'Walk',
@@ -2854,8 +3387,14 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 }
 
 class _SheetSurface extends StatelessWidget {
-  const _SheetSurface({required this.child});
+  const _SheetSurface({
+    required this.sheetController,
+    required this.scrollController,
+    required this.child,
+  });
 
+  final DraggableScrollableController sheetController;
+  final ScrollController scrollController;
   final Widget child;
 
   @override
@@ -2875,18 +3414,17 @@ class _SheetSurface extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: MapColors.text.withValues(alpha: 0.22),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
+          SheetDragHandle(
+            controller: sheetController,
+            scrollController: scrollController,
+            minChildSize: _sheetCollapsedSize,
+            maxChildSize: _sheetMaxSize,
+            snapSizes: _sheetSnapSizes,
+            barWidth: 44,
+            barHeight: 5,
+            barColor: MapColors.text.withValues(alpha: 0.22),
+            barBorderRadius: 999,
           ),
-          const SizedBox(height: 10),
           Expanded(child: child),
         ],
       ),

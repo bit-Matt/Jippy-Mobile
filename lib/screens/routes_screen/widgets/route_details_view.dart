@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/models/jeepney_route.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/details_back_button.dart';
+import 'package:jippy_mobile/widgets/sticker_gallery.dart';
 
 class RouteDetailsView extends StatelessWidget {
   const RouteDetailsView({
@@ -20,11 +21,12 @@ class RouteDetailsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final detailText = (route != null && route!.routeDetails.trim().isNotEmpty)
         ? route!.routeDetails.trim()
-      : 'No details available for this route.';
+        : 'No details available for this route.';
 
     return ListView(
       key: const ValueKey<String>('route-details-view'),
       controller: scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
         Row(
@@ -50,6 +52,10 @@ class RouteDetailsView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+        StickerGallery(
+          imageUrls: route?.imageUrls ?? const [],
+          height: 150,
+        ),
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),

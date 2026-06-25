@@ -1,4 +1,4 @@
-package com.example.jippy_mobile
+package com.jippy.mobile
 
 import io.flutter.embedding.android.FlutterActivity
 

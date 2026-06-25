@@ -137,6 +137,7 @@ class NavigateLeg {
     required this.type,
     required this.routeName,
     this.routeNumber = '',
+    this.routeId = '',
     required this.polyline,
     required this.colorHex,
     required this.distanceMeters,
@@ -148,6 +149,7 @@ class NavigateLeg {
   final NavigateLegType type;
   final String routeName;
   final String routeNumber;
+  final String routeId;
   final String polyline;
   final String? colorHex;
   final double distanceMeters;
@@ -160,6 +162,8 @@ class NavigateLeg {
     final routeNumber =
       _normalizeNullableString(json['route_number'] ?? json['routeNumber']) ??
         '';
+    final routeId =
+      _normalizeNullableString(json['route_id'] ?? json['routeId']) ?? '';
     final polyline = json['polyline']?.toString().trim() ?? '';
 
     final rawInstructions = json['instructions'];
@@ -179,6 +183,7 @@ class NavigateLeg {
       type: parseNavigateLegType(json['type']?.toString()),
       routeName: routeName,
       routeNumber: routeNumber,
+      routeId: routeId,
       polyline: polyline,
       colorHex: _normalizeNullableString(json['color']),
       distanceMeters: _toDouble(json['distance']) ?? 0,
