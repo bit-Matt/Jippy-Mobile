@@ -20,7 +20,7 @@ import 'package:jippy_mobile/screens/go_screen/go_state.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/debug_trip_simulator_overlay.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_map_canvas.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
-import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
+import 'package:jippy_mobile/widgets/map_location_control.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
 import 'package:jippy_mobile/services/navigation_tracker.dart';
@@ -84,6 +84,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
+  final ValueNotifier<double> _sheetExtent = ValueNotifier<double>(0);
   final GeocodingService _geocoding = GeocodingService();
   final LocationService _locationService = LocationService.instance;
   final Connectivity _connectivity = Connectivity();
@@ -153,6 +154,54 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     if (_userPosition == null) return false;
     final p = _locationPermission;
     return p == LocationPermission.whileInUse || p == LocationPermission.always;
+  }
+
+  bool get _hasActiveBottomSheet {
+    if (_flow == GoNavigationFlow.navigating) return true;
+    if (_flow == GoNavigationFlow.locationDetail) return true;
+    if (_pinTarget != null) return true;
+    if (_pinTarget == null && _flow == GoNavigationFlow.routeSelection) {
+      return true;
+    }
+    if (_pinTarget == null && _flow == GoNavigationFlow.routeDetails) {
+      return true;
+    }
+    return false;
+  }
+
+  bool get _locationControlOn {
+    if (!_permissionChecked) return true;
+    final permission = _locationPermission;
+    return permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always;
+  }
+
+  String get _locationOffMessage {
+    if (_locationPermission == null) {
+      return 'Location service is disabled.';
+    }
+    return 'Location permission denied. Enable it to see your position.';
+  }
+
+  void _syncSheetExtentForActiveSheet() {
+    if (_hasActiveBottomSheet) return;
+    if (_sheetExtent.value == 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _hasActiveBottomSheet) return;
+      _sheetExtent.value = 0;
+    });
+  }
+
+  Future<void> _enableLocation() async {
+    if (_locationPermission == null) {
+      await Geolocator.openLocationSettings();
+      return;
+    }
+    if (_locationPermission == LocationPermission.deniedForever) {
+      await openAppSettings();
+      return;
+    }
+    await _initLocation();
   }
 
   bool get _showRoutingHeader {
@@ -398,6 +447,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _endController.dispose();
     _startFocus.dispose();
     _endFocus.dispose();
+    _sheetExtent.dispose();
     super.dispose();
   }
 
@@ -1912,8 +1962,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ? null
         : LatLng(_userPosition!.latitude, _userPosition!.longitude);
 
+    _syncSheetExtentForActiveSheet();
+
     return Scaffold(
-      body: Stack(
+      body: NotificationListener<DraggableScrollableNotification>(
+        onNotification: (notification) {
+          _sheetExtent.value = notification.extent;
+          return false;
+        },
+        child: Stack(
         children: [
           Positioned.fill(
             child: GoMapCanvas(
@@ -1937,11 +1994,14 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             ),
           ),
           if (_pinTarget != null) _buildCenterPinCrosshair(),
-          GoRecenterButton(
-            userPosition: _userPosition,
-            mapController: _mapController,
+          MapLocationControl(
+            drawerExtent: _sheetExtent,
+            followClampExtent: _sheetDefaultSize,
+            locationOn: _locationControlOn,
             isFollowing: _followUser,
             onRecenter: _recenterOnUser,
+            onEnableLocation: _enableLocation,
+            offMessage: _locationOffMessage,
           ),
           Positioned(
             top: 0,
@@ -2006,15 +2066,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               _pinTarget == null &&
               _flow == GoNavigationFlow.routeDetails)
             _buildRouteDetailsSheet(),
-          if (_permissionChecked &&
-              (_locationPermission == LocationPermission.denied ||
-                  _locationPermission == LocationPermission.deniedForever ||
-                  _locationPermission == null))
-            MapLocationMessage(
-              message: _locationPermission == null
-                  ? 'Location service is disabled.'
-                  : 'Location permission denied. Enable it to see your position on the Go map.',
-            ),
           if (kDebugMode &&
               _flow == GoNavigationFlow.navigating &&
               _debugTripSimulatorEnabled)
@@ -2033,6 +2084,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               ),
             ),
         ],
+        ),
       ),
     );
   }

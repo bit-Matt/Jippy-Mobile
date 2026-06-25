@@ -12,9 +12,8 @@ import 'package:jippy_mobile/screens/routes_screen/widgets/closure_details_view.
 import 'package:jippy_mobile/screens/routes_screen/widgets/bottom_drawer.dart';
 import 'package:jippy_mobile/screens/routes_screen/routes_state.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/loading_overlay.dart';
-import 'package:jippy_mobile/screens/routes_screen/widgets/location_message.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_canvas.dart';
-import 'package:jippy_mobile/screens/routes_screen/widgets/routes_action_buttons.dart';
+import 'package:jippy_mobile/widgets/map_location_control.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/overlapping_routes_view.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/route_details_view.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/routes_header.dart';
@@ -96,6 +95,8 @@ class _RoutesScreenState extends State<RoutesScreen>
   final MapController _mapController = MapController();
   final DraggableScrollableController _drawerController =
       DraggableScrollableController();
+  final ValueNotifier<double> _drawerExtent =
+      ValueNotifier<double>(_drawerDefaultSize);
   final LocationService _locationService = LocationService.instance;
   Position? _userPosition;
   double? _compassHeading;
@@ -438,14 +439,55 @@ class _RoutesScreenState extends State<RoutesScreen>
     _closureHitNotifier.removeListener(_onClosureLayerHit);
     _closureHitNotifier.dispose();
     _drawerController.dispose();
+    _drawerExtent.dispose();
     super.dispose();
+  }
+
+  bool get _locationOn {
+    if (!_permissionChecked) return true;
+    final permission = _locationPermission;
+    return permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always;
+  }
+
+  String get _locationOffMessage {
+    if (_locationPermission == null) {
+      return 'Location service is disabled.';
+    }
+    return 'Location permission denied. Enable it to see your position.';
+  }
+
+  Future<void> _enableLocation() async {
+    if (_locationPermission == null) {
+      await Geolocator.openLocationSettings();
+      return;
+    }
+    if (_locationPermission == LocationPermission.deniedForever) {
+      await Geolocator.openAppSettings();
+      return;
+    }
+    await _initLocation();
+  }
+
+  void _recenterOnUser() {
+    final position = _userPosition;
+    if (position == null) return;
+    _mapController.move(
+      LatLng(position.latitude, position.longitude),
+      _mapController.camera.zoom,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final vectorStyle = _vectorStyle;
     return Scaffold(
-      body: Stack(
+      body: NotificationListener<DraggableScrollableNotification>(
+        onNotification: (notification) {
+          _drawerExtent.value = notification.extent;
+          return false;
+        },
+        child: Stack(
         children: [
           Positioned.fill(
             child: Stack(
@@ -483,9 +525,14 @@ class _RoutesScreenState extends State<RoutesScreen>
               ],
             ),
           ),
-          RoutesActionButtons(
-            userPosition: _userPosition,
-            mapController: _mapController,
+          MapLocationControl(
+            drawerExtent: _drawerExtent,
+            followClampExtent: _drawerDefaultSize,
+            locationOn: _locationOn,
+            isFollowing: true,
+            onRecenter: _recenterOnUser,
+            onEnableLocation: _enableLocation,
+            offMessage: _locationOffMessage,
           ),
           MapBottomDrawer(
             controller: _drawerController,
@@ -542,16 +589,8 @@ class _RoutesScreenState extends State<RoutesScreen>
               ),
             ),
           ),
-          if (_permissionChecked &&
-              (_locationPermission == LocationPermission.denied ||
-                  _locationPermission == LocationPermission.deniedForever ||
-                  _locationPermission == null))
-            MapLocationMessage(
-              message: _locationPermission == null
-                  ? 'Location service is disabled.'
-                  : 'Location permission denied. Enable it to see your position on the routes map.',
-            ),
         ],
+        ),
       ),
     );
   }
