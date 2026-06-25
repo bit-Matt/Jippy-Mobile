@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'core/theme/map_colors.dart';
-import 'screens/app_shell.dart';
+import 'screens/splash_gate.dart';
 import 'services/entitlement_service.dart';
 import 'services/notification_service.dart';
 import 'services/subscription_service.dart';
@@ -43,7 +43,7 @@ class JippyApp extends StatelessWidget {
         canvasColor: MapColors.background,
         useMaterial3: true,
       ),
-      home: const AppShell(),
+      home: const SplashGate(),
     );
   }
 }

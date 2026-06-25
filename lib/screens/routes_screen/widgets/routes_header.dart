@@ -5,18 +5,14 @@ import 'package:jippy_mobile/core/theme/map_colors.dart';
 class RoutesHeader extends StatelessWidget {
   const RoutesHeader({
     super.key,
-    required this.isFocusedMode,
     required this.isCompareMode,
     required this.showStations,
-    required this.onShowAllRoutes,
     required this.onCompareModeChanged,
     required this.onShowStationsChanged,
   });
 
-  final bool isFocusedMode;
   final bool isCompareMode;
   final bool showStations;
-  final VoidCallback onShowAllRoutes;
   final ValueChanged<bool> onCompareModeChanged;
   final ValueChanged<bool> onShowStationsChanged;
 
@@ -39,27 +35,6 @@ class RoutesHeader extends StatelessWidget {
           spacing: 10,
           runSpacing: 10,
           children: [
-            FilterChip(
-              label: const Text('All routes'),
-              selected: !isFocusedMode,
-              onSelected: (selected) {
-                if (selected) onShowAllRoutes();
-              },
-              showCheckmark: false,
-              selectedColor: MapColors.primary.withValues(alpha: 0.18),
-              checkmarkColor: MapColors.primary,
-              labelStyle: TextStyle(
-                color: !isFocusedMode
-                    ? MapColors.primary
-                    : MapColors.text.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w600,
-              ),
-              side: BorderSide(
-                color: !isFocusedMode
-                    ? MapColors.primary.withValues(alpha: 0.7)
-                    : MapColors.text.withValues(alpha: 0.18),
-              ),
-            ),
             FilterChip(
               label: const Text('Compare Routes'),
               selected: isCompareMode,

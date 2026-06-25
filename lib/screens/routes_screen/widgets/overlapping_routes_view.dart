@@ -34,7 +34,7 @@ class OverlappingRoutesView extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(left: 8),
                 child: Text(
-                  'Overlapping Routes',
+                  'Routes Nearby',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

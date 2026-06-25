@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
+import 'package:jippy_mobile/widgets/sheet_drag_handle.dart';
 
 class MapBottomDrawer extends StatelessWidget {
   const MapBottomDrawer({
@@ -49,18 +50,13 @@ class MapBottomDrawer extends StatelessWidget {
           ),
           child: Column(
             children: [
-              const SizedBox(height: 12),
-              Center(
-                child: Container(
-                  width: 78,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: MapColors.text.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+              SheetDragHandle(
+                controller: controller,
+                scrollController: scrollController,
+                minChildSize: minChildSize,
+                maxChildSize: maxChildSize,
+                snapSizes: snapSizes,
               ),
-              const SizedBox(height: 10),
               Expanded(
                 child: _buildActivePanel(scrollController),
               ),
