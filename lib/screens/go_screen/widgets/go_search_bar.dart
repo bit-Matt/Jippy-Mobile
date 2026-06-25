@@ -17,8 +17,6 @@ class GoSearchBar extends StatelessWidget {
     required this.onStartTextChanged,
     required this.onEndTextChanged,
     required this.onEndSubmitted,
-    required this.onStartMapPinTap,
-    required this.onEndMapPinTap,
     required this.showUseCurrentLocation,
     required this.onUseCurrentLocationTap,
     required this.suggestions,
@@ -39,8 +37,6 @@ class GoSearchBar extends StatelessWidget {
   final ValueChanged<String> onStartTextChanged;
   final ValueChanged<String> onEndTextChanged;
   final ValueChanged<String> onEndSubmitted;
-  final VoidCallback onStartMapPinTap;
-  final VoidCallback onEndMapPinTap;
   final bool showUseCurrentLocation;
   final VoidCallback onUseCurrentLocationTap;
   final List<NominatimSearchHit> suggestions;
@@ -53,45 +49,28 @@ class GoSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top + 8;
-    final showOriginPinUseLocation = showUseCurrentLocation &&
-      activeRoutingField == GoRoutingField.start;
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Padding(
-        padding: EdgeInsets.only(top: topPadding, left: 16, right: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            mode == GoSearchBarMode.collapsed
-                ? _CollapsedBar(onTap: onCollapsedTap)
-                : _RoutingHeaderPanel(
-                    startController: startController,
-                    startFocusNode: startFocusNode,
-                    endController: endController,
-                    endFocusNode: endFocusNode,
-                    onStartTextChanged: onStartTextChanged,
-                    onEndTextChanged: onEndTextChanged,
-                    onEndSubmitted: onEndSubmitted,
-                    onStartMapPinTap: onStartMapPinTap,
-                    onEndMapPinTap: onEndMapPinTap,
-                    showUseCurrentLocationAction: showOriginPinUseLocation,
-                    onUseCurrentLocationTap: onUseCurrentLocationTap,
-                    suggestions: suggestions,
-                    onSuggestionTap: onSuggestionTap,
-                    searchError: searchError,
-                    showOutOfAreaDisclaimer: showOutOfAreaDisclaimer,
-                    isSearchingNominatim: isSearchingNominatim,
-                    activeRoutingField: activeRoutingField,
-                    onActiveRoutingFieldChanged: onActiveRoutingFieldChanged,
-                  ),
-          ],
-        ),
-      ),
-    );
+    final showOriginPinUseLocation =
+        showUseCurrentLocation && activeRoutingField == GoRoutingField.start;
+    return mode == GoSearchBarMode.collapsed
+        ? _CollapsedBar(onTap: onCollapsedTap)
+        : _RoutingHeaderPanel(
+            startController: startController,
+            startFocusNode: startFocusNode,
+            endController: endController,
+            endFocusNode: endFocusNode,
+            onStartTextChanged: onStartTextChanged,
+            onEndTextChanged: onEndTextChanged,
+            onEndSubmitted: onEndSubmitted,
+            showUseCurrentLocationAction: showOriginPinUseLocation,
+            onUseCurrentLocationTap: onUseCurrentLocationTap,
+            suggestions: suggestions,
+            onSuggestionTap: onSuggestionTap,
+            searchError: searchError,
+            showOutOfAreaDisclaimer: showOutOfAreaDisclaimer,
+            isSearchingNominatim: isSearchingNominatim,
+            activeRoutingField: activeRoutingField,
+            onActiveRoutingFieldChanged: onActiveRoutingFieldChanged,
+          );
   }
 }
 
@@ -156,8 +135,6 @@ class _RoutingHeaderPanel extends StatelessWidget {
     required this.onStartTextChanged,
     required this.onEndTextChanged,
     required this.onEndSubmitted,
-    required this.onStartMapPinTap,
-    required this.onEndMapPinTap,
     required this.showUseCurrentLocationAction,
     required this.onUseCurrentLocationTap,
     required this.suggestions,
@@ -176,8 +153,6 @@ class _RoutingHeaderPanel extends StatelessWidget {
   final ValueChanged<String> onStartTextChanged;
   final ValueChanged<String> onEndTextChanged;
   final ValueChanged<String> onEndSubmitted;
-  final VoidCallback onStartMapPinTap;
-  final VoidCallback onEndMapPinTap;
   final bool showUseCurrentLocationAction;
   final VoidCallback onUseCurrentLocationTap;
   final List<NominatimSearchHit> suggestions;
@@ -213,9 +188,6 @@ class _RoutingHeaderPanel extends StatelessWidget {
               isActive: activeRoutingField == GoRoutingField.start,
               onTap: () => onActiveRoutingFieldChanged(GoRoutingField.start),
               onChanged: onStartTextChanged,
-              onTrailingTap: onStartMapPinTap,
-              trailingIcon: Icons.edit_location_alt_outlined,
-              trailingTooltip: 'Pin start on map',
             ),
             const SizedBox(height: 6),
             _RoutingInputRow(
@@ -229,9 +201,6 @@ class _RoutingHeaderPanel extends StatelessWidget {
               onTap: () => onActiveRoutingFieldChanged(GoRoutingField.end),
               onChanged: onEndTextChanged,
               onSubmitted: onEndSubmitted,
-              onTrailingTap: onEndMapPinTap,
-              trailingIcon: Icons.edit_location_alt_outlined,
-              trailingTooltip: 'Pin destination on map',
               trailingProgress: isSearchingNominatim,
             ),
             if (showUseCurrentLocationAction) ...[
@@ -327,9 +296,6 @@ class _RoutingInputRow extends StatelessWidget {
     required this.onTap,
     required this.onChanged,
     this.onSubmitted,
-    required this.onTrailingTap,
-    required this.trailingIcon,
-    required this.trailingTooltip,
     this.trailingProgress = false,
   });
 
@@ -343,14 +309,12 @@ class _RoutingInputRow extends StatelessWidget {
   final VoidCallback onTap;
   final ValueChanged<String> onChanged;
   final ValueChanged<String>? onSubmitted;
-  final VoidCallback onTrailingTap;
-  final IconData trailingIcon;
-  final String trailingTooltip;
   final bool trailingProgress;
 
   @override
   Widget build(BuildContext context) {
-    void selectAllText() {
+    void handleTextFieldTap() {
+      onTap();
       final text = controller.text;
       if (text.isEmpty) return;
       controller.selection = TextSelection(
@@ -383,7 +347,7 @@ class _RoutingInputRow extends StatelessWidget {
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,
-                  onTap: selectAllText,
+                  onTap: handleTextFieldTap,
                   onChanged: onChanged,
                   onSubmitted: onSubmitted,
                   textInputAction: textInputAction,
@@ -394,24 +358,47 @@ class _RoutingInputRow extends StatelessWidget {
                   ),
                 ),
               ),
-              IconButton(
-                tooltip: trailingTooltip,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                icon: Icon(
-                  trailingIcon,
-                  size: 20,
-                  color: MapColors.text.withValues(alpha: 0.58),
-                ),
-                onPressed: onTrailingTap,
-              ),
               if (trailingProgress)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                const Padding(
+                  padding: EdgeInsets.only(left: 8, right: 8),
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class GoManualPinLocationButton extends StatelessWidget {
+  const GoManualPinLocationButton({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 2,
+      shadowColor: Colors.black26,
+      color: MapColors.primary,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Text(
+            'Manually pin location',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),
