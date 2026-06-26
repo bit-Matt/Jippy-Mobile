@@ -27,6 +27,7 @@ import 'package:jippy_mobile/services/navigation_tracker.dart';
 import 'package:jippy_mobile/services/notification_service.dart';
 import 'package:jippy_mobile/services/trip_simulator_service.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
+import 'package:jippy_mobile/utils/route_arrow_utils.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 import 'package:jippy_mobile/widgets/sheet_scroll_hint.dart';
 import 'package:jippy_mobile/widgets/sticker_gallery.dart';
@@ -348,6 +349,36 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       }
     }
     return polylines;
+  }
+
+  List<Marker> get _selectedRouteArrowMarkers {
+    if (_flow != GoNavigationFlow.routeSelection &&
+        _flow != GoNavigationFlow.routeDetails &&
+        _flow != GoNavigationFlow.navigating) {
+      return const <Marker>[];
+    }
+
+    final selected = _selectedSuggestion;
+    if (selected == null) return const <Marker>[];
+
+    final isolatedIndex = _activeLegIsolationIndex;
+    final markers = <Marker>[];
+
+    for (var i = 0; i < selected.route.legs.length; i++) {
+      if (isolatedIndex != null && i != isolatedIndex) continue;
+      final leg = selected.route.legs[i];
+      if (leg.type == NavigateLegType.walk) continue;
+
+      final encoded = leg.polyline.trim();
+      if (encoded.isEmpty) continue;
+      final points = decodeApiRoutePolyline(encoded);
+      if (points == null || points.length < 2) continue;
+
+      markers.addAll(
+        buildArrowMarkers(points, _mapColorForLeg(leg)),
+      );
+    }
+    return markers;
   }
 
   List<LatLng> get _selectedRideStopPoints {
@@ -1741,6 +1772,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       points: points,
       color: color ?? _mapColorForLeg(leg),
       strokeWidth: _strokeWidthForLeg(leg),
+      borderColor: MapColors.text,
+      borderStrokeWidth: 1.0,
       pattern: _polylinePatternForLeg(leg),
     );
   }
@@ -2001,6 +2034,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               initialZoom: _initialZoom,
               onMapTap: _handleMapTap,
               routePolylines: _selectedRoutePolylines,
+              arrowMarkers: _selectedRouteArrowMarkers,
               dropOffPoints: _selectedRideStopPoints,
               userPosition: userLatLng,
               userHeading: _compassHeading,
@@ -2774,18 +2808,21 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           width: 182,
           padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
           decoration: BoxDecoration(
-            color: _sheetSurfaceColor,
+            color: isSelected
+                ? MapColors.primary.withValues(alpha: 0.06)
+                : _sheetSurfaceColor,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isSelected
-                  ? MapColors.text.withValues(alpha: 0.24)
+                  ? MapColors.primary
                   : MapColors.text.withValues(alpha: 0.12),
+              width: isSelected ? 2.5 : 1,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: MapColors.text.withValues(alpha: 0.08),
-                      blurRadius: 10,
+                      color: MapColors.primary.withValues(alpha: 0.22),
+                      blurRadius: 12,
                       offset: const Offset(0, 3),
                     ),
                   ]

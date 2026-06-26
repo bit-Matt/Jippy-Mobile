@@ -18,7 +18,7 @@ class GeocodingService {
       'Jippy-Mobile/1.0.0 (capstone; contact: https://jippy.shinosawa-laboratories.dev)';
 
   /// Iloilo bounded search area: min_lon, max_lat, max_lon, min_lat.
-  static const String iloiloViewBox = '122.019,11.628,123.336,10.407';
+  static const String iloiloViewBox = '122.425908,10.802327,122.599368,10.676554';
 
   static const double _iloiloMinLat = 10.65;
   static const double _iloiloMaxLat = 10.78;
