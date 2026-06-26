@@ -5,6 +5,10 @@ const String apiBaseUrl = 'https://jippy.shinosawa-laboratories.dev'; // Product
 /// Public API URL for all routes and regions (dashboard API shape).
 const String routesApiUrl = '$apiBaseUrl/api/public/all';
 
+/// Relative path prefix for route sticker images in API payloads, e.g.
+/// `/api/public/images/{uuid}.png` in [routesApiUrl] responses.
+const String publicImagesPathPrefix = '/api/public/images/';
+
 /// Public API URL for feedback submission.
 const String feedbackApiUrl = '$apiBaseUrl/api/public/feedback';
 

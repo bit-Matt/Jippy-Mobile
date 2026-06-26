@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -10,11 +9,14 @@ import 'package:jippy_mobile/core/config/map_config.dart';
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/map_data_loader.dart';
 import 'package:jippy_mobile/models/map_layer_models.dart';
+import 'package:jippy_mobile/models/offline_map_status.dart';
 import 'package:jippy_mobile/models/routes_and_stations_data.dart';
 import 'package:jippy_mobile/models/tricycle_region.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/loading_overlay.dart';
 import 'package:jippy_mobile/screens/tricycles_screen/widgets/tricycles_regions_list.dart';
+import 'package:jippy_mobile/services/connectivity_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
+import 'package:jippy_mobile/services/offline_map_service.dart';
 import 'package:jippy_mobile/utils/map_coords.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 import 'package:jippy_mobile/widgets/jippy_map_canvas.dart';
@@ -35,13 +37,6 @@ const List<double> _drawerSnapSizes = <double>[
   _drawerMaxSize,
 ];
 
-bool _hasNetworkInterface(List<ConnectivityResult> results) {
-  if (results.length == 1 && results.single == ConnectivityResult.none) {
-    return false;
-  }
-  return true;
-}
-
 class TricyclesScreen extends StatefulWidget {
   const TricyclesScreen({super.key, this.isActive = true});
 
@@ -59,15 +54,14 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   final ValueNotifier<double> _drawerExtent =
       ValueNotifier<double>(_drawerDefaultSize);
   final LocationService _locationService = LocationService.instance;
-  final Connectivity _connectivity = Connectivity();
 
   Position? _userPosition;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
   bool _online = true;
+  bool _hasOfflineRegion = false;
 
   RoutesAndStationsData? _mapData;
   String? _mapStyle;
@@ -102,7 +96,10 @@ class _TricyclesScreenState extends State<TricyclesScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _mapEverActive = widget.isActive;
-    _initConnectivity();
+    _online = ConnectivityService.instance.isOnline.value;
+    ConnectivityService.instance.isOnline.addListener(_onConnectivityChanged);
+    OfflineMapService.instance.status.addListener(_onOfflineMapStatusChanged);
+    unawaited(_refreshOfflineRegionState());
     _resolveMapStyle();
     _initLocation();
     _subscribeToServiceStatus();
@@ -123,6 +120,7 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshOfflineRegionState());
       _resolveMapStyle();
       _loadMapData();
       _locationService.refresh();
@@ -133,34 +131,49 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ConnectivityService.instance.isOnline.removeListener(_onConnectivityChanged);
+    OfflineMapService.instance.status.removeListener(_onOfflineMapStatusChanged);
     _positionSubscription?.cancel();
     _serviceStatusSubscription?.cancel();
-    _connectivitySubscription?.cancel();
     _drawerController.dispose();
     _drawerExtent.dispose();
     super.dispose();
   }
 
-  Future<void> _initConnectivity() async {
-    final first = await _connectivity.checkConnectivity();
+  void _onConnectivityChanged() {
+    final online = ConnectivityService.instance.isOnline.value;
+    if (online == _online) return;
+    setState(() => _online = online);
+    unawaited(_resolveMapStyle());
+    unawaited(_loadMapData());
+  }
+
+  void _onOfflineMapStatusChanged() {
+    final status = OfflineMapService.instance.status.value;
+    final hasRegion = status is OfflineMapDownloaded;
+    if (hasRegion != _hasOfflineRegion) {
+      setState(() => _hasOfflineRegion = hasRegion);
+      unawaited(_resolveMapStyle());
+    }
+    if (status is OfflineMapDownloaded) {
+      unawaited(_loadMapData());
+    }
+  }
+
+  Future<void> _refreshOfflineRegionState() async {
+    final hasRegion = await OfflineMapService.instance.hasDownloadedRegion();
     if (!mounted) return;
-    setState(() => _online = _hasNetworkInterface(first));
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
-      results,
-    ) async {
-      if (!mounted) return;
-      final online = _hasNetworkInterface(results);
-      if (online != _online) {
-        setState(() => _online = online);
-        await _resolveMapStyle();
-      }
-    });
+    if (hasRegion != _hasOfflineRegion) {
+      setState(() => _hasOfflineRegion = hasRegion);
+    }
   }
 
   Future<void> _resolveMapStyle() async {
+    final online = ConnectivityService.instance.isOnline.value;
     final style = await resolveMapStyle(
       primaryStyleUrl: MapConfig.routesStyleUrl,
-      online: _online,
+      online: online,
+      hasOfflineRegion: _hasOfflineRegion,
     );
     if (!mounted) return;
     setState(() => _mapStyle = style);
@@ -170,14 +183,9 @@ class _TricyclesScreenState extends State<TricyclesScreen>
     if (!mounted) return;
     setState(() => _loadingData = true);
     try {
-      RoutesAndStationsData data;
-      try {
-        data = await loadRoutesFromApi();
-      } catch (_) {
-        data = await loadSampleMapData();
-      }
+      final result = await loadMapDataForCurrentConnectivity();
       if (!mounted) return;
-      setState(() => _mapData = data);
+      setState(() => _mapData = result.data);
       _completeLoadingAfterRender();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;

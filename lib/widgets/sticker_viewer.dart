@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'cached_network_or_file_image.dart';
+
 /// Opens a full-screen modal to view sticker images with pinch-to-zoom.
 /// Tap outside the image area to dismiss. Swipe horizontally when multiple images.
 Future<void> showStickerViewer(
@@ -78,25 +80,13 @@ class _StickerViewerDialogState extends State<_StickerViewerDialog> {
                     child: InteractiveViewer(
                       minScale: 0.5,
                       maxScale: 4,
-                      child: Image.network(
-                        widget.imageUrls[index],
+                      child: CachedNetworkOrFileImage(
+                        url: widget.imageUrls[index],
                         fit: BoxFit.contain,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.5,
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, _, _) => const Icon(
-                          Icons.broken_image_outlined,
-                          color: Colors.white54,
-                          size: 64,
-                        ),
+                        loadingSize: 48,
+                        errorIconSize: 64,
+                        loadingColor: Colors.white,
+                        errorIconColor: Colors.white54,
                       ),
                     ),
                   ),

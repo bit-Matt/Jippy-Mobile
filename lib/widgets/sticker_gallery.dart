@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
+import 'package:jippy_mobile/widgets/cached_network_or_file_image.dart';
 import 'package:jippy_mobile/widgets/sticker_viewer.dart';
 
 /// Horizontally scrollable gallery of route sticker images.
@@ -104,31 +105,11 @@ class _StickerTile extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(11),
-            child: Image.network(
-              url,
+            child: CachedNetworkOrFileImage(
+              url: url,
               fit: BoxFit.contain,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: MapColors.primary.withValues(alpha: 0.6),
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, _, _) => Icon(
-                Icons.broken_image_outlined,
-                color: MapColors.text.withValues(alpha: 0.35),
-                size: height * 0.35,
-              ),
+              loadingSize: 22,
+              errorIconSize: height * 0.35,
             ),
           ),
         ),

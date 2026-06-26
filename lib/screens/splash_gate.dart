@@ -39,7 +39,9 @@ class _SplashGateState extends State<SplashGate> {
     if (_appReady) return;
     _appReady = true;
     _timeoutTimer?.cancel();
-    _dismissOverlay();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _dismissOverlay();
+    });
   }
 
   void _dismissOverlay() {

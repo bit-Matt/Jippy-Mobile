@@ -23,4 +23,11 @@ class MapConfig {
 
   /// Routes / tricycles default center (slightly north-west of city core).
   static final LatLng routesDefaultCenter = LatLng(10.7, 122.5521);
+
+  /// Offline vector tile pack for Iloilo City.
+  static const double iloiloOfflineMinZoom = 10;
+  static const double iloiloOfflineMaxZoom = 16;
+  static const LatLng iloiloOfflineSouthWest = LatLng(10.636251, 122.379863);
+  static const LatLng iloiloOfflineNorthEast = LatLng(10.835500, 122.610123);
+  static const String iloiloOfflineRegionKey = 'iloilo_city';
 }

@@ -13,13 +13,14 @@ import 'package:jippy_mobile/models/map_layer_models.dart';
 import 'package:jippy_mobile/utils/map_coords.dart';
 import 'package:jippy_mobile/widgets/map_user_location.dart';
 
-/// Resolves the basemap style: remote vector URL when online, bundled raster
-/// fallback when offline.
+/// Resolves the basemap style: remote vector URL when online or when an
+/// offline region is available, bundled raster fallback otherwise.
 Future<String> resolveMapStyle({
   required String primaryStyleUrl,
   required bool online,
+  required bool hasOfflineRegion,
 }) async {
-  if (online) return primaryStyleUrl;
+  if (online || hasOfflineRegion) return primaryStyleUrl;
   return rootBundle.loadString(MapConfig.osmRasterStyleAsset);
 }
 

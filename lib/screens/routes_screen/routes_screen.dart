@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -27,7 +26,10 @@ import 'package:jippy_mobile/models/jeepney_route.dart';
 import 'package:jippy_mobile/models/map_layer_models.dart';
 import 'package:jippy_mobile/models/road_closure.dart';
 import 'package:jippy_mobile/models/routes_and_stations_data.dart';
+import 'package:jippy_mobile/models/offline_map_status.dart';
+import 'package:jippy_mobile/services/connectivity_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
+import 'package:jippy_mobile/services/offline_map_service.dart';
 import 'package:jippy_mobile/utils/map_coords.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
 import 'package:jippy_mobile/utils/route_arrow_utils.dart';
@@ -68,13 +70,6 @@ const List<double> _drawerSnapSizes = <double>[
   _drawerMaxSize,
 ];
 
-bool _hasNetworkInterface(List<ConnectivityResult> results) {
-  if (results.length == 1 && results.single == ConnectivityResult.none) {
-    return false;
-  }
-  return true;
-}
-
 /// Full-screen routes map with MapLibre basemap, user location, route polylines.
 class RoutesScreen extends StatefulWidget {
   const RoutesScreen({super.key, this.isActive = true});
@@ -93,14 +88,13 @@ class _RoutesScreenState extends State<RoutesScreen>
   final ValueNotifier<double> _drawerExtent =
       ValueNotifier<double>(_drawerDefaultSize);
   final LocationService _locationService = LocationService.instance;
-  final Connectivity _connectivity = Connectivity();
   Position? _userPosition;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
   bool _online = true;
+  bool _hasOfflineRegion = false;
   double _cameraZoom = _initialZoom;
 
   /// Loaded routes and stations from API (or asset fallback).
@@ -195,7 +189,10 @@ class _RoutesScreenState extends State<RoutesScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _mapEverActive = widget.isActive;
-    _initConnectivity();
+    _online = ConnectivityService.instance.isOnline.value;
+    ConnectivityService.instance.isOnline.addListener(_onConnectivityChanged);
+    OfflineMapService.instance.status.addListener(_onOfflineMapStatusChanged);
+    unawaited(_refreshOfflineRegionState());
     _resolveMapStyle();
     _initLocation();
     _subscribeToServiceStatus();
@@ -216,6 +213,7 @@ class _RoutesScreenState extends State<RoutesScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshOfflineRegionState());
       _resolveMapStyle();
       _loadRoutesData();
       _locationService.refresh();
@@ -240,30 +238,60 @@ class _RoutesScreenState extends State<RoutesScreen>
     });
   }
 
-  Future<void> _initConnectivity() async {
-    final first = await _connectivity.checkConnectivity();
+  void _onConnectivityChanged() {
+    final online = ConnectivityService.instance.isOnline.value;
+    if (online == _online) return;
+    setState(() => _online = online);
+    unawaited(_resolveMapStyle());
+    unawaited(_loadRoutesData());
+  }
+
+  void _onOfflineMapStatusChanged() {
+    final status = OfflineMapService.instance.status.value;
+    final hasRegion = status is OfflineMapDownloaded;
+    if (hasRegion != _hasOfflineRegion) {
+      setState(() => _hasOfflineRegion = hasRegion);
+      unawaited(_resolveMapStyle());
+    }
+    if (status is OfflineMapDownloaded) {
+      unawaited(_loadRoutesData());
+    }
+  }
+
+  Future<void> _refreshOfflineRegionState() async {
+    final hasRegion = await OfflineMapService.instance.hasDownloadedRegion();
     if (!mounted) return;
-    setState(() => _online = _hasNetworkInterface(first));
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
-      results,
-    ) async {
-      if (!mounted) return;
-      final online = _hasNetworkInterface(results);
-      if (online != _online) {
-        setState(() => _online = online);
-        await _resolveMapStyle();
-      }
-    });
+    if (hasRegion != _hasOfflineRegion) {
+      setState(() => _hasOfflineRegion = hasRegion);
+    }
   }
 
   Future<void> _resolveMapStyle() async {
+    final online = ConnectivityService.instance.isOnline.value;
     final style = await resolveMapStyle(
       primaryStyleUrl: MapConfig.routesStyleUrl,
-      online: _online,
+      online: online,
+      hasOfflineRegion: _hasOfflineRegion,
     );
     if (!mounted) return;
     setState(() => _mapStyle = style);
   }
+
+  JeepneyRoute? _routeById(String? id) {
+    return _routeByIdFromList(_routesData?.routes ?? const <JeepneyRoute>[], id);
+  }
+
+  JeepneyRoute? _routeByIdFromList(List<JeepneyRoute> routes, String? id) {
+    if (id == null || id.isEmpty) return null;
+    for (final route in routes) {
+      if (route.id == id) return route;
+    }
+    return null;
+  }
+
+  /// Route details must read from [_routesData] so offline image paths stay current.
+  JeepneyRoute? get _routeForDetails =>
+      _routeById(_uiState.selectedRoute?.id) ?? _uiState.selectedRoute;
 
   void _onMapCreated(MapController controller) {
     _mapController = controller;
@@ -277,14 +305,9 @@ class _RoutesScreenState extends State<RoutesScreen>
       _loadingRoutes = true;
     });
     try {
-      RoutesAndStationsData data;
-      var usedFallbackData = false;
-      try {
-        data = await loadRoutesFromApi();
-      } catch (_) {
-        data = await loadSampleMapData();
-        usedFallbackData = true;
-      }
+      final result = await loadMapDataForCurrentConnectivity();
+      final data = result.data;
+      final usedFallbackData = result.source == MapDataSource.sampleAsset;
       if (mounted) {
         final incomingRouteIds = data.routes.map((r) => r.id).toSet();
         setState(() {
@@ -310,6 +333,14 @@ class _RoutesScreenState extends State<RoutesScreen>
               );
             } else {
               _uiState = _uiState.copyWith(selectedRouteIds: nextIds);
+            }
+          }
+
+          final selectedId = _uiState.selectedRoute?.id;
+          if (selectedId != null) {
+            final refreshed = _routeByIdFromList(data.routes, selectedId);
+            if (refreshed != null) {
+              _uiState = _uiState.copyWith(selectedRoute: refreshed);
             }
           }
         });
@@ -441,9 +472,10 @@ class _RoutesScreenState extends State<RoutesScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ConnectivityService.instance.isOnline.removeListener(_onConnectivityChanged);
+    OfflineMapService.instance.status.removeListener(_onOfflineMapStatusChanged);
     _positionSubscription?.cancel();
     _serviceStatusSubscription?.cancel();
-    _connectivitySubscription?.cancel();
     _drawerController.dispose();
     _drawerExtent.dispose();
     super.dispose();
@@ -622,7 +654,7 @@ class _RoutesScreenState extends State<RoutesScreen>
             ),
             routeDetailsViewBuilder: (scrollController) => RouteDetailsView(
               scrollController: scrollController,
-              route: _uiState.selectedRoute,
+              route: _routeForDetails,
               onBackPressed: _closeRouteDetails,
             ),
             overlappingRoutesViewBuilder: (scrollController) =>

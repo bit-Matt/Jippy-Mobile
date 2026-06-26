@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -23,6 +22,7 @@ import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
 import 'package:jippy_mobile/widgets/jippy_map_canvas.dart';
 import 'package:jippy_mobile/widgets/map_location_control.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
+import 'package:jippy_mobile/services/connectivity_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
 import 'package:jippy_mobile/services/navigation_tracker.dart';
 import 'package:jippy_mobile/services/notification_service.dart';
@@ -56,13 +56,6 @@ const List<double> _sheetSnapSizes = <double>[
 /// interpolation [t] in [0, 1] along that segment.
 typedef RouteProgress = ({int legIndex, int pointIndex, double t});
 
-bool _hasNetworkInterface(List<ConnectivityResult> results) {
-  if (results.length == 1 && results.single == ConnectivityResult.none) {
-    return false;
-  }
-  return true;
-}
-
 class GoScreen extends StatefulWidget {
   const GoScreen({
     super.key,
@@ -86,7 +79,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   final ValueNotifier<double> _sheetExtent = ValueNotifier<double>(0);
   final GeocodingService _geocoding = GeocodingService();
   final LocationService _locationService = LocationService.instance;
-  final Connectivity _connectivity = Connectivity();
   final TextEditingController _startController = TextEditingController();
   final TextEditingController _endController = TextEditingController();
   final FocusNode _startFocus = FocusNode();
@@ -100,7 +92,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   double _mapViewportHeight = 800;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   StreamSubscription<ProximityEvent>? _trackerSubscription;
   StreamSubscription<TripSimulatorState>? _simulatorStateSubscription;
 
@@ -492,7 +483,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _resolveMapStyle();
     _initLocation();
     _subscribeToServiceStatus();
-    _initConnectivity();
+    _online = ConnectivityService.instance.isOnline.value;
+    ConnectivityService.instance.isOnline.addListener(_onConnectivityChanged);
     unawaited(_loadStickerUrls());
   }
 
@@ -506,19 +498,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   Future<void> _loadStickerUrls() async {
     try {
-      final data = await loadRoutesFromApi();
+      final result = await loadMapDataForCurrentConnectivity();
       if (!mounted) return;
-      setState(() => _stickerUrlsByRouteId = _buildStickerUrlMap(data.routes));
+      setState(
+        () => _stickerUrlsByRouteId = _buildStickerUrlMap(result.data.routes),
+      );
     } catch (_) {
-      try {
-        final data = await loadSampleMapData();
-        if (!mounted) return;
-        setState(
-          () => _stickerUrlsByRouteId = _buildStickerUrlMap(data.routes),
-        );
-      } catch (_) {
-        // Leave map empty; stickers simply won't appear.
-      }
+      // Leave map empty; stickers simply won't appear.
     }
   }
 
@@ -537,7 +523,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _searchDebounce?.cancel();
     _positionSubscription?.cancel();
     _serviceStatusSubscription?.cancel();
-    _connectivitySubscription?.cancel();
+    ConnectivityService.instance.isOnline.removeListener(_onConnectivityChanged);
     _trackerSubscription?.cancel();
     _simulatorStateSubscription?.cancel();
     _navigationTracker?.stop();
@@ -607,26 +593,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _initConnectivity() async {
-    final first = await _connectivity.checkConnectivity();
+  void _onConnectivityChanged() {
     if (!mounted) return;
-    setState(() => _online = _hasNetworkInterface(first));
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
-      results,
-    ) async {
-      if (!mounted) return;
-      final online = _hasNetworkInterface(results);
-      if (online != _online) {
-        setState(() => _online = online);
-        await _resolveMapStyle();
-      }
-    });
+    final online = ConnectivityService.instance.isOnline.value;
+    if (online == _online) return;
+    setState(() => _online = online);
+    unawaited(_resolveMapStyle());
   }
 
   Future<void> _resolveMapStyle() async {
     final style = await resolveMapStyle(
       primaryStyleUrl: MapConfig.goStyleUrl,
       online: _online,
+      hasOfflineRegion: false,
     );
     if (!mounted) return;
     setState(() => _mapStyle = style);
