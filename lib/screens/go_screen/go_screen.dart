@@ -36,6 +36,8 @@ import 'package:jippy_mobile/widgets/sticker_gallery.dart';
 import 'package:jippy_mobile/widgets/sheet_drag_handle.dart';
 
 const double _initialZoom = 14.0;
+const double _navigation3dPitch = 55.0;
+const double _navigation3dZoom = 17.0;
 
 const Color _sheetSurfaceColor = Colors.white;
 const Color _timelineSubtleLineColor = Color(0xFFCFD4DB);
@@ -92,7 +94,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   String? _mapStyle;
   double _cameraZoom = _initialZoom;
+  double _cameraBearing = 0;
   LatLng _cameraCenter = MapConfig.iloiloCenter;
+  GoNavigationMapView _navigationMapView = GoNavigationMapView.perspective3d;
   double _mapViewportHeight = 800;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
@@ -132,6 +136,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   Position? _userPosition;
   RouteProgress? _routeProgress;
+  List<MapPolylineSpec> _routePolylines = const [];
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
   bool _hasCenteredToUserOnce = false;
@@ -332,7 +337,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return nextLegIndex.clamp(0, selected.route.legs.length - 1);
   }
 
-  List<MapPolylineSpec> get _selectedRoutePolylines {
+  List<MapPolylineSpec> _computeRoutePolylines() {
     if (_flow != GoNavigationFlow.routeSelection &&
         _flow != GoNavigationFlow.routeDetails &&
         _flow != GoNavigationFlow.navigating) {
@@ -395,6 +400,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       }
     }
     return polylines;
+  }
+
+  void _syncRoutePolylines() {
+    _routePolylines = _computeRoutePolylines();
   }
 
   List<MapWidgetMarkerSpec> get _selectedRouteArrowMarkers {
@@ -543,6 +552,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _endController.dispose();
     _startFocus.dispose();
     _endFocus.dispose();
+    _sheetController.dispose();
     _sheetExtent.dispose();
     super.dispose();
   }
@@ -705,7 +715,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         setState(() {
           _userPosition = position;
           if (_flow == GoNavigationFlow.navigating) {
+            final previousProgress = _routeProgress;
             _updateRouteProgress(position);
+            if (_routeProgress != previousProgress) {
+              _syncRoutePolylines();
+            }
           }
         });
 
@@ -734,6 +748,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       controller.moveCamera(
         center: toGeographic(LatLng(position.latitude, position.longitude)),
         zoom: _initialZoom,
+        pitch: 0,
+        bearing: 0,
         padding: EdgeInsets.zero,
       ),
     );
@@ -742,22 +758,181 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   /// Fixed offset that keeps the user marker centered between the top of the
   /// screen and the top of the navigating sheet at its default height.
-  void _moveMapToFollowUser(Position position) {
+  void _moveMapToFollowUser(Position position, {bool animate = false}) {
     final controller = _mapController;
-    if (controller == null) return;
+    if (controller == null || !_mapFirstFrame) return;
     _suppressNextGestureFollowBreak = true;
     final latLng = LatLng(position.latitude, position.longitude);
     final padding = _flow == GoNavigationFlow.navigating
         ? EdgeInsets.only(bottom: _mapViewportHeight * _sheetCollapsedSize / 2)
         : EdgeInsets.zero;
-    unawaited(
-      controller.moveCamera(
-        center: toGeographic(latLng),
-        zoom: _cameraZoom,
-        padding: padding,
-      ),
-    );
+
+    final navigating = _flow == GoNavigationFlow.navigating;
+    final use3d = navigating &&
+        _navigationMapView == GoNavigationMapView.perspective3d;
+    final pitch = use3d ? _navigation3dPitch : 0.0;
+    final bearing = use3d ? (_resolveNavigationBearing(position) ?? _cameraBearing) : 0.0;
+    final zoom = navigating ? _navigation3dZoom : _cameraZoom;
+
+    if (animate) {
+      unawaited(
+        controller.animateCamera(
+          center: toGeographic(latLng),
+          zoom: zoom,
+          pitch: pitch,
+          bearing: bearing,
+          padding: padding,
+          nativeDuration: const Duration(milliseconds: 600),
+        ),
+      );
+    } else {
+      unawaited(
+        controller.moveCamera(
+          center: toGeographic(latLng),
+          zoom: zoom,
+          pitch: pitch,
+          bearing: bearing,
+          padding: padding,
+        ),
+      );
+    }
+
     _cameraCenter = latLng;
+    _cameraZoom = zoom;
+    _cameraBearing = bearing;
+  }
+
+  double? _resolveNavigationBearing(Position position) {
+    if (position.isMocked) {
+      final simHeading = position.heading;
+      if (simHeading >= 0 &&
+          !simHeading.isNaN &&
+          simHeading.isFinite) {
+        return simHeading;
+      }
+      return _bearingFromRouteProgress();
+    }
+
+    final speed = position.speed;
+    final gpsHeading = position.heading;
+    if (speed >= 0.5 &&
+        gpsHeading >= 0 &&
+        !gpsHeading.isNaN &&
+        gpsHeading.isFinite) {
+      return gpsHeading;
+    }
+
+    final routeBearing = _bearingFromRouteProgress();
+    if (routeBearing != null) return routeBearing;
+
+    if (gpsHeading >= 0 && !gpsHeading.isNaN && gpsHeading.isFinite) {
+      return gpsHeading;
+    }
+    return null;
+  }
+
+  double? _bearingFromRouteProgress() {
+    final progress = _routeProgress;
+    final selected = _selectedSuggestion;
+    if (progress == null || selected == null) return null;
+    if (progress.legIndex < 0 ||
+        progress.legIndex >= selected.route.legs.length) {
+      return null;
+    }
+
+    final encoded = selected.route.legs[progress.legIndex].polyline.trim();
+    if (encoded.isEmpty) return null;
+    final points = decodeApiRoutePolyline(encoded);
+    if (points == null || points.length < 2) return null;
+    if (progress.pointIndex >= points.length - 1) return null;
+
+    final start = points[progress.pointIndex];
+    final end = points[progress.pointIndex + 1];
+    if (progress.t > 0) {
+      final split = _interpolateRoutePoint(start, end, progress.t);
+      return Geolocator.bearingBetween(
+        split.latitude,
+        split.longitude,
+        end.latitude,
+        end.longitude,
+      );
+    }
+    return Geolocator.bearingBetween(
+      start.latitude,
+      start.longitude,
+      end.latitude,
+      end.longitude,
+    );
+  }
+
+  void _toggleNavigationMapView() {
+    if (_flow != GoNavigationFlow.navigating) return;
+    if (!_mapFirstFrame || _mapController == null) return;
+    setState(() {
+      _navigationMapView =
+          _navigationMapView == GoNavigationMapView.perspective3d
+          ? GoNavigationMapView.topDown2d
+          : GoNavigationMapView.perspective3d;
+      _followUser = true;
+    });
+    final position = _userPosition;
+    if (position != null) {
+      _moveMapToFollowUser(position, animate: true);
+    }
+  }
+
+  double _navigationViewToggleBottom(double screenHeight) {
+    final clampedExtent = math.min(_sheetExtent.value, _sheetDefaultSize);
+    return clampedExtent * screenHeight + 12 + MapLocationControl.buttonSize + 8;
+  }
+
+  Widget _buildNavigationViewToggle() {
+    if (_flow != GoNavigationFlow.navigating) {
+      return const SizedBox.shrink();
+    }
+
+    final is3d = _navigationMapView == GoNavigationMapView.perspective3d;
+    return ValueListenableBuilder<double>(
+      valueListenable: _sheetExtent,
+      builder: (context, _, child) {
+        final screenHeight = MediaQuery.sizeOf(context).height;
+        return Positioned(
+          right: 16,
+          bottom: _navigationViewToggleBottom(screenHeight),
+          child: Material(
+            color: MapColors.background,
+            borderRadius: BorderRadius.circular(14),
+            elevation: 2,
+            child: InkWell(
+              onTap: _toggleNavigationMapView,
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: MapLocationControl.buttonSize,
+                height: MapLocationControl.buttonSize,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      is3d ? Icons.map_outlined : Icons.view_in_ar_outlined,
+                      color: MapColors.primary,
+                      size: 22,
+                    ),
+                    Text(
+                      is3d ? '2D' : '3D',
+                      style: TextStyle(
+                        color: MapColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _onUserMapGesture() {
@@ -881,7 +1056,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _lastProximityAlertAt = null;
       _navigationBusy = false;
       _routeProgress = null;
+      _routePolylines = const [];
       _followUser = true;
+      _navigationMapView = GoNavigationMapView.topDown2d;
     });
 
     _startFocus.unfocus();
@@ -900,6 +1077,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         controller.moveCamera(
           center: toGeographic(LatLng(pos.latitude, pos.longitude)),
           zoom: _initialZoom,
+          pitch: 0,
+          bearing: 0,
           padding: EdgeInsets.zero,
         ),
       );
@@ -911,6 +1090,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       controller.moveCamera(
         center: toGeographic(MapConfig.iloiloCenter),
         zoom: _initialZoom,
+        pitch: 0,
+        bearing: 0,
         padding: EdgeInsets.zero,
       ),
     );
@@ -1233,6 +1414,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _selectedSuggestionIndex = 0;
         _isolatedLegIndex = null;
         _flow = GoNavigationFlow.routeSelection;
+        _syncRoutePolylines();
       });
 
       _fitRouteOrStartEnd();
@@ -1300,6 +1482,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     setState(() {
       _selectedSuggestionIndex = index;
       _isolatedLegIndex = null;
+      _syncRoutePolylines();
     });
     _fitRouteOrStartEnd();
   }
@@ -1363,16 +1546,36 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         _lastProximityAlertAt = null;
         _routeProgress = null;
         _followUser = true;
+        _navigationMapView = GoNavigationMapView.perspective3d;
         final position = _userPosition;
         if (position != null) {
           _updateRouteProgress(position);
         }
+        _syncRoutePolylines();
       });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted || _flow != GoNavigationFlow.navigating) return;
+        if (!_mapFirstFrame || _mapController == null) return;
+        try {
+          await _sheetController.animateTo(
+            _sheetCollapsedSize,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+          );
+        } catch (_) {}
         final position = _userPosition;
         if (position != null) {
-          _moveMapToFollowUser(position);
+          _moveMapToFollowUser(position, animate: true);
+        }
+        final simulator = _tripSimulator;
+        if (kDebugMode &&
+            _debugTripSimulatorEnabled &&
+            simulator != null &&
+            !simulator.isPlaying) {
+          simulator.play();
+          if (mounted) {
+            setState(() => _tripSimulatorState = simulator.snapshot);
+          }
         }
       });
     } finally {
@@ -1636,7 +1839,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     if (legIndex < 0 || legIndex >= selected.route.legs.length) return;
 
     final nextIsolation = _isolatedLegIndex == legIndex ? null : legIndex;
-    setState(() => _isolatedLegIndex = nextIsolation);
+    setState(() {
+      _isolatedLegIndex = nextIsolation;
+      _syncRoutePolylines();
+    });
 
     if (nextIsolation == null) {
       _fitRouteOrStartEnd();
@@ -1663,7 +1869,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   void _showAllRouteSteps() {
     if (_isolatedLegIndex == null) return;
-    setState(() => _isolatedLegIndex = null);
+    setState(() {
+      _isolatedLegIndex = null;
+      _syncRoutePolylines();
+    });
     _fitRouteOrStartEnd();
     _expandRouteDetailsSheetToDefault();
   }
@@ -2101,10 +2310,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           return false;
         },
         child: Stack(
-        children: [
+          fit: StackFit.expand,
+          children: [
           Positioned.fill(
             child: mapStyle == null
-                ? const ColoredBox(color: MapColors.background)
+                ? ColoredBox(
+                    color: MapColors.background,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: MapColors.primary.withValues(alpha: 0.85),
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  )
                 : JippyMapCanvas(
                     style: mapStyle,
                     initialCenter: MapConfig.iloiloCenter,
@@ -2113,7 +2331,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     onMapClick: _handleMapTap,
                     onUserGesture: _onUserMapGesture,
                     onStyleLoaded: _markMapReady,
-                    polylines: _selectedRoutePolylines,
+                    polylines: _routePolylines,
                     widgetMarkers: _mapWidgetMarkers,
                   ),
           ),
@@ -2127,6 +2345,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             onEnableLocation: _enableLocation,
             offMessage: _locationOffMessage,
           ),
+          _buildNavigationViewToggle(),
           Positioned(
             top: 0,
             left: 0,
@@ -2177,19 +2396,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
-          if (_flow != GoNavigationFlow.navigating && _pinTarget != null)
-            _buildPinModeSheet()
-          else if (_flow == GoNavigationFlow.locationDetail)
-            _buildLocationDetailSheet(),
-          if (_flow == GoNavigationFlow.navigating) _buildNavigatingSheet(),
-          if (_flow != GoNavigationFlow.navigating &&
-              _pinTarget == null &&
-              _flow == GoNavigationFlow.routeSelection)
-            _buildRouteSelectionSheet(),
-          if (_flow != GoNavigationFlow.navigating &&
-              _pinTarget == null &&
-              _flow == GoNavigationFlow.routeDetails)
-            _buildRouteDetailsSheet(),
+          if (_hasActiveBottomSheet) _buildPersistentBottomSheet(),
           if (kDebugMode &&
               _flow == GoNavigationFlow.navigating &&
               _debugTripSimulatorEnabled)
@@ -2244,16 +2451,23 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildPinModeSheet() {
-    final isOrigin = _pinTarget == GoPinTarget.origin;
-    final title = isOrigin ? 'Pin starting point' : 'Pin destination';
-    final body = isOrigin
-        ? 'Move the map so the crosshair points to your starting location.'
-        : 'Move the map so the crosshair points to your destination.';
+  double _initialBottomSheetSizeForFlow() {
+    switch (_flow) {
+      case GoNavigationFlow.routeSelection:
+      case GoNavigationFlow.routeDetails:
+        return _sheetDefaultSize;
+      default:
+        return _sheetCollapsedSize;
+    }
+  }
 
+  /// One [DraggableScrollableSheet] for all Go flows — reusing a single
+  /// [DraggableScrollableController] across multiple sheet widgets throws.
+  Widget _buildPersistentBottomSheet() {
     return DraggableScrollableSheet(
+      key: const ValueKey('go_persistent_bottom_sheet'),
       controller: _sheetController,
-      initialChildSize: _sheetCollapsedSize,
+      initialChildSize: _initialBottomSheetSizeForFlow(),
       minChildSize: _sheetCollapsedSize,
       maxChildSize: _sheetMaxSize,
       snap: true,
@@ -2262,71 +2476,122 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         return _SheetSurface(
           sheetController: _sheetController,
           scrollController: scrollController,
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: MapColors.text,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                body,
-                style: TextStyle(
-                  color: MapColors.text.withValues(alpha: 0.78),
-                  fontSize: 14,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _cancelMapPinMode,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(44),
-                        side: BorderSide(
-                          color: MapColors.text.withValues(alpha: 0.18),
-                        ),
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _confirmMapPinFromCenter,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: MapColors.primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(44),
-                      ),
-                      child: const Text(
-                        'Confirm pin',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          child: _buildBottomSheetBody(scrollController),
         );
       },
     );
   }
 
-  Widget _buildNavigatingSheet() {
+  Widget _buildBottomSheetBody(ScrollController scrollController) {
+    if (_flow != GoNavigationFlow.navigating && _pinTarget != null) {
+      return _buildPinModeSheetBody(scrollController);
+    }
+    if (_flow == GoNavigationFlow.locationDetail) {
+      return _buildLocationDetailSheetBody(scrollController);
+    }
+    if (_flow == GoNavigationFlow.navigating) {
+      return _buildNavigatingSheetBody(scrollController);
+    }
+    if (_pinTarget == null && _flow == GoNavigationFlow.routeSelection) {
+      return _buildRouteSelectionSheetBody(scrollController);
+    }
+    if (_pinTarget == null && _flow == GoNavigationFlow.routeDetails) {
+      return _buildRouteDetailsSheetBody(scrollController);
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildPinModeSheetBody(ScrollController scrollController) {
+    final isOrigin = _pinTarget == GoPinTarget.origin;
+    final title = isOrigin ? 'Pin starting point' : 'Pin destination';
+    final body = isOrigin
+        ? 'Move the map so the crosshair points to your starting location.'
+        : 'Move the map so the crosshair points to your destination.';
+
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: MapColors.text,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          body,
+          style: TextStyle(
+            color: MapColors.text.withValues(alpha: 0.78),
+            fontSize: 14,
+            height: 1.35,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _cancelMapPinMode,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(44),
+                  side: BorderSide(
+                    color: MapColors.text.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: const Text('Cancel'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton(
+                onPressed: _confirmMapPinFromCenter,
+                style: FilledButton.styleFrom(
+                  backgroundColor: MapColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(44),
+                ),
+                child: const Text(
+                  'Confirm pin',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavigatingSheetBody(ScrollController scrollController) {
     final tracker = _navigationTracker;
     if (tracker == null || tracker.stops.isEmpty) {
-      return const SizedBox.shrink();
+      return ListView(
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(18, 2, 18, 20),
+        children: [
+          const Text(
+            'Navigating',
+            style: TextStyle(
+              color: MapColors.text,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Starting trip…',
+            style: TextStyle(
+              color: MapColors.text.withValues(alpha: 0.72),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      );
     }
     final clampedIndex = _currentStopIndex.clamp(0, tracker.stops.length - 1);
     final nextStop = tracker.stops[clampedIndex];
@@ -2347,91 +2612,77 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ? 'Destination'
         : nextStop.label;
 
-    return DraggableScrollableSheet(
-      controller: _sheetController,
-      initialChildSize: _sheetCollapsedSize,
-      minChildSize: _sheetCollapsedSize,
-      maxChildSize: _sheetMaxSize,
-      snap: true,
-      snapSizes: _sheetSnapSizes,
-      builder: (context, scrollController) {
-        return _SheetSurface(
-          sheetController: _sheetController,
-          scrollController: scrollController,
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(18, 2, 18, 20),
-            children: [
-              const Text(
-                'Navigating',
-                style: TextStyle(
-                  color: MapColors.text,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Next stop: $nextLabel',
-                style: TextStyle(
-                  color: MapColors.text.withValues(alpha: 0.86),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                distanceMeters == null
-                    ? 'Waiting for GPS...'
-                    : '${distanceMeters.round()}m away',
-                style: TextStyle(
-                  color: MapColors.text.withValues(alpha: 0.7),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 14),
-              _buildStopProgressIndicator(tracker),
-              const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: _navigationBusy ? null : _endNavigating,
-                style: FilledButton.styleFrom(
-                  backgroundColor: MapColors.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(46),
-                ),
-                icon: _navigationBusy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.stop_circle_outlined),
-                label: Text(
-                  _navigationBusy ? 'Ending…' : 'End trip',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Divider(color: MapColors.text.withValues(alpha: 0.12)),
-              const SizedBox(height: 8),
-              const Text(
-                'Itinerary',
-                style: TextStyle(
-                  color: MapColors.text,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ..._buildLegBlocks(withCompletedState: true),
-            ],
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 20),
+      children: [
+        const Text(
+          'Navigating',
+          style: TextStyle(
+            color: MapColors.text,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Next stop: $nextLabel',
+          style: TextStyle(
+            color: MapColors.text.withValues(alpha: 0.86),
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          distanceMeters == null
+              ? 'Waiting for GPS...'
+              : '${distanceMeters.round()}m away',
+          style: TextStyle(
+            color: MapColors.text.withValues(alpha: 0.7),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildStopProgressIndicator(tracker),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          onPressed: _navigationBusy ? null : _endNavigating,
+          style: FilledButton.styleFrom(
+            backgroundColor: MapColors.primary,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(46),
+          ),
+          icon: _navigationBusy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.stop_circle_outlined),
+          label: Text(
+            _navigationBusy ? 'Ending…' : 'End trip',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Divider(color: MapColors.text.withValues(alpha: 0.12)),
+        const SizedBox(height: 8),
+        const Text(
+          'Itinerary',
+          style: TextStyle(
+            color: MapColors.text,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ..._buildLegBlocks(withCompletedState: true),
+      ],
     );
   }
 
@@ -2515,7 +2766,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildLocationDetailSheet() {
+  Widget _buildLocationDetailSheetBody(ScrollController scrollController) {
     final selectedPoint = _selectedExplorePoint;
     if (selectedPoint == null) {
       return const SizedBox.shrink();
@@ -2525,98 +2776,73 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ? 'Selected location'
         : _selectedExploreLabel;
 
-    return DraggableScrollableSheet(
-      controller: _sheetController,
-      initialChildSize: _sheetCollapsedSize,
-      minChildSize: _sheetCollapsedSize,
-      maxChildSize: _sheetMaxSize,
-      snap: true,
-      snapSizes: _sheetSnapSizes,
-      builder: (context, scrollController) {
-        return _SheetSurface(
-          sheetController: _sheetController,
-          scrollController: scrollController,
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: MapColors.text,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: 'Close',
-                    onPressed: _resetToExplore,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${selectedPoint.latitude.toStringAsFixed(5)}, ${selectedPoint.longitude.toStringAsFixed(5)}',
-                style: TextStyle(
-                  color: MapColors.text.withValues(alpha: 0.6),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: MapColors.text,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: MapColors.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: _onDirectionsFromLocationDetail,
-                icon: const Icon(Icons.navigation_rounded),
-                label: const Text(
-                  'Directions',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-            ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded),
+              tooltip: 'Close',
+              onPressed: _resetToExplore,
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '${selectedPoint.latitude.toStringAsFixed(5)}, ${selectedPoint.longitude.toStringAsFixed(5)}',
+          style: TextStyle(
+            color: MapColors.text.withValues(alpha: 0.6),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: MapColors.primary,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          onPressed: _onDirectionsFromLocationDetail,
+          icon: const Icon(Icons.navigation_rounded),
+          label: const Text(
+            'Directions',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildRouteSelectionSheet() {
+  Widget _buildRouteSelectionSheetBody(ScrollController scrollController) {
     final selected = _selectedSuggestion;
     final showRouteError = _searchError != null && !_routePreviewLoading;
     const errorColor = Color(0xFFB00020);
 
-    return DraggableScrollableSheet(
-      controller: _sheetController,
-      initialChildSize: _sheetDefaultSize,
-      minChildSize: _sheetCollapsedSize,
-      maxChildSize: _sheetMaxSize,
-      snap: true,
-      snapSizes: _sheetSnapSizes,
-      builder: (context, scrollController) {
-        return _SheetSurface(
-          sheetController: _sheetController,
-          scrollController: scrollController,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
-                children: [
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
+          children: [
                   Row(
                     children: [
                       const Expanded(
@@ -2784,14 +3010,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     else
                       ..._buildPreviewInstructionRows(selected),
                   ],
-                ],
-              ),
-              if (selected != null)
-                SheetScrollHint(scrollController: scrollController),
-            ],
-          ),
-        );
-      },
+          ],
+        ),
+        if (selected != null)
+          SheetScrollHint(scrollController: scrollController),
+      ],
     );
   }
 
@@ -3105,7 +3328,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return trimmed;
   }
 
-  Widget _buildRouteDetailsSheet() {
+  Widget _buildRouteDetailsSheetBody(ScrollController scrollController) {
     final selected = _selectedSuggestion;
     if (selected == null) {
       return const SizedBox.shrink();
@@ -3113,69 +3336,55 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     final legTimelineBlocks = _buildLegBlocks();
 
-    return DraggableScrollableSheet(
-      controller: _sheetController,
-      initialChildSize: _sheetDefaultSize,
-      minChildSize: _sheetCollapsedSize,
-      maxChildSize: _sheetMaxSize,
-      snap: true,
-      snapSizes: _sheetSnapSizes,
-      builder: (context, scrollController) {
-        return _SheetSurface(
-          sheetController: _sheetController,
-          scrollController: scrollController,
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(18, 2, 18, 28),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Route Details',
-                      style: const TextStyle(
-                        color: MapColors.text,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: 'Close and reset',
-                    onPressed: _resetToExplore,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${_formatMinutes(selected.totalDurationMinutes)} - ${_formatDistance(selected.totalDistanceMeters)}',
-                style: TextStyle(
-                  color: MapColors.text.withValues(alpha: 0.72),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.fromLTRB(18, 2, 18, 28),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Route Details',
+                style: const TextStyle(
+                  color: MapColors.text,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              if (_activeLegIsolationIndex != null) ...[
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _showAllRouteSteps,
-                  icon: const Icon(Icons.center_focus_strong_rounded),
-                  label: const Text('Show all step-by-step'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(42),
-                    side: BorderSide(
-                      color: MapColors.text.withValues(alpha: 0.2),
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              ...legTimelineBlocks,
-            ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.close_rounded),
+              tooltip: 'Close and reset',
+              onPressed: _resetToExplore,
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${_formatMinutes(selected.totalDurationMinutes)} - ${_formatDistance(selected.totalDistanceMeters)}',
+          style: TextStyle(
+            color: MapColors.text.withValues(alpha: 0.72),
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
           ),
-        );
-      },
+        ),
+        if (_activeLegIsolationIndex != null) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _showAllRouteSteps,
+            icon: const Icon(Icons.center_focus_strong_rounded),
+            label: const Text('Show all step-by-step'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(42),
+              side: BorderSide(
+                color: MapColors.text.withValues(alpha: 0.2),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        ...legTimelineBlocks,
+      ],
     );
   }
 

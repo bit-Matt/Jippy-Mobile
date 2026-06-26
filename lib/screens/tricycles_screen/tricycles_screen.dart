@@ -71,6 +71,7 @@ class _TricyclesScreenState extends State<TricyclesScreen>
 
   RoutesAndStationsData? _mapData;
   String? _mapStyle;
+  bool _mapEverActive = false;
   bool _loadingData = true;
   String? _selectedRegionId;
   double _cameraZoom = _initialZoom;
@@ -100,6 +101,7 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _mapEverActive = widget.isActive;
     _initConnectivity();
     _resolveMapStyle();
     _initLocation();
@@ -110,6 +112,9 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   @override
   void didUpdateWidget(TricyclesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.isActive) {
+      _mapEverActive = true;
+    }
     if (oldWidget.isActive && !widget.isActive) {
       _resetToDefaultView();
     }
@@ -450,7 +455,7 @@ class _TricyclesScreenState extends State<TricyclesScreen>
             Positioned.fill(
               child: Stack(
                 children: [
-                  if (mapStyle != null)
+                  if (mapStyle != null && _mapEverActive)
                     JippyMapCanvas(
                       style: mapStyle,
                       initialCenter: MapConfig.routesDefaultCenter,

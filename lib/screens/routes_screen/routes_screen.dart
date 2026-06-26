@@ -108,6 +108,7 @@ class _RoutesScreenState extends State<RoutesScreen>
   bool _isUsingFallbackRoutesData = false;
 
   String? _mapStyle;
+  bool _mapEverActive = false;
 
   /// True while routes are being fetched and during the first render pass.
   bool _loadingRoutes = true;
@@ -193,6 +194,7 @@ class _RoutesScreenState extends State<RoutesScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _mapEverActive = widget.isActive;
     _initConnectivity();
     _resolveMapStyle();
     _initLocation();
@@ -203,6 +205,9 @@ class _RoutesScreenState extends State<RoutesScreen>
   @override
   void didUpdateWidget(RoutesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.isActive) {
+      _mapEverActive = true;
+    }
     if (oldWidget.isActive && !widget.isActive) {
       _resetToDefaultView();
     }
@@ -566,7 +571,7 @@ class _RoutesScreenState extends State<RoutesScreen>
           Positioned.fill(
             child: Stack(
               children: [
-                if (mapStyle != null)
+                if (mapStyle != null && _mapEverActive)
                   JippyMapCanvas(
                     style: mapStyle,
                     initialCenter: MapConfig.routesDefaultCenter,
