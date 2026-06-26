@@ -1,38 +1,30 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:vector_map_tiles/vector_map_tiles.dart';
+import 'package:maplibre/maplibre.dart' hide Position;
 
+import 'package:jippy_mobile/core/config/map_config.dart';
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/map_data_loader.dart';
+import 'package:jippy_mobile/models/map_layer_models.dart';
 import 'package:jippy_mobile/models/routes_and_stations_data.dart';
 import 'package:jippy_mobile/models/tricycle_region.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/loading_overlay.dart';
-import 'package:jippy_mobile/screens/tricycles_screen/widgets/tricycles_canvas.dart';
 import 'package:jippy_mobile/screens/tricycles_screen/widgets/tricycles_regions_list.dart';
 import 'package:jippy_mobile/services/location_service.dart';
+import 'package:jippy_mobile/utils/map_coords.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
+import 'package:jippy_mobile/widgets/jippy_map_canvas.dart';
 import 'package:jippy_mobile/widgets/map_location_control.dart';
 import 'package:jippy_mobile/widgets/sheet_drag_handle.dart';
 import 'package:jippy_mobile/widgets/tricycle_station_marker.dart';
 
-/// Default center for the tricycles map: Iloilo City, Philippines.
-final LatLng _tricyclesDefaultCenter = LatLng(10.7, 122.5521);
-
 const double _initialZoom = 12.0;
 
-const String _osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-const String _vectorStyleUrl =
-    'https://jippy.shinosawa-laboratories.dev/tileserver/style.json';
-
-const String _userAgentPackageName = 'com.jippy.mobile';
-
 const double _regionFillOpacity = 0.25;
-const double _regionStrokeWidth = 2;
 
 const double _drawerCollapsedSize = 0.16;
 const double _drawerDefaultSize = 0.38;
@@ -42,6 +34,13 @@ const List<double> _drawerSnapSizes = <double>[
   _drawerDefaultSize,
   _drawerMaxSize,
 ];
+
+bool _hasNetworkInterface(List<ConnectivityResult> results) {
+  if (results.length == 1 && results.single == ConnectivityResult.none) {
+    return false;
+  }
+  return true;
+}
 
 class TricyclesScreen extends StatefulWidget {
   const TricyclesScreen({super.key, this.isActive = true});
@@ -54,25 +53,27 @@ class TricyclesScreen extends StatefulWidget {
 
 class _TricyclesScreenState extends State<TricyclesScreen>
     with WidgetsBindingObserver {
-  final MapController _mapController = MapController();
+  MapController? _mapController;
   final DraggableScrollableController _drawerController =
       DraggableScrollableController();
   final ValueNotifier<double> _drawerExtent =
       ValueNotifier<double>(_drawerDefaultSize);
   final LocationService _locationService = LocationService.instance;
+  final Connectivity _connectivity = Connectivity();
 
   Position? _userPosition;
-  double? _compassHeading;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
-  StreamSubscription<double?>? _headingSubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
+  bool _online = true;
 
   RoutesAndStationsData? _mapData;
-  Style? _vectorStyle;
+  String? _mapStyle;
   bool _loadingData = true;
   String? _selectedRegionId;
+  double _cameraZoom = _initialZoom;
 
   bool get _isFocusedMode => _selectedRegionId != null;
 
@@ -99,10 +100,10 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadVectorStyle();
+    _initConnectivity();
+    _resolveMapStyle();
     _initLocation();
     _subscribeToServiceStatus();
-    _subscribeToHeading();
     _loadMapData();
   }
 
@@ -117,7 +118,7 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _loadVectorStyle();
+      _resolveMapStyle();
       _loadMapData();
       _locationService.refresh();
       _initLocation();
@@ -129,30 +130,35 @@ class _TricyclesScreenState extends State<TricyclesScreen>
     WidgetsBinding.instance.removeObserver(this);
     _positionSubscription?.cancel();
     _serviceStatusSubscription?.cancel();
-    _headingSubscription?.cancel();
+    _connectivitySubscription?.cancel();
     _drawerController.dispose();
     _drawerExtent.dispose();
     super.dispose();
   }
 
-  Future<void> _loadVectorStyle() async {
-    try {
-      final style = await StyleReader(
-        uri: _vectorStyleUrl,
-        httpHeaders: const {
-          'User-Agent':
-              'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
-        },
-      ).read().timeout(const Duration(seconds: 6));
-
+  Future<void> _initConnectivity() async {
+    final first = await _connectivity.checkConnectivity();
+    if (!mounted) return;
+    setState(() => _online = _hasNetworkInterface(first));
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
+      results,
+    ) async {
       if (!mounted) return;
-      setState(() => _vectorStyle = style);
-    } catch (_) {
-      if (!mounted) return;
-      if (_vectorStyle != null) {
-        setState(() => _vectorStyle = null);
+      final online = _hasNetworkInterface(results);
+      if (online != _online) {
+        setState(() => _online = online);
+        await _resolveMapStyle();
       }
-    }
+    });
+  }
+
+  Future<void> _resolveMapStyle() async {
+    final style = await resolveMapStyle(
+      primaryStyleUrl: MapConfig.routesStyleUrl,
+      online: _online,
+    );
+    if (!mounted) return;
+    setState(() => _mapStyle = style);
   }
 
   Future<void> _loadMapData() async {
@@ -214,13 +220,6 @@ class _TricyclesScreenState extends State<TricyclesScreen>
           _userPosition = null;
         });
       }
-    });
-  }
-
-  void _subscribeToHeading() {
-    _headingSubscription = _locationService.headingStream.listen((heading) {
-      if (!mounted) return;
-      setState(() => _compassHeading = heading);
     });
   }
 
@@ -298,12 +297,19 @@ class _TricyclesScreenState extends State<TricyclesScreen>
     await _initLocation();
   }
 
+  void _onMapCreated(MapController controller) {
+    _mapController = controller;
+    _cameraZoom = controller.getCamera().zoom;
+  }
+
   void _recenterOnUser() {
     final position = _userPosition;
-    if (position == null) return;
-    _mapController.move(
-      LatLng(position.latitude, position.longitude),
-      _mapController.camera.zoom,
+    final controller = _mapController;
+    if (position == null || controller == null) return;
+    controller.moveCamera(
+      center: toGeographic(LatLng(position.latitude, position.longitude)),
+      zoom: _cameraZoom,
+      padding: EdgeInsets.zero,
     );
   }
 
@@ -320,7 +326,14 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   }
 
   void _moveToDefaultMapView() {
-    _mapController.move(_tricyclesDefaultCenter, _initialZoom);
+    final controller = _mapController;
+    if (controller == null) return;
+    controller.moveCamera(
+      center: toGeographic(MapConfig.routesDefaultCenter),
+      zoom: _initialZoom,
+      padding: EdgeInsets.zero,
+    );
+    _cameraZoom = _initialZoom;
   }
 
   void _focusRegion(TricycleRegion region) {
@@ -335,27 +348,34 @@ class _TricyclesScreenState extends State<TricyclesScreen>
         .toList();
   }
 
-  void _fitPoints(List<LatLng> points) {
+  Future<void> _fitPoints(List<LatLng> points) async {
+    final controller = _mapController;
+    if (controller == null) return;
     if (points.isEmpty) {
       _moveToDefaultMapView();
       return;
     }
 
-    final bounds = LatLngBounds.fromPoints(points);
     try {
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.fromLTRB(32, 110, 32, 300),
+      await controller.fitBounds(
+        bounds: toLngLatBounds(points),
+        padding: const EdgeInsets.fromLTRB(32, 110, 32, 300),
+        offset: Offset.zero,
+      );
+      _cameraZoom = controller.getCamera().zoom;
+    } catch (_) {
+      final center = toGeographic(
+        LatLng(
+          points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length,
+          points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length,
         ),
       );
-    } catch (_) {
-      _mapController.move(bounds.center, _mapController.camera.zoom);
+      await controller.moveCamera(center: center, zoom: _cameraZoom);
     }
   }
 
   void _fitRegionBounds(TricycleRegion region) {
-    _fitPoints(_polygonPointsForRegion(region));
+    unawaited(_fitPoints(_polygonPointsForRegion(region)));
   }
 
   void _fitAllRegions() {
@@ -368,11 +388,11 @@ class _TricyclesScreenState extends State<TricyclesScreen>
       _moveToDefaultMapView();
       return;
     }
-    _fitPoints(points);
+    unawaited(_fitPoints(points));
   }
 
-  List<Polygon<Object>> get _regionPolygons {
-    final polygons = <Polygon<Object>>[];
+  List<MapPolygonSpec> get _regionPolygons {
+    final polygons = <MapPolygonSpec>[];
     for (final region in _visibleRegions) {
       if (!region.canRenderPolygon) continue;
       final points = _polygonPointsForRegion(region);
@@ -381,19 +401,18 @@ class _TricyclesScreenState extends State<TricyclesScreen>
       final regionColor = parseRouteColor(region.regionColor);
 
       polygons.add(
-        Polygon<Object>(
+        MapPolygonSpec(
           points: points,
-          color: regionColor.withValues(alpha: _regionFillOpacity),
-          borderColor: regionColor,
-          borderStrokeWidth: _regionStrokeWidth,
+          fillColor: regionColor.withValues(alpha: _regionFillOpacity),
+          outlineColor: regionColor,
         ),
       );
     }
     return polygons;
   }
 
-  List<Marker> get _stationMarkers {
-    final markers = <Marker>[];
+  List<MapWidgetMarkerSpec> get _stationMarkers {
+    final markers = <MapWidgetMarkerSpec>[];
     for (final region in _visibleRegions) {
       for (final station in region.stations) {
         markers.add(
@@ -419,6 +438,7 @@ class _TricyclesScreenState extends State<TricyclesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final mapStyle = _mapStyle;
     return Scaffold(
       body: NotificationListener<DraggableScrollableNotification>(
         onNotification: (notification) {
@@ -430,25 +450,17 @@ class _TricyclesScreenState extends State<TricyclesScreen>
             Positioned.fill(
               child: Stack(
                 children: [
-                  TricyclesCanvas(
-                    mapController: _mapController,
-                    vectorStyle: _vectorStyle,
-                    initialCenter: _tricyclesDefaultCenter,
-                    initialZoom: _initialZoom,
-                    regionPolygons: _regionPolygons,
-                    stationMarkers: _stationMarkers,
-                    userPosition: _userPosition == null
-                        ? null
-                        : LatLng(
-                            _userPosition!.latitude,
-                            _userPosition!.longitude,
-                          ),
-                    userHeading: _compassHeading,
-                    userSpeedMps: _userPosition?.speed,
-                    userAccuracyMeters: _userPosition?.accuracy,
-                    osmTileUrl: _osmTileUrl,
-                    userAgentPackageName: _userAgentPackageName,
-                  ),
+                  if (mapStyle != null)
+                    JippyMapCanvas(
+                      style: mapStyle,
+                      initialCenter: MapConfig.routesDefaultCenter,
+                      initialZoom: _initialZoom,
+                      onMapCreated: _onMapCreated,
+                      polygons: _regionPolygons,
+                      widgetMarkers: _stationMarkers,
+                    )
+                  else
+                    const ColoredBox(color: MapColors.background),
                   if (_loadingData) const LoadingOverlay(),
                 ],
               ),

@@ -51,6 +51,23 @@ Set<String> routeIdsNearPolylines(
   return ids;
 }
 
+/// Returns true when [point] lies inside [polygon] (ray-casting algorithm).
+bool pointInPolygon(LatLng point, List<LatLng> polygon) {
+  if (polygon.length < 3) return false;
+  var inside = false;
+  for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    final xi = polygon[i].longitude;
+    final yi = polygon[i].latitude;
+    final xj = polygon[j].longitude;
+    final yj = polygon[j].latitude;
+    final intersects = ((yi > point.latitude) != (yj > point.latitude)) &&
+        (point.longitude <
+            (xj - xi) * (point.latitude - yi) / (yj - yi + 0.0) + xi);
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
 double _pointToSegmentDistanceMeters(LatLng p, LatLng a, LatLng b) {
   final latRef = (a.latitude + b.latitude + p.latitude) / 3.0;
   final cosLat = math.cos(latRef * math.pi / 180.0);

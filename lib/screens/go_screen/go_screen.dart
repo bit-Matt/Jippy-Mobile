@@ -4,28 +4,30 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:maplibre/maplibre.dart' hide LengthUnit, Position;
 import 'package:permission_handler/permission_handler.dart' hide ServiceStatus;
-import 'package:vector_map_tiles/vector_map_tiles.dart';
 import 'package:vibration/vibration.dart';
 
+import 'package:jippy_mobile/core/config/map_config.dart';
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/map_data_loader.dart';
 import 'package:jippy_mobile/data/navigate_client.dart';
 import 'package:jippy_mobile/models/jeepney_route.dart';
+import 'package:jippy_mobile/models/map_layer_models.dart';
 import 'package:jippy_mobile/models/navigate_suggestion.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/debug_trip_simulator_overlay.dart';
-import 'package:jippy_mobile/screens/go_screen/widgets/go_map_canvas.dart';
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
+import 'package:jippy_mobile/widgets/jippy_map_canvas.dart';
 import 'package:jippy_mobile/widgets/map_location_control.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
 import 'package:jippy_mobile/services/navigation_tracker.dart';
 import 'package:jippy_mobile/services/notification_service.dart';
 import 'package:jippy_mobile/services/trip_simulator_service.dart';
+import 'package:jippy_mobile/utils/map_coords.dart';
 import 'package:jippy_mobile/utils/polyline_1e6.dart';
 import 'package:jippy_mobile/utils/route_arrow_utils.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
@@ -33,13 +35,7 @@ import 'package:jippy_mobile/widgets/sheet_scroll_hint.dart';
 import 'package:jippy_mobile/widgets/sticker_gallery.dart';
 import 'package:jippy_mobile/widgets/sheet_drag_handle.dart';
 
-final LatLng _iloiloCenter = LatLng(10.7202, 122.5621);
-
 const double _initialZoom = 14.0;
-const String _osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const String _vectorStyleUrl =
-    'https://jippy.shinosawa-laboratories.dev/tileserver/liberty.json';
-const String _userAgentPackageName = 'com.jippy.mobile';
 
 const Color _sheetSurfaceColor = Colors.white;
 const Color _timelineSubtleLineColor = Color(0xFFCFD4DB);
@@ -82,7 +78,7 @@ class GoScreen extends StatefulWidget {
 }
 
 class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
-  final MapController _mapController = MapController();
+  MapController? _mapController;
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   final ValueNotifier<double> _sheetExtent = ValueNotifier<double>(0);
@@ -94,10 +90,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   final FocusNode _startFocus = FocusNode();
   final FocusNode _endFocus = FocusNode();
 
-  Style? _vectorStyle;
+  String? _mapStyle;
+  double _cameraZoom = _initialZoom;
+  LatLng _cameraCenter = MapConfig.iloiloCenter;
+  double _mapViewportHeight = 800;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<ServiceStatus>? _serviceStatusSubscription;
-  StreamSubscription<double?>? _headingSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   StreamSubscription<ProximityEvent>? _trackerSubscription;
   StreamSubscription<TripSimulatorState>? _simulatorStateSubscription;
@@ -134,7 +132,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   Position? _userPosition;
   RouteProgress? _routeProgress;
-  double? _compassHeading;
   LocationPermission? _locationPermission;
   bool _permissionChecked = false;
   bool _hasCenteredToUserOnce = false;
@@ -147,7 +144,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   Map<String, List<String>> _stickerUrlsByRouteId = const {};
 
   bool _readinessSignaled = false;
-  bool _vectorStyleAttempted = false;
+  bool _mapStyleReady = false;
   bool _mapFirstFrame = false;
   bool _locationAttempted = false;
 
@@ -241,6 +238,55 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return null;
   }
 
+  List<MapWidgetMarkerSpec> get _mapPinMarkers {
+    final markers = <MapWidgetMarkerSpec>[];
+    final origin = _mapOrigin;
+    if (origin != null) {
+      markers.add(
+        MapWidgetMarkerSpec(
+          point: origin,
+          size: const Size(36, 36),
+          child: Icon(
+            Icons.place_rounded,
+            color: MapColors.primary,
+            size: 34,
+          ),
+        ),
+      );
+    }
+    final destination = _mapDestination;
+    if (destination != null) {
+      markers.add(
+        MapWidgetMarkerSpec(
+          point: destination,
+          size: const Size(36, 36),
+          child: Icon(Icons.place, color: MapColors.secondary, size: 34),
+        ),
+      );
+    }
+    for (final dropOff in _selectedRideStopPoints) {
+      markers.add(
+        MapWidgetMarkerSpec(
+          point: dropOff,
+          size: const Size(22, 22),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF9E9E9E),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 1.5),
+            ),
+          ),
+        ),
+      );
+    }
+    return markers;
+  }
+
+  List<MapWidgetMarkerSpec> get _mapWidgetMarkers => [
+    ..._mapPinMarkers,
+    ..._selectedRouteArrowMarkers,
+  ];
+
   int? get _activeLegIsolationIndex {
     final isolated = switch (_flow) {
       GoNavigationFlow.routeDetails => _isolatedLegIndex,
@@ -286,21 +332,21 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return nextLegIndex.clamp(0, selected.route.legs.length - 1);
   }
 
-  List<Polyline<Object>> get _selectedRoutePolylines {
+  List<MapPolylineSpec> get _selectedRoutePolylines {
     if (_flow != GoNavigationFlow.routeSelection &&
         _flow != GoNavigationFlow.routeDetails &&
         _flow != GoNavigationFlow.navigating) {
-      return const <Polyline<Object>>[];
+      return const <MapPolylineSpec>[];
     }
 
     final selected = _selectedSuggestion;
-    if (selected == null) return const <Polyline<Object>>[];
+    if (selected == null) return const <MapPolylineSpec>[];
     final isolatedIndex = _activeLegIsolationIndex;
     final progress = _flow == GoNavigationFlow.navigating
         ? _routeProgress
         : null;
 
-    final polylines = <Polyline<Object>>[];
+    final polylines = <MapPolylineSpec>[];
     for (var i = 0; i < selected.route.legs.length; i++) {
       if (isolatedIndex != null && i != isolatedIndex) continue;
       final leg = selected.route.legs[i];
@@ -310,16 +356,16 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       if (points == null || points.length < 2) continue;
 
       if (progress == null) {
-        polylines.add(_polylineForLegPoints(leg, points));
+        polylines.add(_polylineSpecForLegPoints(leg, points));
         continue;
       }
 
       if (i < progress.legIndex) {
         polylines.add(
-          _polylineForLegPoints(leg, points, color: _passedColorForLeg(leg)),
+          _polylineSpecForLegPoints(leg, points, color: _passedColorForLeg(leg)),
         );
       } else if (i > progress.legIndex) {
-        polylines.add(_polylineForLegPoints(leg, points));
+        polylines.add(_polylineSpecForLegPoints(leg, points));
       } else {
         final splitPoint = _interpolateRoutePoint(
           points[progress.pointIndex],
@@ -336,7 +382,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ];
         if (passedPoints.length >= 2) {
           polylines.add(
-            _polylineForLegPoints(
+            _polylineSpecForLegPoints(
               leg,
               passedPoints,
               color: _passedColorForLeg(leg),
@@ -344,25 +390,25 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           );
         }
         if (remainingPoints.length >= 2) {
-          polylines.add(_polylineForLegPoints(leg, remainingPoints));
+          polylines.add(_polylineSpecForLegPoints(leg, remainingPoints));
         }
       }
     }
     return polylines;
   }
 
-  List<Marker> get _selectedRouteArrowMarkers {
+  List<MapWidgetMarkerSpec> get _selectedRouteArrowMarkers {
     if (_flow != GoNavigationFlow.routeSelection &&
         _flow != GoNavigationFlow.routeDetails &&
         _flow != GoNavigationFlow.navigating) {
-      return const <Marker>[];
+      return const <MapWidgetMarkerSpec>[];
     }
 
     final selected = _selectedSuggestion;
-    if (selected == null) return const <Marker>[];
+    if (selected == null) return const <MapWidgetMarkerSpec>[];
 
     final isolatedIndex = _activeLegIsolationIndex;
-    final markers = <Marker>[];
+    final markers = <MapWidgetMarkerSpec>[];
 
     for (var i = 0; i < selected.route.legs.length; i++) {
       if (isolatedIndex != null && i != isolatedIndex) continue;
@@ -434,10 +480,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _startFocus.addListener(_handleStartFocusChange);
     _endFocus.addListener(_handleEndFocusChange);
-    _loadVectorStyle();
+    _resolveMapStyle();
     _initLocation();
     _subscribeToServiceStatus();
-    _subscribeToHeading();
     _initConnectivity();
     unawaited(_loadStickerUrls());
   }
@@ -483,7 +528,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _searchDebounce?.cancel();
     _positionSubscription?.cancel();
     _serviceStatusSubscription?.cancel();
-    _headingSubscription?.cancel();
     _connectivitySubscription?.cancel();
     _trackerSubscription?.cancel();
     _simulatorStateSubscription?.cancel();
@@ -530,7 +574,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _loadVectorStyle();
+      _resolveMapStyle();
       _locationService.refresh();
       _initLocation();
     }
@@ -553,45 +597,38 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     });
   }
 
-  void _subscribeToHeading() {
-    _headingSubscription = _locationService.headingStream.listen((heading) {
-      if (!mounted) return;
-      setState(() => _compassHeading = heading);
-    });
-  }
-
   Future<void> _initConnectivity() async {
     final first = await _connectivity.checkConnectivity();
     if (!mounted) return;
     setState(() => _online = _hasNetworkInterface(first));
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
       results,
-    ) {
+    ) async {
       if (!mounted) return;
-      setState(() => _online = _hasNetworkInterface(results));
+      final online = _hasNetworkInterface(results);
+      if (online != _online) {
+        setState(() => _online = online);
+        await _resolveMapStyle();
+      }
     });
   }
 
-  Future<void> _loadVectorStyle() async {
-    try {
-      final style = await StyleReader(
-        uri: _vectorStyleUrl,
-        httpHeaders: const {
-          'User-Agent':
-              'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)',
-        },
-      ).read().timeout(const Duration(seconds: 6));
-      if (!mounted) return;
-      setState(() => _vectorStyle = style);
-    } catch (_) {
-      if (!mounted) return;
-      if (_vectorStyle != null) {
-        setState(() => _vectorStyle = null);
-      }
-    }
+  Future<void> _resolveMapStyle() async {
+    final style = await resolveMapStyle(
+      primaryStyleUrl: MapConfig.goStyleUrl,
+      online: _online,
+    );
     if (!mounted) return;
-    _vectorStyleAttempted = true;
+    setState(() => _mapStyle = style);
+    _mapStyleReady = true;
     _checkReadiness();
+  }
+
+  void _onMapCreated(MapController controller) {
+    _mapController = controller;
+    final camera = controller.getCamera();
+    _cameraZoom = camera.zoom;
+    _cameraCenter = toLatLng(camera.center);
   }
 
   void _markMapReady() {
@@ -608,7 +645,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   void _checkReadiness() {
     if (_readinessSignaled) return;
-    if (!_vectorStyleAttempted || !_mapFirstFrame || !_locationAttempted) {
+    if (!_mapStyleReady || !_mapFirstFrame || !_locationAttempted) {
       return;
     }
     _readinessSignaled = true;
@@ -689,51 +726,41 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   void _centerToUserOnce(Position position) {
     if (!mounted || _hasCenteredToUserOnce) return;
     if (_selectedExplorePoint != null || _end != null) return;
+    final controller = _mapController;
+    if (controller == null) return;
     _hasCenteredToUserOnce = true;
     _suppressNextGestureFollowBreak = true;
-    _mapController.move(
-      LatLng(position.latitude, position.longitude),
-      _initialZoom,
+    unawaited(
+      controller.moveCamera(
+        center: toGeographic(LatLng(position.latitude, position.longitude)),
+        zoom: _initialZoom,
+        padding: EdgeInsets.zero,
+      ),
     );
+    _cameraZoom = _initialZoom;
   }
 
   /// Fixed offset that keeps the user marker centered between the top of the
   /// screen and the top of the navigating sheet at its default height.
-  Offset _followOffsetForNavigation() {
-    final mapHeight = _mapController.camera.nonRotatedSize.height;
-    if (mapHeight <= 0) return Offset.zero;
-    final defaultSheetHeight = mapHeight * _sheetCollapsedSize;
-    return Offset(0, -defaultSheetHeight / 2);
-  }
-
   void _moveMapToFollowUser(Position position) {
+    final controller = _mapController;
+    if (controller == null) return;
     _suppressNextGestureFollowBreak = true;
     final latLng = LatLng(position.latitude, position.longitude);
-    if (_flow == GoNavigationFlow.navigating) {
-      _mapController.move(
-        latLng,
-        _mapController.camera.zoom,
-        offset: _followOffsetForNavigation(),
-      );
-      return;
-    }
-    _mapController.move(latLng, _mapController.camera.zoom);
+    final padding = _flow == GoNavigationFlow.navigating
+        ? EdgeInsets.only(bottom: _mapViewportHeight * _sheetCollapsedSize / 2)
+        : EdgeInsets.zero;
+    unawaited(
+      controller.moveCamera(
+        center: toGeographic(latLng),
+        zoom: _cameraZoom,
+        padding: padding,
+      ),
+    );
+    _cameraCenter = latLng;
   }
 
-  /// While in [_followUser] mode, re-center the camera on every new GPS fix
-  /// so the blue dot stays glued to the viewport. Suppressed during routing
-  /// flows where we want bounds-fit camera to remain authoritative.
-  void _maybeFollowUser(Position position) {
-    if (!_followUser) return;
-    if (_flow != GoNavigationFlow.explore &&
-        _flow != GoNavigationFlow.navigating) {
-      return;
-    }
-    _moveMapToFollowUser(position);
-  }
-
-  void _onMapPositionChanged(MapCamera camera, bool hasGesture) {
-    if (!hasGesture) return;
+  void _onUserMapGesture() {
     if (_suppressNextGestureFollowBreak) {
       _suppressNextGestureFollowBreak = false;
       return;
@@ -747,6 +774,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     if (pos == null) return;
     setState(() => _followUser = true);
     _moveMapToFollowUser(pos);
+  }
+
+  /// While in [_followUser] mode, re-center the camera on every new GPS fix
+  /// so the blue dot stays glued to the viewport. Suppressed during routing
+  /// flows where we want bounds-fit camera to remain authoritative.
+  void _maybeFollowUser(Position position) {
+    if (!_followUser) return;
+    if (_flow != GoNavigationFlow.explore &&
+        _flow != GoNavigationFlow.navigating) {
+      return;
+    }
+    _moveMapToFollowUser(position);
   }
 
   void _setActiveRoutingField(GoRoutingField field) {
@@ -852,15 +891,30 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _resetMapToDefaultView() {
+    final controller = _mapController;
+    if (controller == null) return;
     final pos = _userPosition;
+    _suppressNextGestureFollowBreak = true;
     if (pos != null && _gpsOriginAvailable) {
-      _suppressNextGestureFollowBreak = true;
-      _mapController.move(LatLng(pos.latitude, pos.longitude), _initialZoom);
+      unawaited(
+        controller.moveCamera(
+          center: toGeographic(LatLng(pos.latitude, pos.longitude)),
+          zoom: _initialZoom,
+          padding: EdgeInsets.zero,
+        ),
+      );
+      _cameraZoom = _initialZoom;
       return;
     }
 
-    _suppressNextGestureFollowBreak = true;
-    _mapController.move(_iloiloCenter, _initialZoom);
+    unawaited(
+      controller.moveCamera(
+        center: toGeographic(MapConfig.iloiloCenter),
+        zoom: _initialZoom,
+        padding: EdgeInsets.zero,
+      ),
+    );
+    _cameraZoom = _initialZoom;
   }
 
   void _onCollapsedTap() {
@@ -903,9 +957,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     setState(() => _pinTarget = null);
   }
 
-  LatLng _currentMapCenter() {
-    return _mapController.camera.center;
-  }
+  LatLng _currentMapCenter() => _cameraCenter;
 
   Future<void> _confirmMapPinFromCenter() async {
     final target = _pinTarget;
@@ -913,7 +965,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     await _applyMapPinTarget(target, _currentMapCenter());
   }
 
-  void _handleMapTap(TapPosition _, LatLng point) {
+  void _handleMapTap(LatLng point) {
     if (_pinTarget != null) return;
 
     if (_flow == GoNavigationFlow.explore ||
@@ -932,10 +984,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       _pinTarget = null;
     });
 
-    _mapController.move(
-      point,
-      _mapController.camera.zoom < 15 ? 15 : _mapController.camera.zoom,
-    );
+    final controller = _mapController;
+    if (controller != null) {
+      final zoom = _cameraZoom < 15 ? 15.0 : _cameraZoom;
+      unawaited(
+        controller.moveCamera(
+          center: toGeographic(point),
+          zoom: zoom,
+          padding: EdgeInsets.zero,
+        ),
+      );
+      _cameraZoom = zoom;
+      _cameraCenter = point;
+    }
 
     try {
       final label = await _geocoding.reverseLabel(point);
@@ -1524,6 +1585,51 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _fitMapToPoints(
+    List<LatLng> points, {
+    required EdgeInsets padding,
+    double singlePointZoom = 15,
+  }) async {
+    final controller = _mapController;
+    if (controller == null || points.isEmpty) return;
+
+    if (points.length == 1) {
+      unawaited(
+        controller.moveCamera(
+          center: toGeographic(points.first),
+          zoom: singlePointZoom,
+          padding: EdgeInsets.zero,
+        ),
+      );
+      _cameraZoom = singlePointZoom;
+      _cameraCenter = points.first;
+      return;
+    }
+
+    try {
+      await controller.fitBounds(
+        bounds: toLngLatBounds(points),
+        padding: padding,
+        offset: Offset.zero,
+      );
+      _cameraZoom = controller.getCamera().zoom;
+      _cameraCenter = toLatLng(controller.getCamera().center);
+    } catch (_) {
+      final center = LatLng(
+        points.map((p) => p.latitude).reduce((a, b) => a + b) / points.length,
+        points.map((p) => p.longitude).reduce((a, b) => a + b) / points.length,
+      );
+      unawaited(
+        controller.moveCamera(
+          center: toGeographic(center),
+          zoom: _cameraZoom,
+          padding: EdgeInsets.zero,
+        ),
+      );
+      _cameraCenter = center;
+    }
+  }
+
   void _onLegTimelineStepTapped(int legIndex) {
     final selected = _selectedSuggestion;
     if (selected == null) return;
@@ -1546,22 +1652,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final points = decodeApiRoutePolyline(encoded);
     if (points == null || points.isEmpty) return;
 
-    if (points.length == 1) {
-      _mapController.move(points.first, 16);
-      return;
-    }
-
-    final bounds = LatLngBounds.fromPoints(points);
-    try {
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.fromLTRB(56, 168, 56, 136),
-        ),
-      );
-    } catch (_) {
-      _mapController.move(bounds.center, _mapController.camera.zoom);
-    }
+    unawaited(
+      _fitMapToPoints(
+        points,
+        padding: const EdgeInsets.fromLTRB(56, 168, 56, 136),
+        singlePointZoom: 16,
+      ),
+    );
   }
 
   void _showAllRouteSteps() {
@@ -1708,22 +1805,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
     if (points.isEmpty) return;
 
-    if (points.length == 1) {
-      _mapController.move(points.first, 15);
-      return;
-    }
-
-    final bounds = LatLngBounds.fromPoints(points);
-    try {
-      _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: const EdgeInsets.fromLTRB(48, 160, 48, 120),
-        ),
-      );
-    } catch (_) {
-      _mapController.move(bounds.center, _mapController.camera.zoom);
-    }
+    unawaited(
+      _fitMapToPoints(
+        points,
+        padding: const EdgeInsets.fromLTRB(48, 160, 48, 120),
+      ),
+    );
   }
 
   Color _colorForLeg(NavigateLeg leg) {
@@ -1747,13 +1834,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return _colorForLeg(leg);
   }
 
-  StrokePattern _polylinePatternForLeg(NavigateLeg leg) {
-    if (leg.type == NavigateLegType.walk) {
-      return StrokePattern.dashed(segments: const <double>[7, 5]);
-    }
-    return const StrokePattern.solid();
-  }
-
   double _strokeWidthForLeg(NavigateLeg leg) {
     return switch (leg.type) {
       NavigateLegType.walk => MapColors.walkingStrokeWidth,
@@ -1763,18 +1843,16 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     };
   }
 
-  Polyline<Object> _polylineForLegPoints(
+  MapPolylineSpec _polylineSpecForLegPoints(
     NavigateLeg leg,
     List<LatLng> points, {
     Color? color,
   }) {
-    return Polyline<Object>(
+    return MapPolylineSpec(
       points: points,
       color: color ?? _mapColorForLeg(leg),
-      strokeWidth: _strokeWidthForLeg(leg),
-      borderColor: MapColors.text,
-      borderStrokeWidth: 1.0,
-      pattern: _polylinePatternForLeg(leg),
+      width: _strokeWidthForLeg(leg).round(),
+      dashArray: leg.type == NavigateLegType.walk ? const [7, 5] : null,
     );
   }
 
@@ -2012,11 +2090,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       );
     }
 
-    final userLatLng = _userPosition == null
-        ? null
-        : LatLng(_userPosition!.latitude, _userPosition!.longitude);
-
     _syncSheetExtentForActiveSheet();
+    _mapViewportHeight = MediaQuery.sizeOf(context).height;
+    final mapStyle = _mapStyle;
 
     return Scaffold(
       body: NotificationListener<DraggableScrollableNotification>(
@@ -2027,26 +2103,19 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         child: Stack(
         children: [
           Positioned.fill(
-            child: GoMapCanvas(
-              mapController: _mapController,
-              vectorStyle: _vectorStyle,
-              initialCenter: _iloiloCenter,
-              initialZoom: _initialZoom,
-              onMapTap: _handleMapTap,
-              routePolylines: _selectedRoutePolylines,
-              arrowMarkers: _selectedRouteArrowMarkers,
-              dropOffPoints: _selectedRideStopPoints,
-              userPosition: userLatLng,
-              userHeading: _compassHeading,
-              userSpeedMps: _userPosition?.speed,
-              userAccuracyMeters: _userPosition?.accuracy,
-              origin: _mapOrigin,
-              destination: _mapDestination,
-              osmTileUrl: _osmTileUrl,
-              userAgentPackageName: _userAgentPackageName,
-              onPositionChanged: _onMapPositionChanged,
-              onMapReady: _markMapReady,
-            ),
+            child: mapStyle == null
+                ? const ColoredBox(color: MapColors.background)
+                : JippyMapCanvas(
+                    style: mapStyle,
+                    initialCenter: MapConfig.iloiloCenter,
+                    initialZoom: _initialZoom,
+                    onMapCreated: _onMapCreated,
+                    onMapClick: _handleMapTap,
+                    onUserGesture: _onUserMapGesture,
+                    onStyleLoaded: _markMapReady,
+                    polylines: _selectedRoutePolylines,
+                    widgetMarkers: _mapWidgetMarkers,
+                  ),
           ),
           if (_pinTarget != null) _buildCenterPinCrosshair(),
           MapLocationControl(
