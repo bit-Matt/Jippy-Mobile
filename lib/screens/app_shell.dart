@@ -4,6 +4,7 @@ import '../core/theme/map_colors.dart';
 import 'go_screen/go_screen.dart';
 import 'routes_screen/routes_screen.dart';
 import 'settings_screen.dart';
+import 'tricycles_screen/tricycles_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, this.onReady});
@@ -46,6 +47,10 @@ class _AppShellState extends State<AppShell> {
         key: const ValueKey('routes_screen'),
         isActive: _selectedIndex == 1,
       ),
+      TricyclesScreen(
+        key: const ValueKey('tricycles_screen'),
+        isActive: _selectedIndex == 2,
+      ),
       const SettingsScreen(key: ValueKey('settings_screen')),
     ];
 
@@ -72,6 +77,10 @@ class _AppShellState extends State<AppShell> {
                 BottomNavigationBarItem(
                   icon: Icon(Icons.alt_route),
                   label: 'Routes',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.moped_outlined),
+                  label: 'Tricycles',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.settings_outlined),

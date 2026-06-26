@@ -31,6 +31,7 @@ import 'package:jippy_mobile/utils/route_arrow_utils.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 import 'package:jippy_mobile/utils/route_polyline_hit.dart';
 import 'package:jippy_mobile/utils/route_sort.dart';
+import 'package:jippy_mobile/widgets/tricycle_station_marker.dart';
 
 /// Default center for the routes map: Iloilo City, Philippines.
 final LatLng _routesDefaultCenter = LatLng(10.7, 122.5521);
@@ -316,6 +317,7 @@ class _RoutesScreenState extends State<RoutesScreen>
           _routesData = const RoutesAndStationsData(
             routes: [],
             stations: [],
+            regions: [],
             closures: [],
           );
           _isUsingFallbackRoutesData = false;
@@ -1251,32 +1253,8 @@ class _RoutesScreenState extends State<RoutesScreen>
     final stations = _routesData?.stations ?? [];
     return stations
         .map(
-          (s) => Marker(
+          (s) => buildTricycleStationMarker(
             point: LatLng(s.lat, s.lon),
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: MapColors.accentColor, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 4,
-                    spreadRadius: 0,
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(4),
-              child: Image.asset(
-                'assets/icons/tricycle.png',
-                width: 24,
-                height: 24,
-                fit: BoxFit.contain,
-              ),
-            ),
           ),
         )
         .toList();

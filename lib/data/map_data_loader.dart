@@ -44,6 +44,11 @@ Future<RoutesAndStationsData> loadSampleMapData() async {
         jsonDecode(jsonString) as Map<String, dynamic>;
     return RoutesAndStationsData.fromJson(json);
   } catch (_) {
-    return const RoutesAndStationsData(routes: [], stations: [], closures: []);
+    return const RoutesAndStationsData(
+      routes: [],
+      stations: [],
+      regions: [],
+      closures: [],
+    );
   }
 }

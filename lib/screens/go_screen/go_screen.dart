@@ -2346,9 +2346,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 10),
               Divider(color: MapColors.text.withValues(alpha: 0.12)),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               const Text(
                 'Itinerary',
                 style: TextStyle(

@@ -6,6 +6,8 @@ import 'package:vector_map_tiles/vector_map_tiles.dart';
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/widgets/user_location_marker.dart';
 
+const double _overlapPinSize = 34;
+
 class RoutesCanvas extends StatelessWidget {
   const RoutesCanvas({
     super.key,
@@ -86,7 +88,7 @@ class RoutesCanvas extends StatelessWidget {
         if (arrowMarkers.isNotEmpty) MarkerLayer(markers: arrowMarkers),
         if (showOverlapRadius &&
             overlapTapCenter != null &&
-            overlapTapRadiusMeters != null)
+            overlapTapRadiusMeters != null) ...[
           CircleLayer(
             circles: [
               CircleMarker<Object>(
@@ -99,6 +101,29 @@ class RoutesCanvas extends StatelessWidget {
               ),
             ],
           ),
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: overlapTapCenter!,
+                width: _overlapPinSize,
+                height: _overlapPinSize,
+                child: Icon(
+                  Icons.place_rounded,
+                  color: MapColors.secondary,
+                  size: _overlapPinSize,
+                  shadows: const [
+                    Shadow(color: Colors.white, blurRadius: 4),
+                    Shadow(
+                      color: Colors.black38,
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
         if (closurePolygons.isNotEmpty)
           PolygonLayer<Object>(
             polygons: closurePolygons,
