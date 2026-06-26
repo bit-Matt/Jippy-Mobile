@@ -16,6 +16,7 @@ class GoMapCanvas extends StatelessWidget {
     required this.initialZoom,
     required this.onMapTap,
     required this.routePolylines,
+    this.arrowMarkers = const <Marker>[],
     required this.dropOffPoints,
     required this.userPosition,
     required this.origin,
@@ -35,6 +36,7 @@ class GoMapCanvas extends StatelessWidget {
   final double initialZoom;
   final TapCallback onMapTap;
   final List<Polyline<Object>> routePolylines;
+  final List<Marker> arrowMarkers;
   final List<LatLng> dropOffPoints;
   final LatLng? userPosition;
   final LatLng? origin;
@@ -126,6 +128,7 @@ class GoMapCanvas extends StatelessWidget {
           ),
         if (routePolylines.isNotEmpty)
           PolylineLayer<Object>(polylines: routePolylines),
+        if (arrowMarkers.isNotEmpty) MarkerLayer(markers: arrowMarkers),
         if (markers.isNotEmpty) MarkerLayer(markers: markers),
         ...buildUserLocationLayers(
           position: userPosition,

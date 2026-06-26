@@ -99,7 +99,7 @@ class _CollapsedBar extends StatelessWidget {
                 onTap: onTap,
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.fromLTRB(0, 14, 12, 14),
                   child: Text(
                     'Where do you want to go?',
                     style: TextStyle(
@@ -109,14 +109,6 @@ class _CollapsedBar extends StatelessWidget {
                     ),
                   ),
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Icon(
-                Icons.mic_none,
-                color: MapColors.text.withValues(alpha: 0.7),
-                size: 22,
               ),
             ),
           ],

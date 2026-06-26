@@ -19,8 +19,8 @@ class ClosureDetailsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = (closure != null && closure!.closureName.trim().isNotEmpty)
-        ? closure!.closureName.trim()
-        : '(untitled)';
+        ? '❌ ${closure!.closureName.trim()}'
+        : '❌ (untitled)';
     final detailText =
         (closure != null && closure!.closureDescription.trim().isNotEmpty)
         ? closure!.closureDescription.trim()

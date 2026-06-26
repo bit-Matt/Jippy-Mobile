@@ -1,28 +1,32 @@
 import 'jeepney_route.dart';
 import 'road_closure.dart';
+import 'tricycle_region.dart';
 import 'tricycle_station.dart';
 
-/// Parsed dashboard API data: routes, stations, and road closures.
+/// Parsed dashboard API data: routes, stations, regions, and road closures.
 class RoutesAndStationsData {
   const RoutesAndStationsData({
     required this.routes,
     required this.stations,
+    required this.regions,
     required this.closures,
   });
 
   final List<JeepneyRoute> routes;
   final List<TricycleStation> stations;
+  final List<TricycleRegion> regions;
   final List<RoadClosure> closures;
 
   /// Parses from API root:
-  /// { "ok", "data": { "routes": [], "regions": [ { "stations": [] } ], "closures": [] } }.
-  /// Returns empty data if structure is invalid; skips malformed route/station/closure entries.
+  /// { "ok", "data": { "routes": [], "regions": [], "closures": [] } }.
+  /// Returns empty data if structure is invalid; skips malformed entries.
   static RoutesAndStationsData fromJson(Map<String, dynamic> json) {
     final data = json['data'];
     if (data is! Map<String, dynamic>) {
       return const RoutesAndStationsData(
         routes: [],
         stations: [],
+        regions: [],
         closures: [],
       );
     }
@@ -38,19 +42,16 @@ class RoutesAndStationsData {
       }
     }
 
+    final regions = <TricycleRegion>[];
     final stations = <TricycleStation>[];
     final regionsList = data['regions'];
     if (regionsList is List) {
       for (final region in regionsList) {
         if (region is Map<String, dynamic>) {
-          final stationsList = region['stations'];
-          if (stationsList is List) {
-            for (final e in stationsList) {
-              if (e is Map<String, dynamic>) {
-                final s = TricycleStation.fromJson(e);
-                if (s != null) stations.add(s);
-              }
-            }
+          final parsedRegion = TricycleRegion.fromJson(region);
+          if (parsedRegion != null) {
+            regions.add(parsedRegion);
+            stations.addAll(parsedRegion.stations);
           }
         }
       }
@@ -70,6 +71,7 @@ class RoutesAndStationsData {
     return RoutesAndStationsData(
       routes: routes,
       stations: stations,
+      regions: regions,
       closures: closures,
     );
   }

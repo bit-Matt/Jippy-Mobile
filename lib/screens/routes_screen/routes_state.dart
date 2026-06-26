@@ -8,7 +8,7 @@ class RoutesUiState {
     this.panelMode = RoutesPanelMode.routes,
     this.isFocusedMode = false,
     this.isCompareMode = false,
-    this.showStations = true,
+    this.showStations = false,
     this.selectedRouteIds = const <String>{},
     this.selectedRoute,
     this.selectedClosure,
