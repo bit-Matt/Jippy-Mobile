@@ -8,12 +8,16 @@ class MapPolylineSpec {
     required this.color,
     required this.width,
     this.dashArray,
+    this.showOutline = false,
   });
 
   final List<LatLng> points;
   final Color color;
   final int width;
   final List<int>? dashArray;
+
+  /// When true, draws a wider gray polyline underneath this strand.
+  final bool showOutline;
 }
 
 /// One filled polygon overlay (regions, road closures, etc.).
@@ -23,6 +27,8 @@ class MapPolygonSpec {
     required this.fillColor,
     required this.outlineColor,
     this.id,
+    this.outlineWidth = 0,
+    this.outlineDashArray,
   });
 
   final List<LatLng> points;
@@ -31,6 +37,13 @@ class MapPolygonSpec {
 
   /// Optional identifier used for tap hit-testing (e.g. closure id).
   final String? id;
+
+  /// When greater than zero, draws a [PolylineLayer] border at this width
+  /// (pixels) instead of the default 1px fill outline.
+  final int outlineWidth;
+
+  /// Dash pattern for [outlineWidth] borders (e.g. `[5, 4]`).
+  final List<int>? outlineDashArray;
 }
 
 /// A map-aligned Flutter widget marker (arrows, pins, station icons).
@@ -40,12 +53,16 @@ class MapWidgetMarkerSpec {
     required this.size,
     required this.child,
     this.alignment = Alignment.center,
+    this.onTap,
   });
 
   final LatLng point;
   final Size size;
   final Widget child;
   final Alignment alignment;
+
+  /// When set, the marker receives taps (see [JippyMapCanvas] widget marker layer).
+  final VoidCallback? onTap;
 }
 
 /// A pixel-radius circle overlay spec (overlap radius, etc.).

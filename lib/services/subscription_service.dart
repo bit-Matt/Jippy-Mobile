@@ -5,7 +5,9 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../core/config/billing_config.dart';
 import '../data/subscription_verification_client.dart';
+import '../models/entitlement.dart';
 import 'entitlement_service.dart';
+import 'offline_map_service.dart';
 
 /// Singleton wrapper around Google Play Billing (`in_app_purchase`).
 ///
@@ -18,7 +20,7 @@ class SubscriptionService {
 
   static final SubscriptionService instance = SubscriptionService._();
 
-  final InAppPurchase _iap = InAppPurchase.instance;
+  InAppPurchase get _iap => InAppPurchase.instance;
   final SubscriptionVerificationClient _verifier =
       const SubscriptionVerificationClient();
 
@@ -118,6 +120,49 @@ class SubscriptionService {
     }
   }
 
+  /// Grants premium via the sandbox checkout (debug / flagged APK builds only).
+  ///
+  /// Mimics Play's purchase confirmation by briefly showing a pending state,
+  /// then writing an active [Entitlement] through [EntitlementService].
+  Future<void> grantSandboxPremium() async {
+    if (!kPseudoBillingEnabled) {
+      _emit('Sandbox billing is not available in this build.');
+      return;
+    }
+    if (purchasePending.value) return;
+
+    purchasePending.value = true;
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      await EntitlementService.instance.update(createSandboxEntitlement());
+      _emit('Premium unlocked (sandbox). Enjoy offline routes!');
+    } finally {
+      purchasePending.value = false;
+    }
+  }
+
+  /// Clears sandbox entitlement so testers can re-run the checkout flow.
+  Future<void> resetSandboxPremium() async {
+    if (!kPseudoBillingEnabled) {
+      _emit('Sandbox billing is not available in this build.');
+      return;
+    }
+    await EntitlementService.instance.clear();
+    _emit('Sandbox subscription reset.');
+  }
+
+  /// Simulates subscription cancellation: clears entitlement and removes
+  /// all downloaded offline map data. Sandbox / debug builds only.
+  Future<void> simulateSandboxCancellation() async {
+    if (!kPseudoBillingEnabled) {
+      _emit('Sandbox billing is not available in this build.');
+      return;
+    }
+    await EntitlementService.instance.clear();
+    await OfflineMapService.instance.deleteIloiloRegion();
+    _emit('Sandbox subscription cancelled. Offline map removed.');
+  }
+
   /// Restores previously purchased subscriptions for the signed-in Play account.
   Future<void> restore() async {
     purchasePending.value = true;
@@ -193,4 +238,15 @@ class SubscriptionService {
     await _purchaseSub?.cancel();
     await _messages.close();
   }
+}
+
+/// Canonical entitlement written by the sandbox checkout.
+Entitlement createSandboxEntitlement({DateTime? now}) {
+  final instant = now ?? DateTime.now();
+  return Entitlement(
+    status: PremiumStatus.active,
+    willRenew: true,
+    lastVerifiedAt: instant,
+    expiryTime: instant.add(sandboxSubscriptionPeriod),
+  );
 }

@@ -21,6 +21,7 @@ import 'package:jippy_mobile/screens/go_screen/widgets/debug_trip_simulator_over
 import 'package:jippy_mobile/screens/go_screen/widgets/go_search_bar.dart';
 import 'package:jippy_mobile/widgets/jippy_map_canvas.dart';
 import 'package:jippy_mobile/widgets/map_location_control.dart';
+import 'package:jippy_mobile/widgets/tricycle_station_marker.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 import 'package:jippy_mobile/services/connectivity_service.dart';
 import 'package:jippy_mobile/services/location_service.dart';
@@ -51,6 +52,9 @@ const List<double> _sheetSnapSizes = <double>[
   _sheetDefaultSize,
   _sheetMaxSize,
 ];
+
+/// Gap above the bottom sheet for [MapLocationControl] (default 12 + 5px nudge).
+const double _mapLocationControlBottomGap = 47;
 
 /// Progress along the selected route: leg index, segment start point index, and
 /// interpolation [t] in [0, 1] along that segment.
@@ -281,6 +285,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   List<MapWidgetMarkerSpec> get _mapWidgetMarkers => [
     ..._mapPinMarkers,
     ..._selectedRouteArrowMarkers,
+    ..._selectedTricycleStartMarkers,
   ];
 
   int? get _activeLegIsolationIndex {
@@ -404,6 +409,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       return const <MapWidgetMarkerSpec>[];
     }
 
+    if (_flow == GoNavigationFlow.navigating &&
+        _navigationMapView == GoNavigationMapView.perspective3d) {
+      return const <MapWidgetMarkerSpec>[];
+    }
+
     final selected = _selectedSuggestion;
     if (selected == null) return const <MapWidgetMarkerSpec>[];
 
@@ -423,6 +433,34 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       markers.addAll(
         buildArrowMarkers(points, _mapColorForLeg(leg)),
       );
+    }
+    return markers;
+  }
+
+  List<MapWidgetMarkerSpec> get _selectedTricycleStartMarkers {
+    if (_flow != GoNavigationFlow.routeSelection &&
+        _flow != GoNavigationFlow.routeDetails &&
+        _flow != GoNavigationFlow.navigating) {
+      return const <MapWidgetMarkerSpec>[];
+    }
+
+    final selected = _selectedSuggestion;
+    if (selected == null) return const <MapWidgetMarkerSpec>[];
+
+    final isolatedIndex = _activeLegIsolationIndex;
+    final markers = <MapWidgetMarkerSpec>[];
+
+    for (var i = 0; i < selected.route.legs.length; i++) {
+      if (isolatedIndex != null && i != isolatedIndex) continue;
+      final leg = selected.route.legs[i];
+      if (leg.type != NavigateLegType.tricycle) continue;
+
+      final encoded = leg.polyline.trim();
+      if (encoded.isEmpty) continue;
+      final points = decodeApiRoutePolyline(encoded);
+      if (points == null || points.isEmpty) continue;
+
+      markers.add(buildTricycleStationMarker(point: points.first));
     }
     return markers;
   }
@@ -735,12 +773,22 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     _cameraZoom = _initialZoom;
   }
 
+  void _syncCameraFromMap() {
+    final camera = _mapController?.getCamera();
+    if (camera == null) return;
+    _cameraCenter = toLatLng(camera.center);
+    _cameraZoom = camera.zoom;
+    _cameraBearing = camera.bearing;
+  }
+
   /// Fixed offset that keeps the user marker centered between the top of the
   /// screen and the top of the navigating sheet at its default height.
   void _moveMapToFollowUser(Position position, {bool animate = false}) {
     final controller = _mapController;
     if (controller == null || !_mapFirstFrame) return;
-    _suppressNextGestureFollowBreak = true;
+    if (_flow != GoNavigationFlow.navigating) {
+      _suppressNextGestureFollowBreak = true;
+    }
     final latLng = LatLng(position.latitude, position.longitude);
     final padding = _flow == GoNavigationFlow.navigating
         ? EdgeInsets.only(bottom: _mapViewportHeight * _sheetCollapsedSize / 2)
@@ -862,7 +910,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   double _navigationViewToggleBottom(double screenHeight) {
     final clampedExtent = math.min(_sheetExtent.value, _sheetDefaultSize);
-    return clampedExtent * screenHeight + 12 + MapLocationControl.buttonSize + 8;
+    return clampedExtent * screenHeight +
+        _mapLocationControlBottomGap +
+        MapLocationControl.buttonSize +
+        8;
   }
 
   Widget _buildNavigationViewToggle() {
@@ -915,11 +966,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _onUserMapGesture() {
+    if (_flow == GoNavigationFlow.navigating) {
+      if (!_followUser) return;
+      _syncCameraFromMap();
+      setState(() => _followUser = false);
+      return;
+    }
     if (_suppressNextGestureFollowBreak) {
       _suppressNextGestureFollowBreak = false;
       return;
     }
     if (!_followUser) return;
+    _syncCameraFromMap();
     setState(() => _followUser = false);
   }
 
@@ -1117,7 +1175,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     setState(() => _pinTarget = null);
   }
 
-  LatLng _currentMapCenter() => _cameraCenter;
+  LatLng _currentMapCenter() {
+    final camera = _mapController?.getCamera();
+    if (camera == null) return _cameraCenter;
+
+    final center = toLatLng(camera.center);
+    _cameraCenter = center;
+    _cameraZoom = camera.zoom;
+    return center;
+  }
 
   Future<void> _confirmMapPinFromCenter() async {
     final target = _pinTarget;
@@ -1386,10 +1452,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         return;
       }
 
-      final prioritized = _prioritizeSuggestions(suggestions);
+      final sorted = _sortRouteSuggestions(suggestions);
       setState(() {
         _routePreviewLoading = false;
-        _routeSuggestions = prioritized;
+        _routeSuggestions = sorted;
         _selectedSuggestionIndex = 0;
         _isolatedLegIndex = null;
         _flow = GoNavigationFlow.routeSelection;
@@ -1416,43 +1482,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     }
   }
 
-  List<NavigateSuggestion> _prioritizeSuggestions(
+  List<NavigateSuggestion> _sortRouteSuggestions(
     List<NavigateSuggestion> suggestions,
   ) {
-    if (suggestions.isEmpty) return const [];
-
-    final grouped = <NavigateSuggestionLabel, List<NavigateSuggestion>>{};
-    for (final suggestion in suggestions) {
-      grouped.putIfAbsent(suggestion.label, () => []).add(suggestion);
-    }
-
-    final priority = <NavigateSuggestionLabel>[
-      NavigateSuggestionLabel.simplest,
-      NavigateSuggestionLabel.fastest,
-      NavigateSuggestionLabel.leastWalking,
-      NavigateSuggestionLabel.explorer,
-      NavigateSuggestionLabel.unknown,
-    ];
-
-    final selected = <NavigateSuggestion>[];
-    for (final label in priority) {
-      final group = grouped[label];
-      if (group == null || group.isEmpty) continue;
-      selected.add(group.first);
-      if (selected.length == 3) return selected;
-    }
-
-    for (final label in priority) {
-      final group = grouped[label];
-      if (group == null || group.isEmpty) continue;
-      for (final suggestion in group) {
-        if (selected.length == 3) return selected;
-        if (selected.contains(suggestion)) continue;
-        selected.add(suggestion);
-      }
-    }
-
-    return selected;
+    final sorted = List<NavigateSuggestion>.from(suggestions);
+    sorted.sort(compareNavigateSuggestions);
+    return sorted;
   }
 
   void _onSuggestionCardSelected(int index) {
@@ -1915,12 +1950,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  int _rideCountForSuggestion(NavigateSuggestion suggestion) {
-    return suggestion.route.legs
-        .where((leg) => leg.type == NavigateLegType.jeepney)
-        .length;
-  }
-
   String _modeSummaryForSuggestion(NavigateSuggestion suggestion) {
     final labels = <String>[];
     for (final leg in suggestion.route.legs) {
@@ -1956,12 +1985,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     };
   }
 
-  String _routeBadgeText(NavigateSuggestion suggestion, int index) {
-    if (_isBestSuggestionIndex(index)) return 'Best';
-    return suggestion.labelText;
-  }
-
-  bool _isBestSuggestionIndex(int index) => index == 0;
+  String _routeBadgeText(int index) => 'Option ${index + 1}';
 
   Color _badgeTextColor(Color background) {
     return background.computeLuminance() > 0.55 ? MapColors.text : Colors.white;
@@ -2040,7 +2064,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       points: points,
       color: color ?? _mapColorForLeg(leg),
       width: _strokeWidthForLeg(leg).round(),
-      dashArray: leg.type == NavigateLegType.walk ? const [7, 5] : null,
+      dashArray: leg.type == NavigateLegType.walk ? const [3, 2] : null,
+      showOutline: leg.type != NavigateLegType.walk,
     );
   }
 
@@ -2323,6 +2348,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             onRecenter: _recenterOnUser,
             onEnableLocation: _enableLocation,
             offMessage: _locationOffMessage,
+            bottomGap: _mapLocationControlBottomGap,
           ),
           _buildNavigationViewToggle(),
           Positioned(
@@ -3059,13 +3085,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     required bool isSelected,
   }) {
     final accentColor = _accentColorForSuggestion(suggestion, index);
-    final badgeColor = suggestion.label == NavigateSuggestionLabel.fastest
-        ? MapColors.primary
-        : accentColor;
+    final badgeColor = index == 0 ? MapColors.primary : accentColor;
     final badgeTextColor = _badgeTextColor(badgeColor);
-    final badgeText = _routeBadgeText(suggestion, index);
-    final rides = _rideCountForSuggestion(suggestion);
-    final rideLabel = rides == 1 ? 'Ride' : 'Rides';
+    final badgeText = _routeBadgeText(index);
+    final transitRideSummary = suggestion.transitRideSummary;
     final distance = _formatDistance(suggestion.totalDistanceMeters);
     final modeSummary = _modeSummaryForSuggestion(suggestion);
 
@@ -3140,7 +3163,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '$rides $rideLabel',
+                      transitRideSummary,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

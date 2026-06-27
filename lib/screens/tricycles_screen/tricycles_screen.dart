@@ -26,7 +26,10 @@ import 'package:jippy_mobile/widgets/tricycle_station_marker.dart';
 
 const double _initialZoom = 12.0;
 
-const double _regionFillOpacity = 0.25;
+const double _regionFillOpacity = 0.18;
+const double _regionOutlineOpacity = 0.85;
+const int _regionOutlineWidth = 2;
+const List<int> _regionOutlineDashArray = <int>[5, 4];
 
 const double _drawerCollapsedSize = 0.16;
 const double _drawerDefaultSize = 0.38;
@@ -68,6 +71,8 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   bool _mapEverActive = false;
   bool _loadingData = true;
   String? _selectedRegionId;
+  bool _showStations = true;
+  bool? _showStationsBeforeFocus;
   double _cameraZoom = _initialZoom;
 
   bool get _isFocusedMode => _selectedRegionId != null;
@@ -327,15 +332,29 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   }
 
   void _resetToDefaultView() {
-    setState(() => _selectedRegionId = null);
+    setState(() {
+      _restoreStationsVisibilityAfterFocus();
+      _selectedRegionId = null;
+    });
     _moveToDefaultMapView();
     _animateDrawerTo(_drawerDefaultSize);
   }
 
   void _showAllRegions() {
-    setState(() => _selectedRegionId = null);
+    setState(() {
+      _restoreStationsVisibilityAfterFocus();
+      _selectedRegionId = null;
+    });
     _fitAllRegions();
     _animateDrawerTo(_drawerDefaultSize);
+  }
+
+  void _restoreStationsVisibilityAfterFocus() {
+    final saved = _showStationsBeforeFocus;
+    if (saved != null) {
+      _showStations = saved;
+      _showStationsBeforeFocus = null;
+    }
   }
 
   void _moveToDefaultMapView() {
@@ -350,7 +369,13 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   }
 
   void _focusRegion(TricycleRegion region) {
-    setState(() => _selectedRegionId = region.id);
+    setState(() {
+      if (!_isFocusedMode) {
+        _showStationsBeforeFocus = _showStations;
+        _showStations = true;
+      }
+      _selectedRegionId = region.id;
+    });
     _fitRegionBounds(region);
     _animateDrawerTo(_drawerDefaultSize);
   }
@@ -417,7 +442,9 @@ class _TricyclesScreenState extends State<TricyclesScreen>
         MapPolygonSpec(
           points: points,
           fillColor: regionColor.withValues(alpha: _regionFillOpacity),
-          outlineColor: regionColor,
+          outlineColor: regionColor.withValues(alpha: _regionOutlineOpacity),
+          outlineWidth: _regionOutlineWidth,
+          outlineDashArray: _regionOutlineDashArray,
         ),
       );
     }
@@ -425,6 +452,8 @@ class _TricyclesScreenState extends State<TricyclesScreen>
   }
 
   List<MapWidgetMarkerSpec> get _stationMarkers {
+    if (!_showStations) return const <MapWidgetMarkerSpec>[];
+
     final markers = <MapWidgetMarkerSpec>[];
     for (final region in _visibleRegions) {
       for (final station in region.stations) {
@@ -518,8 +547,12 @@ class _TricyclesScreenState extends State<TricyclesScreen>
                           isLoading: _loadingData,
                           isFocusedMode: _isFocusedMode,
                           selectedRegionId: _selectedRegionId,
+                          showStations: _showStations,
                           onRegionTap: _focusRegion,
                           onShowAllRegions: _showAllRegions,
+                          onShowStationsChanged: (selected) {
+                            setState(() => _showStations = selected);
+                          },
                         ),
                       ),
                     ],

@@ -33,4 +33,13 @@ class MapColors {
 
   /// Color for the user position dot (primary so it stands out).
   static const Color userLocationColor = primary;
+
+  /// Black halo drawn under route polylines on the map.
+  static const Color routeOutlineColor = text;
+
+  /// Extra stroke width (pixels) added to the fill width for route outlines.
+  static const int routeOutlineExtraWidth = 2;
+
+  /// Uniform border for unselected route list cards.
+  static const Color routeListBorderColor = Color(0xFFBDBDBD);
 }

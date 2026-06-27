@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/map_colors.dart';
+import '../models/entitlement.dart';
+import '../services/entitlement_service.dart';
 import 'offline_maps_screen.dart';
 import 'report_screen.dart';
 
@@ -28,16 +30,25 @@ class SettingsScreen extends StatelessWidget {
         _buildSettingsSection(
           title: 'Maps',
           children: [
-            _SettingsTile(
-              icon: Icons.map_outlined,
-              title: 'Offline Map',
-              subtitle: 'Download Iloilo map, routes & regions',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (BuildContext context) =>
-                        const OfflineMapsScreen(),
-                  ),
+            ValueListenableBuilder<Entitlement>(
+              valueListenable: EntitlementService.instance.listenable,
+              builder: (context, entitlement, child) {
+                final locked = !EntitlementService.instance.premiumUnlocked;
+                return _SettingsTile(
+                  icon: Icons.map_outlined,
+                  title: 'Offline Map',
+                  subtitle: locked
+                      ? 'Premium · download Iloilo map, routes & regions'
+                      : 'Download Iloilo map, routes & regions',
+                  trailing: locked ? const _ProBadge() : null,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (BuildContext context) =>
+                            const OfflineMapsScreen(),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -120,12 +131,14 @@ class _SettingsTile extends StatelessWidget {
     required this.icon,
     required this.title,
     this.subtitle,
+    this.trailing,
     this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String? subtitle;
+  final Widget? trailing;
   final VoidCallback? onTap;
 
   @override
@@ -170,7 +183,10 @@ class _SettingsTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              if (trailing != null) ...[
+                trailing!,
+                const SizedBox(width: 4),
+              ],
               Icon(
                 Icons.chevron_right,
                 color: MapColors.text.withValues(alpha: 0.4),
@@ -179,6 +195,37 @@ class _SettingsTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ProBadge extends StatelessWidget {
+  const _ProBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: MapColors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock_outline, size: 12, color: MapColors.primary),
+          const SizedBox(width: 4),
+          Text(
+            'PRO',
+            style: TextStyle(
+              color: MapColors.primary,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
       ),
     );
   }

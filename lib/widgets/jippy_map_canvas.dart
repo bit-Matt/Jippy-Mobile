@@ -56,6 +56,44 @@ List<PolylineLayer> buildPolylineLayers(List<MapPolylineSpec> polylines) {
       .toList(growable: false);
 }
 
+/// Builds wider gray under-stroke [PolylineLayer]s for specs with [MapPolylineSpec.showOutline].
+List<PolylineLayer> buildPolylineOutlineLayers(
+  List<MapPolylineSpec> polylines,
+) {
+  final grouped = <String, List<Feature<LineString>>>{};
+  final styles =
+      <String, ({Color color, int width, List<int>? dashArray})>{};
+
+  for (final polyline in polylines) {
+    if (!polyline.showOutline || polyline.points.length < 2) continue;
+    final dashKey = polyline.dashArray?.join('-') ?? 'solid';
+    final outlineWidth =
+        polyline.width + MapColors.routeOutlineExtraWidth;
+    final key =
+        '${MapColors.routeOutlineColor.toARGB32()}-$outlineWidth-$dashKey';
+    styles[key] = (
+      color: MapColors.routeOutlineColor,
+      width: outlineWidth,
+      dashArray: polyline.dashArray,
+    );
+    grouped.putIfAbsent(key, () => <Feature<LineString>>[]).add(
+      Feature(geometry: toLineString(polyline.points)),
+    );
+  }
+
+  return grouped.entries
+      .map((entry) {
+        final style = styles[entry.key]!;
+        return PolylineLayer(
+          polylines: entry.value,
+          color: style.color,
+          width: style.width,
+          dashArray: style.dashArray,
+        );
+      })
+      .toList(growable: false);
+}
+
 /// Builds grouped [PolygonLayer]s from [MapPolygonSpec] list.
 List<PolygonLayer> buildPolygonLayers(List<MapPolygonSpec> polygons) {
   final grouped = <String, List<Feature<Polygon>>>{};
@@ -63,11 +101,14 @@ List<PolygonLayer> buildPolygonLayers(List<MapPolygonSpec> polygons) {
 
   for (final polygon in polygons) {
     if (polygon.points.length < 3) continue;
+    final outlineColor = polygon.outlineWidth > 0
+        ? Colors.transparent
+        : polygon.outlineColor;
     final key =
-        '${polygon.fillColor.toARGB32()}-${polygon.outlineColor.toARGB32()}';
+        '${polygon.fillColor.toARGB32()}-${outlineColor.toARGB32()}';
     styles[key] = (
       fillColor: polygon.fillColor,
-      outlineColor: polygon.outlineColor,
+      outlineColor: outlineColor,
     );
     grouped.putIfAbsent(key, () => <Feature<Polygon>>[]).add(
       Feature(geometry: toPolygon(polygon.points)),
@@ -81,6 +122,43 @@ List<PolygonLayer> buildPolygonLayers(List<MapPolygonSpec> polygons) {
           polygons: entry.value,
           color: style.fillColor,
           outlineColor: style.outlineColor,
+        );
+      })
+      .toList(growable: false);
+}
+
+/// Builds thick border [PolylineLayer]s for polygons with [MapPolygonSpec.outlineWidth].
+List<PolylineLayer> buildPolygonOutlinePolylineLayers(
+  List<MapPolygonSpec> polygons,
+) {
+  final grouped = <String, List<Feature<LineString>>>{};
+  final styles =
+      <String, ({Color color, int width, List<int>? dashArray})>{};
+
+  for (final polygon in polygons) {
+    if (polygon.points.length < 3 || polygon.outlineWidth <= 0) continue;
+    final dashKey = polygon.outlineDashArray?.join('-') ?? 'solid';
+    final key =
+        '${polygon.outlineColor.toARGB32()}-${polygon.outlineWidth}-$dashKey';
+    styles[key] = (
+      color: polygon.outlineColor,
+      width: polygon.outlineWidth,
+      dashArray: polygon.outlineDashArray,
+    );
+    final closedRing = <LatLng>[...polygon.points, polygon.points.first];
+    grouped.putIfAbsent(key, () => <Feature<LineString>>[]).add(
+      Feature(geometry: toLineString(closedRing)),
+    );
+  }
+
+  return grouped.entries
+      .map((entry) {
+        final style = styles[entry.key]!;
+        return PolylineLayer(
+          polylines: entry.value,
+          color: style.color,
+          width: style.width,
+          dashArray: style.dashArray,
         );
       })
       .toList(growable: false);
@@ -224,8 +302,10 @@ class _JippyMapCanvasState extends State<JippyMapCanvas> {
     _cachedPolygons = widget.polygons;
     _cachedCircles = widget.circles;
     _cachedLayers = <Layer<Feature<Geometry>>>[
+      ...buildPolylineOutlineLayers(widget.polylines),
       ...buildPolylineLayers(widget.polylines),
       ...buildPolygonLayers(widget.polygons),
+      ...buildPolygonOutlinePolylineLayers(widget.polygons),
       ...buildCircleLayers(widget.circles),
     ];
     return _cachedLayers!;
@@ -237,10 +317,19 @@ class _JippyMapCanvasState extends State<JippyMapCanvas> {
           point: toGeographic(m.point),
           size: m.size,
           alignment: m.alignment,
-          child: m.child,
+          child: m.onTap == null
+              ? m.child
+              : GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: m.onTap,
+                  child: m.child,
+                ),
         ),
       )
       .toList(growable: false);
+
+  bool get _allowWidgetMarkerInteraction =>
+      widget.widgetMarkers.any((marker) => marker.onTap != null);
 
   @override
   Widget build(BuildContext context) {
@@ -259,7 +348,11 @@ class _JippyMapCanvasState extends State<JippyMapCanvas> {
         onEvent: _handleEvent,
         layers: _resolveLayers(),
         children: [
-          if (_widgetMarkers.isNotEmpty) WidgetLayer(markers: _widgetMarkers),
+          if (_widgetMarkers.isNotEmpty)
+            WidgetLayer(
+              markers: _widgetMarkers,
+              allowInteraction: _allowWidgetMarkerInteraction,
+            ),
           if (widget.showUserLocation) const MapUserLocationLayer(),
           const SourceAttribution(),
         ],
