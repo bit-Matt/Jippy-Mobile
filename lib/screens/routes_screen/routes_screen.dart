@@ -97,9 +97,8 @@ class _RoutesScreenState extends State<RoutesScreen>
   bool _hasOfflineRegion = false;
   double _cameraZoom = _initialZoom;
 
-  /// Loaded routes and stations from API (or asset fallback).
+  /// Loaded routes and stations from API or offline cache.
   RoutesAndStationsData? _routesData;
-  bool _isUsingFallbackRoutesData = false;
 
   String? _mapStyle;
   bool _mapEverActive = false;
@@ -307,12 +306,10 @@ class _RoutesScreenState extends State<RoutesScreen>
     try {
       final result = await loadMapDataForCurrentConnectivity();
       final data = result.data;
-      final usedFallbackData = result.source == MapDataSource.sampleAsset;
       if (mounted) {
         final incomingRouteIds = data.routes.map((r) => r.id).toSet();
         setState(() {
           _routesData = data;
-          _isUsingFallbackRoutesData = usedFallbackData;
           _hitGeometryGeneration++;
 
           // Selection semantics:
@@ -357,7 +354,6 @@ class _RoutesScreenState extends State<RoutesScreen>
             regions: [],
             closures: [],
           );
-          _isUsingFallbackRoutesData = false;
           _uiState = _uiState.copyWith(selectedRouteIds: <String>{});
           _hitGeometryGeneration++;
         });
@@ -848,24 +844,19 @@ class _RoutesScreenState extends State<RoutesScreen>
         final points = _displayPointsForDirection(g.points);
         final usedDecoded = g.usedDecoded;
         final usedValhalla = g.usedValhalla;
-        final shouldUseOfflineTranslucency = _isUsingFallbackRoutesData;
         if (_debugPolylineDiagnostics) {
           final dirLabel = direction == _RouteDirection.goingTo ? 'to' : 'back';
           diagParts.add(
             '${route.id}:$dirLabel:${usedDecoded ? 'decoded' : (usedValhalla ? 'valhalla' : 'fallback')}:${points.length}',
           );
         }
-        final width = shouldUseOfflineTranslucency
-            ? (MapColors.jeepneyRouteStrokeWidth - 1).clamp(1, 999).round()
-            : usedDecoded || usedValhalla
+        final width = usedDecoded || usedValhalla
             ? MapColors.jeepneyRouteStrokeWidth.round()
             : (MapColors.jeepneyRouteStrokeWidth - 1).clamp(1, 999).round();
         polylines.add(
           MapPolylineSpec(
             points: points,
-            color: shouldUseOfflineTranslucency
-                ? routeColor.withValues(alpha: 0.35)
-                : usedDecoded || usedValhalla
+            color: usedDecoded || usedValhalla
                 ? routeColor
                 : routeColor.withValues(alpha: 0.35),
             width: width,

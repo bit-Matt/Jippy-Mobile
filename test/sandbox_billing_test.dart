@@ -81,5 +81,12 @@ void main() {
 
       expect(EntitlementService.instance.premiumUnlocked, isFalse);
     });
+
+    test('simulateSandboxCancellation clears premium access', () async {
+      await SubscriptionService.instance.grantSandboxPremium();
+      await SubscriptionService.instance.simulateSandboxCancellation();
+
+      expect(EntitlementService.instance.premiumUnlocked, isFalse);
+    });
   });
 }

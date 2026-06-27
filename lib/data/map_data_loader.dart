@@ -1,24 +1,28 @@
 import 'dart:convert';
 
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/config/api_config.dart';
 import '../models/routes_and_stations_data.dart';
 import '../services/connectivity_service.dart';
+import '../services/entitlement_service.dart';
 import '../services/offline_routes_cache_service.dart';
 
 /// Timeout for the routes API request.
 const Duration _routesApiTimeout = Duration(seconds: 15);
 
-/// Path to the sample routes/stations JSON asset (dashboard API shape).
-const String sampleRoutesAssetPath =
-    'assets/sample_routes/sample_api_data.json';
+/// Empty map payload when no live or cached data is available.
+const emptyMapData = RoutesAndStationsData(
+  routes: [],
+  stations: [],
+  regions: [],
+  closures: [],
+);
 
 /// Where [loadMapData] sourced its payload.
-enum MapDataSource { api, offlineCache, sampleAsset }
+enum MapDataSource { api, offlineCache }
 
-/// Result of [loadMapData] including whether bundled sample data was used.
+/// Result of [loadMapData] including data source.
 typedef MapDataLoadResult = ({
   RoutesAndStationsData data,
   MapDataSource source,
@@ -26,7 +30,7 @@ typedef MapDataLoadResult = ({
 
 /// Fetches route and station data from the server API.
 /// Returns parsed [RoutesAndStationsData] on success.
-/// Throws on network error, non-200 response, or parse failure (caller can fall back to [loadSampleMapData]).
+/// Throws on network error, non-200 response, or parse failure.
 Future<RoutesAndStationsData> loadRoutesFromApi() async {
   final response = await http
       .get(Uri.parse(routesApiUrl))
@@ -45,22 +49,32 @@ Future<RoutesAndStationsData> loadRoutesFromApi() async {
 }
 
 /// Loads route/station/region data using current connectivity.
-Future<MapDataLoadResult> loadMapDataForCurrentConnectivity() {
-  return loadMapData(online: ConnectivityService.instance.isOnline.value);
+Future<MapDataLoadResult> loadMapDataForCurrentConnectivity({
+  bool? premiumUnlocked,
+}) {
+  return loadMapData(
+    online: ConnectivityService.instance.isOnline.value,
+    premiumUnlocked: premiumUnlocked,
+  );
 }
 
-/// Loads route/station/region data: live API when online, offline cache when
-/// available, otherwise bundled sample asset.
-Future<MapDataLoadResult> loadMapData({required bool online}) async {
+/// Loads route/station/region data: live API when online, premium-gated offline
+/// cache when available, otherwise empty data.
+Future<MapDataLoadResult> loadMapData({
+  required bool online,
+  bool? premiumUnlocked,
+}) async {
+  final hasPremium =
+      premiumUnlocked ?? EntitlementService.instance.premiumUnlocked;
+
   if (!online) {
-    final cached = await OfflineRoutesCacheService.instance.loadCached();
-    if (cached != null) {
-      return (data: cached, source: MapDataSource.offlineCache);
+    if (hasPremium) {
+      final cached = await OfflineRoutesCacheService.instance.loadCached();
+      if (cached != null) {
+        return (data: cached, source: MapDataSource.offlineCache);
+      }
     }
-    return (
-      data: await loadSampleMapData(),
-      source: MapDataSource.sampleAsset,
-    );
+    return (data: emptyMapData, source: MapDataSource.offlineCache);
   }
 
   try {
@@ -69,33 +83,12 @@ Future<MapDataLoadResult> loadMapData({required bool online}) async {
       source: MapDataSource.api,
     );
   } catch (_) {
-    final cached = await OfflineRoutesCacheService.instance.loadCached();
-    if (cached != null) {
-      return (data: cached, source: MapDataSource.offlineCache);
+    if (hasPremium) {
+      final cached = await OfflineRoutesCacheService.instance.loadCached();
+      if (cached != null) {
+        return (data: cached, source: MapDataSource.offlineCache);
+      }
     }
-    return (
-      data: await loadSampleMapData(),
-      source: MapDataSource.sampleAsset,
-    );
-  }
-}
-
-/// Loads the sample map data from assets and parses it into [RoutesAndStationsData].
-/// Returns empty data on load or parse error.
-Future<RoutesAndStationsData> loadSampleMapData() async {
-  try {
-    final String jsonString = await rootBundle.loadString(
-      sampleRoutesAssetPath,
-    );
-    final Map<String, dynamic> json =
-        jsonDecode(jsonString) as Map<String, dynamic>;
-    return RoutesAndStationsData.fromJson(json);
-  } catch (_) {
-    return const RoutesAndStationsData(
-      routes: [],
-      stations: [],
-      regions: [],
-      closures: [],
-    );
+    return (data: emptyMapData, source: MapDataSource.offlineCache);
   }
 }

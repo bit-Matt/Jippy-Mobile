@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/config/billing_config.dart';
 import '../core/config/map_config.dart';
 import '../core/theme/map_colors.dart';
 import '../models/entitlement.dart';
@@ -8,6 +9,7 @@ import '../services/connectivity_service.dart';
 import '../services/entitlement_service.dart';
 import '../services/notification_service.dart';
 import '../services/offline_map_service.dart';
+import '../services/subscription_service.dart';
 import 'widgets/paywall_sheet.dart';
 
 /// Settings sub-screen for downloading and managing the Iloilo offline map.
@@ -105,6 +107,40 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
     }
   }
 
+  Future<void> _confirmSimulateCancellation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Simulate subscription cancellation?'),
+        content: const Text(
+          'This clears your sandbox Premium subscription and deletes the '
+          'downloaded offline map from your device. Internal testing only.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    await SubscriptionService.instance.simulateSandboxCancellation();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sandbox subscription cancelled. Offline map removed.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -138,6 +174,11 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
                     OfflineMapDownloaded() => _buildDownloadedCard(),
                     OfflineMapError() => _buildErrorCard(status),
                   },
+                  if (kPseudoBillingEnabled &&
+                      (_premiumUnlocked || status is OfflineMapDownloaded)) ...[
+                    const SizedBox(height: 24),
+                    _buildSimulateCancellationSection(),
+                  ],
                 ],
               );
             },
@@ -430,6 +471,32 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
         color: MapColors.background,
       ),
       child: child,
+    );
+  }
+
+  Widget _buildSimulateCancellationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Internal testing only. Simulates cancelling a Premium subscription '
+          'and removes all offline map data from this device.',
+          style: TextStyle(
+            color: MapColors.text.withValues(alpha: 0.55),
+            fontSize: 12,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: _confirmSimulateCancellation,
+          icon: Icon(Icons.cancel_outlined, color: MapColors.accent),
+          label: Text(
+            'Simulate cancel subscription',
+            style: TextStyle(color: MapColors.accent),
+          ),
+        ),
+      ],
     );
   }
 

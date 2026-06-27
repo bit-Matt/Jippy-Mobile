@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/map_colors.dart';
 import '../services/connectivity_service.dart';
+import '../services/entitlement_service.dart';
 import 'go_screen/go_screen.dart';
 import 'routes_screen/routes_screen.dart';
 import 'settings_screen.dart';
@@ -20,6 +21,7 @@ class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   bool _bottomNavVisible = true;
   bool _offlineReadySignaled = false;
+  bool _offlineNoticeShown = false;
 
   @override
   void initState() {
@@ -54,7 +56,36 @@ class _AppShellState extends State<AppShell> {
     if (!ConnectivityService.instance.isOnline.value) {
       _offlineReadySignaled = true;
       widget.onReady?.call();
+      _maybeShowOfflineNotice();
     }
+  }
+
+  void _maybeShowOfflineNotice() {
+    if (_offlineNoticeShown || !mounted) return;
+    if (ConnectivityService.instance.isOnline.value) return;
+    if (EntitlementService.instance.premiumUnlocked) return;
+
+    _offlineNoticeShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No internet connection'),
+          content: const Text(
+            'You are currently offline. Routes, tricycle regions, and offline '
+            'features require a Premium subscription. Subscribe when you are '
+            'back online to unlock offline access.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   void _onConnectivityChanged() {

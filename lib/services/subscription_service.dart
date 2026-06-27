@@ -7,6 +7,7 @@ import '../core/config/billing_config.dart';
 import '../data/subscription_verification_client.dart';
 import '../models/entitlement.dart';
 import 'entitlement_service.dart';
+import 'offline_map_service.dart';
 
 /// Singleton wrapper around Google Play Billing (`in_app_purchase`).
 ///
@@ -148,6 +149,18 @@ class SubscriptionService {
     }
     await EntitlementService.instance.clear();
     _emit('Sandbox subscription reset.');
+  }
+
+  /// Simulates subscription cancellation: clears entitlement and removes
+  /// all downloaded offline map data. Sandbox / debug builds only.
+  Future<void> simulateSandboxCancellation() async {
+    if (!kPseudoBillingEnabled) {
+      _emit('Sandbox billing is not available in this build.');
+      return;
+    }
+    await EntitlementService.instance.clear();
+    await OfflineMapService.instance.deleteIloiloRegion();
+    _emit('Sandbox subscription cancelled. Offline map removed.');
   }
 
   /// Restores previously purchased subscriptions for the signed-in Play account.
