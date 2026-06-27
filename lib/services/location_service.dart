@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+
+import 'package:jippy_mobile/core/config/trip_simulator_config.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -229,7 +231,7 @@ class LocationService {
     TripSimulatorService simulator, {
     bool initialize = true,
   }) async {
-    if (!kDebugMode) return;
+    if (!kTripSimulatorEnabled) return;
 
     await detachTripSimulator(resumeRealStream: false);
 

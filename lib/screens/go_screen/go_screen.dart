@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart' hide ServiceStatus;
 import 'package:vibration/vibration.dart';
 
 import 'package:jippy_mobile/core/config/map_config.dart';
+import 'package:jippy_mobile/core/config/trip_simulator_config.dart';
 import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/data/map_data_loader.dart';
 import 'package:jippy_mobile/data/navigate_client.dart';
@@ -1545,7 +1546,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       });
       tracker.start();
 
-      if (kDebugMode && _debugTripSimulatorEnabled) {
+      if (kTripSimulatorEnabled && _debugTripSimulatorEnabled) {
         await _startTripSimulator(selected);
       } else {
         await _stopTripSimulator();
@@ -1582,7 +1583,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           _moveMapToFollowUser(position, animate: true);
         }
         final simulator = _tripSimulator;
-        if (kDebugMode &&
+        if (kTripSimulatorEnabled &&
             _debugTripSimulatorEnabled &&
             simulator != null &&
             !simulator.isPlaying) {
@@ -1600,7 +1601,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _startTripSimulator(NavigateSuggestion suggestion) async {
-    if (!kDebugMode || !_debugTripSimulatorEnabled) return;
+    if (!kTripSimulatorEnabled || !_debugTripSimulatorEnabled) return;
 
     await _stopTripSimulator();
     final simulator = TripSimulatorService.fromSuggestion(
@@ -1636,7 +1637,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   void _onDebugSimulatorToggled(bool enabled) {
-    if (!kDebugMode) return;
+    if (!kTripSimulatorEnabled) return;
     setState(() {
       _debugTripSimulatorEnabled = enabled;
       if (!enabled) {
@@ -1714,7 +1715,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         '${event.distanceMeters.round()}m to ${event.stop.label.trim().isEmpty ? 'next stop' : event.stop.label}';
 
     var shouldNotify = true;
-    if (kDebugMode && _debugTripSimulatorEnabled) {
+    if (kTripSimulatorEnabled && _debugTripSimulatorEnabled) {
       final now = DateTime.now();
       final last = _lastProximityAlertAt;
       if (last != null && now.difference(last) < const Duration(seconds: 2)) {
@@ -2402,7 +2403,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             ),
           ),
           if (_hasActiveBottomSheet) _buildPersistentBottomSheet(),
-          if (kDebugMode &&
+          if (kTripSimulatorEnabled &&
               _flow == GoNavigationFlow.navigating &&
               _debugTripSimulatorEnabled)
             Positioned(
@@ -2988,7 +2989,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
-                    if (kDebugMode) ...[
+                    if (kTripSimulatorEnabled) ...[
                       const SizedBox(height: 10),
                       _buildDebugSimulatorToggleTile(),
                     ],
