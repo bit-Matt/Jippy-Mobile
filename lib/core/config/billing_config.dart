@@ -5,6 +5,8 @@
 /// `subscription_architecture.md`).
 library;
 
+import 'package:flutter/foundation.dart';
+
 /// Google Play subscription product ID. Must match the Play Console product
 /// exactly. This string is permanent once the product is published.
 const String premiumOfflineProductId = 'jippy_premium_offline';
@@ -27,6 +29,27 @@ const bool kUseServerVerification = false;
 /// Debug-only override to exercise the gated UI without a real purchase.
 /// MUST stay `false` in release builds.
 const bool kDebugForcePremium = false;
+
+/// Compile-time opt-in for pseudo billing in release APKs.
+///
+/// Build with `--dart-define=JIPPY_PSEUDO_BILLING=true` for internal QA APKs.
+/// Omit this flag for Play-distributed AAB/release builds.
+const bool _kPseudoBillingDartDefine = bool.fromEnvironment(
+  'JIPPY_PSEUDO_BILLING',
+  defaultValue: false,
+);
+
+/// Whether the sandbox pseudo-billing checkout is available.
+///
+/// Enabled in debug builds and in release APKs built with
+/// `JIPPY_PSEUDO_BILLING=true`. Never enabled in a normal production build.
+bool get kPseudoBillingEnabled => kDebugMode || _kPseudoBillingDartDefine;
+
+/// Placeholder price shown on the sandbox paywall (no real charge).
+const String sandboxPremiumPriceLabel = '₱0.00 (sandbox)';
+
+/// Simulated billing period for sandbox entitlements.
+const Duration sandboxSubscriptionPeriod = Duration(days: 30);
 
 /// Deep link to the user's Play subscriptions screen ("Manage subscription").
 const String premiumManageSubscriptionsUrl =

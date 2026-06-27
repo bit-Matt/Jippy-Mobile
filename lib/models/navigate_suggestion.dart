@@ -94,6 +94,63 @@ class NavigateSuggestion {
         .length;
     return transitLegCount > 1 ? transitLegCount - 1 : 0;
   }
+
+  int get jeepneyRideCount =>
+      route.legs.where((leg) => leg.type == NavigateLegType.jeepney).length;
+
+  int get tricycleRideCount =>
+      route.legs.where((leg) => leg.type == NavigateLegType.tricycle).length;
+
+  int get jeepneyTransferCount =>
+      jeepneyRideCount > 1 ? jeepneyRideCount - 1 : 0;
+
+  int get transitRideCount => jeepneyRideCount + tricycleRideCount;
+
+  /// Human-readable transit summary for route suggestion cards, e.g.
+  /// `2 Rides + 1 Tricycle` or `1 Tricycle Ride`.
+  String get transitRideSummary {
+    final jeepneys = jeepneyRideCount;
+    final tricycles = tricycleRideCount;
+    final parts = <String>[];
+
+    if (jeepneys > 0) {
+      parts.add(jeepneys == 1 ? '1 Ride' : '$jeepneys Rides');
+    }
+
+    if (tricycles > 0) {
+      if (jeepneys > 0) {
+        parts.add(tricycles == 1 ? '1 Tricycle' : '$tricycles Tricycles');
+      } else {
+        parts.add(
+          tricycles == 1
+              ? '1 Tricycle Ride'
+              : '$tricycles Tricycle Rides',
+        );
+      }
+    }
+
+    if (parts.isEmpty) return 'Walk';
+    return parts.join(' + ');
+  }
+
+  bool get hasTricycleLeg => tricycleRideCount > 0;
+}
+
+/// Sorts route suggestions: fewest jeepney transfers first, then routes
+/// without tricycles, then fewest total transit rides, then shortest duration.
+int compareNavigateSuggestions(NavigateSuggestion a, NavigateSuggestion b) {
+  final transferCompare =
+      a.jeepneyTransferCount.compareTo(b.jeepneyTransferCount);
+  if (transferCompare != 0) return transferCompare;
+
+  final tricycleCompare =
+      (a.hasTricycleLeg ? 1 : 0).compareTo(b.hasTricycleLeg ? 1 : 0);
+  if (tricycleCompare != 0) return tricycleCompare;
+
+  final ridesCompare = a.transitRideCount.compareTo(b.transitRideCount);
+  if (ridesCompare != 0) return ridesCompare;
+
+  return a.totalDurationMinutes.compareTo(b.totalDurationMinutes);
 }
 
 class NavigateRoute {
