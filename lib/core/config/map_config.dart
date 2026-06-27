@@ -5,7 +5,7 @@ class MapConfig {
   MapConfig._();
 
   static const String userAgent =
-      'JippyMobile/1.0 (https://jippy.shinosawa-laboratories.dev)';
+      'JippyMobile/1.0 (com.jippy.mobile; https://jippy.shinosawa-laboratories.dev)';
 
   /// Vector style for routes and tricycles screens.
   static const String routesStyleUrl =

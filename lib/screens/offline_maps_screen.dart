@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../core/config/map_config.dart';
 import '../core/theme/map_colors.dart';
+import '../models/entitlement.dart';
 import '../models/offline_map_status.dart';
 import '../services/connectivity_service.dart';
+import '../services/entitlement_service.dart';
 import '../services/notification_service.dart';
 import '../services/offline_map_service.dart';
+import 'widgets/paywall_sheet.dart';
 
 /// Settings sub-screen for downloading and managing the Iloilo offline map.
 class OfflineMapsScreen extends StatefulWidget {
@@ -18,7 +21,19 @@ class OfflineMapsScreen extends StatefulWidget {
 class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
   final OfflineMapService _offlineMapService = OfflineMapService.instance;
 
+  bool get _premiumUnlocked => EntitlementService.instance.premiumUnlocked;
+
+  Future<void> _openPaywall() async {
+    if (!mounted) return;
+    await showPaywallSheet(context);
+  }
+
   Future<void> _startDownload() async {
+    if (!_premiumUnlocked) {
+      await _openPaywall();
+      return;
+    }
+
     if (!ConnectivityService.instance.isOnline.value) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -103,22 +118,29 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
-      body: ValueListenableBuilder<OfflineMapStatus>(
-        valueListenable: _offlineMapService.status,
-        builder: (context, status, _) {
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            children: [
-              _buildInfoCard(),
-              const SizedBox(height: 16),
-              switch (status) {
-                OfflineMapUnsupported() => _buildUnsupportedCard(),
-                OfflineMapNotDownloaded() => _buildNotDownloadedCard(),
-                OfflineMapDownloading() => _buildDownloadingCard(status),
-                OfflineMapDownloaded() => _buildDownloadedCard(),
-                OfflineMapError() => _buildErrorCard(status),
-              },
-            ],
+      body: ValueListenableBuilder<Entitlement>(
+        valueListenable: EntitlementService.instance.listenable,
+        builder: (context, entitlement, child) {
+          return ValueListenableBuilder<OfflineMapStatus>(
+            valueListenable: _offlineMapService.status,
+            builder: (context, status, child) {
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _buildInfoCard(),
+                  const SizedBox(height: 16),
+                  switch (status) {
+                    OfflineMapUnsupported() => _buildUnsupportedCard(),
+                    OfflineMapNotDownloaded() => _premiumUnlocked
+                        ? _buildNotDownloadedCard()
+                        : _buildPremiumLockedCard(),
+                    OfflineMapDownloading() => _buildDownloadingCard(status),
+                    OfflineMapDownloaded() => _buildDownloadedCard(),
+                    OfflineMapError() => _buildErrorCard(status),
+                  },
+                ],
+              );
+            },
           );
         },
       ),
@@ -190,6 +212,54 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
             onPressed: _startDownload,
             icon: const Icon(Icons.download_outlined),
             label: const Text('Download map'),
+            style: FilledButton.styleFrom(
+              backgroundColor: MapColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPremiumLockedCard() {
+    return _actionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.workspace_premium_outlined,
+                  color: MapColors.primary, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Offline map is a Premium feature',
+                  style: TextStyle(
+                    color: MapColors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Subscribe to download map tiles, jeepney routes, tricycle regions, '
+            'and route images for use without a connection.',
+            style: TextStyle(
+              color: MapColors.text.withValues(alpha: 0.72),
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _openPaywall,
+            icon: const Icon(Icons.lock_open_outlined),
+            label: const Text('Unlock with Premium'),
             style: FilledButton.styleFrom(
               backgroundColor: MapColors.primary,
               foregroundColor: Colors.white,
