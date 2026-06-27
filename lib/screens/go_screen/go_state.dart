@@ -16,3 +16,12 @@ enum GoNavigationFlow {
 
 /// Active input field in the routing header.
 enum GoRoutingField { start, end }
+
+/// Camera style while actively navigating a selected route.
+enum GoNavigationMapView {
+  /// Tilted, direction-facing perspective (Google Maps–style navigation).
+  perspective3d,
+
+  /// North-up top-down view.
+  topDown2d,
+}

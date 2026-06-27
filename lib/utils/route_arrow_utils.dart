@@ -2,8 +2,9 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+
+import 'package:jippy_mobile/models/map_layer_models.dart';
 
 /// Geographic offset applied to each direction strand (right of travel).
 const double routePolylineOffsetMeters = 7.0;
@@ -28,14 +29,16 @@ List<LatLng> offsetPolyline(List<LatLng> points, double offsetMeters) {
 }
 
 /// Places chevron markers along [offsetPoints] at [spacingMeters] intervals.
-List<Marker> buildArrowMarkers(
+List<MapWidgetMarkerSpec> buildArrowMarkers(
   List<LatLng> offsetPoints,
   Color color, {
   double spacingMeters = routeArrowSpacingMeters,
 }) {
-  if (offsetPoints.length < 2 || spacingMeters <= 0) return const <Marker>[];
+  if (offsetPoints.length < 2 || spacingMeters <= 0) {
+    return const <MapWidgetMarkerSpec>[];
+  }
 
-  final markers = <Marker>[];
+  final markers = <MapWidgetMarkerSpec>[];
   var nextMarkerAt = spacingMeters;
   var accumulated = 0.0;
 
@@ -64,12 +67,14 @@ List<Marker> buildArrowMarkers(
   return markers;
 }
 
-Marker _arrowMarker(LatLng point, double bearingDegrees, Color color) {
-  return Marker(
+MapWidgetMarkerSpec _arrowMarker(
+  LatLng point,
+  double bearingDegrees,
+  Color color,
+) {
+  return MapWidgetMarkerSpec(
     point: point,
-    width: _arrowSizePx,
-    height: _arrowSizePx,
-    alignment: Alignment.center,
+    size: const Size(_arrowSizePx, _arrowSizePx),
     child: IgnorePointer(
       child: Transform.rotate(
         angle: bearingDegrees * math.pi / 180,
@@ -116,7 +121,11 @@ double _bearingDegrees(LatLng start, LatLng end) {
   return (_toDegrees(theta) + 360) % 360;
 }
 
-LatLng _destinationPoint(LatLng origin, double bearingDeg, double distanceMeters) {
+LatLng _destinationPoint(
+  LatLng origin,
+  double bearingDeg,
+  double distanceMeters,
+) {
   const earthRadiusM = 6371000.0;
   final bearing = _toRadians(bearingDeg);
   final lat1 = _toRadians(origin.latitude);

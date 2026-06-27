@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/map_colors.dart';
+import 'offline_maps_screen.dart';
 import 'report_screen.dart';
 
 /// Settings screen displaying app configuration and action options.
@@ -22,6 +23,25 @@ class SettingsScreen extends StatelessWidget {
             fontWeight: FontWeight.w800,
             height: 1,
           ),
+        ),
+        const SizedBox(height: 16),
+        _buildSettingsSection(
+          title: 'Maps',
+          children: [
+            _SettingsTile(
+              icon: Icons.map_outlined,
+              title: 'Offline Map',
+              subtitle: 'Download Iloilo map, routes & regions',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) =>
+                        const OfflineMapsScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         _buildSettingsSection(

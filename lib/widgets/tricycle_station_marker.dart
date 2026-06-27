@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'package:jippy_mobile/core/theme/map_colors.dart';
+import 'package:jippy_mobile/models/map_layer_models.dart';
 
 /// Shared sizing for tricycle station markers on map screens.
 class TricycleMarkerStyle {
@@ -15,15 +15,16 @@ class TricycleMarkerStyle {
 }
 
 /// Builds a map marker for a tricycle waiting station.
-Marker buildTricycleStationMarker({
+MapWidgetMarkerSpec buildTricycleStationMarker({
   required LatLng point,
   VoidCallback? onTap,
 }) {
-  return Marker(
+  return MapWidgetMarkerSpec(
     point: point,
-    width: TricycleMarkerStyle.markerSize,
-    height: TricycleMarkerStyle.markerSize,
-    alignment: Alignment.center,
+    size: const Size(
+      TricycleMarkerStyle.markerSize,
+      TricycleMarkerStyle.markerSize,
+    ),
     child: GestureDetector(
       onTap: onTap,
       child: Container(

@@ -43,6 +43,9 @@ class MapLocationControl extends StatefulWidget {
 
   static const double _buttonSize = 48;
 
+  /// Exposed so sibling map controls can align with this button.
+  static const double buttonSize = _buttonSize;
+
   @override
   State<MapLocationControl> createState() => _MapLocationControlState();
 }

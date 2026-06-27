@@ -38,16 +38,13 @@ dependencies:
   # HTTP client for routes API
   http: ^1.2.0
 
-  # Map (OpenStreetMap) and user location
-  flutter_map: 8.2.2
+  maplibre: ^0.3.5
   latlong2: ^0.9.1
   geolocator: ^14.0.2
   flutter_compass: ^0.8.1
 
   # Google-style polyline decode for Valhalla route shapes
   polyline_codec: ^0.1.6
-  vector_map_tiles: ^9.0.0-beta.8
-  vector_tile_renderer: ^6.0.0
   connectivity_plus: ^7.1.1
   collection: ^1.19.1
   flutter_local_notifications: ^21.0.0
@@ -55,6 +52,7 @@ dependencies:
   vibration: ^3.1.8
   in_app_purchase: ^3.3.0
   shared_preferences: ^2.5.5
+  path_provider: ^2.1.5
   url_launcher: ^6.3.2
 
 dev_dependencies:
@@ -89,6 +87,9 @@ flutter_native_splash:
 # The following section is specific to Flutter packages.
 flutter:
 
+  config:
+    enable-swift-package-manager: true
+
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -97,6 +98,7 @@ flutter:
   assets:
     - assets/sample_routes/
     - assets/icons/
+    - assets/map/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
