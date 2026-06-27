@@ -35,7 +35,7 @@ class RouteListItem extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? color : color.withValues(alpha: 0.18),
+            color: isSelected ? color : MapColors.routeListBorderColor,
             width: isSelected ? 2 : 1,
           ),
           color: MapColors.background,
@@ -97,8 +97,8 @@ class RouteListItem extends StatelessWidget {
                     children: [
                       Text(
                         'Details',
-                        style: TextStyle(
-                          color: color,
+                        style: const TextStyle(
+                          color: MapColors.text,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),

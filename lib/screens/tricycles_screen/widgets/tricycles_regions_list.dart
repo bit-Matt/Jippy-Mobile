@@ -12,8 +12,10 @@ class TricyclesRegionsList extends StatelessWidget {
     required this.isLoading,
     required this.isFocusedMode,
     required this.selectedRegionId,
+    required this.showStations,
     required this.onRegionTap,
     required this.onShowAllRegions,
+    required this.onShowStationsChanged,
   });
 
   final ScrollController scrollController;
@@ -21,8 +23,10 @@ class TricyclesRegionsList extends StatelessWidget {
   final bool isLoading;
   final bool isFocusedMode;
   final String? selectedRegionId;
+  final bool showStations;
   final ValueChanged<TricycleRegion> onRegionTap;
   final VoidCallback onShowAllRegions;
+  final ValueChanged<bool> onShowStationsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +57,18 @@ class TricyclesRegionsList extends StatelessWidget {
                   ),
                 ),
               ),
+              if (!isFocusedMode)
+                TextButton(
+                  onPressed: () => onShowStationsChanged(!showStations),
+                  style: TextButton.styleFrom(
+                    foregroundColor: showStations
+                        ? MapColors.text.withValues(alpha: 0.55)
+                        : MapColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  child: Text(showStations ? 'Hide Stations' : 'Show Stations'),
+                ),
               if (isFocusedMode)
                 TextButton(
                   onPressed: onShowAllRegions,

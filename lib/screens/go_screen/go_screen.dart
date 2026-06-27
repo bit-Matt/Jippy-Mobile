@@ -404,6 +404,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       return const <MapWidgetMarkerSpec>[];
     }
 
+    if (_flow == GoNavigationFlow.navigating &&
+        _navigationMapView == GoNavigationMapView.perspective3d) {
+      return const <MapWidgetMarkerSpec>[];
+    }
+
     final selected = _selectedSuggestion;
     if (selected == null) return const <MapWidgetMarkerSpec>[];
 
@@ -1117,7 +1122,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     setState(() => _pinTarget = null);
   }
 
-  LatLng _currentMapCenter() => _cameraCenter;
+  LatLng _currentMapCenter() {
+    final camera = _mapController?.getCamera();
+    if (camera == null) return _cameraCenter;
+
+    final center = toLatLng(camera.center);
+    _cameraCenter = center;
+    _cameraZoom = camera.zoom;
+    return center;
+  }
 
   Future<void> _confirmMapPinFromCenter() async {
     final target = _pinTarget;
@@ -2041,6 +2054,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       color: color ?? _mapColorForLeg(leg),
       width: _strokeWidthForLeg(leg).round(),
       dashArray: leg.type == NavigateLegType.walk ? const [7, 5] : null,
+      showOutline: true,
     );
   }
 

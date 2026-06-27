@@ -25,9 +25,8 @@ MapWidgetMarkerSpec buildTricycleStationMarker({
       TricycleMarkerStyle.markerSize,
       TricycleMarkerStyle.markerSize,
     ),
-    child: GestureDetector(
-      onTap: onTap,
-      child: Container(
+    onTap: onTap,
+    child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           shape: BoxShape.circle,
@@ -51,6 +50,5 @@ MapWidgetMarkerSpec buildTricycleStationMarker({
           fit: BoxFit.contain,
         ),
       ),
-    ),
   );
 }

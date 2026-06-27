@@ -821,6 +821,11 @@ class _RoutesScreenState extends State<RoutesScreen>
     return count >= 1 && count <= 3;
   }
 
+  /// Gray route halos when the map shows a filtered subset of routes.
+  bool get _shouldShowRouteOutlines =>
+      _uiState.isFocusedMode ||
+      _uiState.panelMode == RoutesPanelMode.overlap;
+
   List<LatLng> _displayPointsForDirection(List<LatLng> points) {
     if (!_shouldShowArrows || points.length < 2) return points;
     return offsetPolyline(points, routePolylineOffsetMeters);
@@ -832,6 +837,7 @@ class _RoutesScreenState extends State<RoutesScreen>
   /// Falls back to straight segments between the stored waypoints.
   List<MapPolylineSpec> get _routePolylines {
     final routes = _visibleRoutes;
+    final showOutline = _shouldShowRouteOutlines;
     final polylines = <MapPolylineSpec>[];
     final diagParts = <String>[];
     for (final route in routes) {
@@ -863,6 +869,7 @@ class _RoutesScreenState extends State<RoutesScreen>
                 ? routeColor
                 : routeColor.withValues(alpha: 0.35),
             width: width,
+            showOutline: showOutline,
           ),
         );
       }
