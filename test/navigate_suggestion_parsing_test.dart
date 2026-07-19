@@ -49,6 +49,63 @@ void main() {
       expect(suggestion.route.legs.first.bbox, hasLength(2));
     });
 
+    test('parses leg fare and route total_fare', () {
+      final parsed = NavigateSuggestionsResponse.fromJson({
+        'ok': true,
+        'data': {
+          'suggestions': [
+            {
+              'label': '1 Transfer',
+              'route': {
+                'legs': [
+                  {
+                    'type': 'WALK',
+                    'route_name': null,
+                    'polyline': 'a',
+                    'distance': 100,
+                    'duration': 60,
+                    'fare': 0,
+                    'instructions': [],
+                    'bbox': [],
+                  },
+                  {
+                    'type': 'JEEPNEY',
+                    'route_name': 'Route Alpha',
+                    'route_number': 'R3',
+                    'polyline': 'b',
+                    'distance': 3000,
+                    'duration': 900,
+                    'fare': 15,
+                    'instructions': [],
+                    'bbox': [],
+                  },
+                  {
+                    'type': 'JEEPNEY',
+                    'route_name': 'Route Beta',
+                    'route_number': 'R1',
+                    'polyline': 'c',
+                    'distance': 2900,
+                    'duration': 800,
+                    'fare': 16.34,
+                    'instructions': [],
+                    'bbox': [],
+                  },
+                ],
+                'total_fare': 31.34,
+              },
+            },
+          ],
+        },
+      });
+
+      final suggestion = parsed.suggestions.first;
+      expect(suggestion.route.legs[0].fare, 0);
+      expect(suggestion.route.legs[1].fare, 15);
+      expect(suggestion.route.legs[2].fare, closeTo(16.34, 1e-9));
+      expect(suggestion.route.totalFare, closeTo(31.34, 1e-9));
+      expect(suggestion.totalFare, closeTo(31.34, 1e-9));
+    });
+
     test('transferCount uses board instructions first', () {
       final suggestion = NavigateSuggestion.fromJson({
         'label': 'simplest',

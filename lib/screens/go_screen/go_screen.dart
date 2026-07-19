@@ -2195,14 +2195,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return '${hours}h ${mins}m';
   }
 
-  int _previewInstructionCount(NavigateSuggestion suggestion) {
-    var count = 0;
-    for (final leg in suggestion.route.legs) {
-      if (_previewInstructionText(leg).isEmpty) continue;
-      count += 1;
-      if (count >= 5) break;
-    }
-    return count;
+  String _formatFare(double fare) {
+    if (fare <= 0) return 'Free';
+    final isWhole = (fare - fare.roundToDouble()).abs() < 1e-9;
+    final amount = isWhole
+        ? fare.round().toString()
+        : fare.toStringAsFixed(2);
+    return '₱$amount';
   }
 
   IconData _iconForLegType(NavigateLegType type) {
@@ -2963,15 +2962,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               ],
               const SizedBox(height: 14),
               Text(
-                'Preview instructions',
-                style: textTheme.labelLarge?.copyWith(
-                  color: colorScheme.onSurface.withValues(alpha: 0.82),
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
+                'Itinerary',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 8),
-              if (_previewInstructionCount(selected) == 0)
+              const SizedBox(height: 12),
+              if (selected.route.legs.isEmpty)
                 Text(
                   'No step previews available for this suggestion.',
                   style: textTheme.bodySmall?.copyWith(
@@ -2980,7 +2977,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   ),
                 )
               else
-                ..._buildPreviewInstructionRows(selected),
+                ..._buildLegBlocks(),
             ],
           ],
         ),
@@ -3164,114 +3161,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ),
       ),
     );
-  }
-
-  List<Widget> _buildPreviewInstructionRows(NavigateSuggestion suggestion) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final widgets = <Widget>[];
-    var rendered = 0;
-    for (final leg in suggestion.route.legs) {
-      final previewText = _previewInstructionText(leg);
-      if (previewText.isEmpty) continue;
-
-      rendered += 1;
-      if (rendered > 5) break;
-      widgets.add(
-        Padding(
-          padding: EdgeInsets.only(bottom: rendered == 5 ? 0 : 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                _iconForLegType(leg.type),
-                size: 16,
-                color: _colorForLeg(leg),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  previewText,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface.withValues(alpha: 0.83),
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return widgets;
-  }
-
-  String _previewInstructionText(NavigateLeg leg) {
-    final distance = _formatDistance(leg.distanceMeters);
-    switch (leg.type) {
-      case NavigateLegType.walk:
-        return 'Walk $distance';
-      case NavigateLegType.jeepney:
-        final label = _jeepneyPreviewLabel(leg);
-        final base = label.isEmpty ? _labelForLegType(leg.type) : label;
-        return '$base - $distance';
-      case NavigateLegType.tricycle:
-      case NavigateLegType.unknown:
-        final routeName = leg.routeName.trim();
-        final base = routeName.isNotEmpty
-            ? routeName
-            : _labelForLegType(leg.type);
-        return '$base - $distance';
-    }
-  }
-
-  String _jeepneyPreviewLabel(NavigateLeg leg) {
-    final routeName = leg.routeName.trim();
-    if (routeName.isEmpty) return '';
-
-    final routeNumber = leg.routeNumber.trim();
-    if (routeNumber.isNotEmpty) {
-      final code = _formatRouteCode(routeNumber);
-      return '$routeName ($code)';
-    }
-
-    if (_hasRouteNumberInName(routeName)) {
-      return routeName;
-    }
-
-    final extracted = _extractRouteNumberFromName(routeName);
-    if (extracted == null || extracted.isEmpty) return routeName;
-    final code = _formatRouteCode(extracted);
-    return '$routeName ($code)';
-  }
-
-  bool _hasRouteNumberInName(String name) {
-    return RegExp(r'\broute\s*\w+\b', caseSensitive: false).hasMatch(name) ||
-        RegExp(r'\bR\s*\d+\b', caseSensitive: false).hasMatch(name);
-  }
-
-  String? _extractRouteNumberFromName(String name) {
-    final parenMatch = RegExp(
-      r'\(\s*Route\s*([^)]+)\)',
-      caseSensitive: false,
-    ).firstMatch(name);
-    if (parenMatch != null) return parenMatch.group(1)?.trim();
-
-    final routeMatch = RegExp(
-      r'\bRoute\s*([A-Za-z0-9-]+)\b',
-      caseSensitive: false,
-    ).firstMatch(name);
-    if (routeMatch != null) return routeMatch.group(1)?.trim();
-
-    final rMatch = RegExp(
-      r'\bR\s*\d+\b',
-      caseSensitive: false,
-    ).firstMatch(name);
-    if (rMatch != null) return rMatch.group(0)?.replaceAll(' ', '');
-
-    return null;
   }
 
   String _formatRouteCode(String raw) {
@@ -3507,12 +3396,29 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                                 ),
                               ),
                             ),
-                            Text(
-                              _formatMinutes(leg.durationMinutes),
-                              style: textTheme.labelMedium?.copyWith(
-                                color: bodyColor.withValues(alpha: 0.74),
-                                fontWeight: FontWeight.w700,
-                              ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  _formatMinutes(leg.durationMinutes),
+                                  style: textTheme.labelMedium?.copyWith(
+                                    color: bodyColor.withValues(alpha: 0.74),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (leg.fare > 0) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _formatFare(leg.fare),
+                                    style: textTheme.labelMedium?.copyWith(
+                                      color: isCompleted
+                                          ? bodyColor.withValues(alpha: 0.55)
+                                          : colorScheme.primary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ],
                         ),
