@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/models/road_closure.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/details_back_button.dart';
 
@@ -18,6 +17,7 @@ class ClosureDetailsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final title = (closure != null && closure!.closureName.trim().isNotEmpty)
         ? '❌ ${closure!.closureName.trim()}'
         : '❌ (untitled)';
@@ -40,9 +40,7 @@ class ClosureDetailsView extends StatelessWidget {
                   title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MapColors.text,
-                    fontSize: 26,
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     height: 1.1,
                   ),
@@ -54,22 +52,15 @@ class ClosureDetailsView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: MapColors.primary.withValues(alpha: 0.18),
-            ),
-            color: MapColors.background,
-          ),
-          padding: const EdgeInsets.all(14),
-          child: Text(
-            detailText,
-            style: const TextStyle(
-              color: MapColors.text,
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              height: 1.35,
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Text(
+              detailText,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w500,
+                height: 1.35,
+              ),
             ),
           ),
         ),

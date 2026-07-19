@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/models/jeepney_route.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/route_list_item.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
@@ -67,24 +66,22 @@ class _RoutesListBodyState extends State<RoutesListBody> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     if (widget.isLoading) {
       return widget.loadingState;
     }
 
     if (widget.routes.isEmpty) {
-      return Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
-          color: MapColors.background,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-        child: const Text(
-          'No routes available right now.',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+          child: Text(
+            'No routes available right now.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       );
@@ -112,11 +109,9 @@ class _RoutesListBodyState extends State<RoutesListBody> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.isFocusedMode && widget.isCompareMode) ...[
-          const Text(
+          Text(
             'Selected Routes',
-            style: TextStyle(
-              color: MapColors.text,
-              fontSize: 18,
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -124,9 +119,8 @@ class _RoutesListBodyState extends State<RoutesListBody> {
           if (selectedRoutes.isEmpty)
             Text(
               'No routes selected.',
-              style: TextStyle(
-                color: MapColors.text.withValues(alpha: 0.65),
-                fontSize: 14,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             )
@@ -182,16 +176,6 @@ class _RoutesListBodyState extends State<RoutesListBody> {
                     },
                   )
                 : null,
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 12,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -200,24 +184,28 @@ class _RoutesListBodyState extends State<RoutesListBody> {
             Expanded(
               child: Text(
                 sectionHeading,
-                style: TextStyle(
-                  color: showCompareHint
-                      ? MapColors.text.withValues(alpha: 0.65)
-                      : MapColors.text,
-                  fontSize: showCompareHint ? 16 : 18,
-                  fontWeight: showCompareHint
-                      ? FontWeight.w600
-                      : FontWeight.w700,
-                ),
+                style: (showCompareHint
+                        ? theme.textTheme.titleSmall
+                        : theme.textTheme.titleMedium)
+                    ?.copyWith(
+                      color: showCompareHint
+                          ? colorScheme.onSurfaceVariant
+                          : null,
+                      fontWeight: showCompareHint
+                          ? FontWeight.w600
+                          : FontWeight.w700,
+                    ),
               ),
             ),
             if (shouldShowActionButton)
               TextButton(
                 onPressed: _showAllRoutes,
                 style: TextButton.styleFrom(
-                  foregroundColor: MapColors.primary,
+                  foregroundColor: colorScheme.primary,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                  textStyle: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 child: Text(actionButtonLabel),
               ),
@@ -227,9 +215,8 @@ class _RoutesListBodyState extends State<RoutesListBody> {
         if (filteredRoutes.isEmpty)
           Text(
             'No routes match your search.',
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.65),
-              fontSize: 14,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
           )

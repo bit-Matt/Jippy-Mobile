@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme/map_colors.dart';
 import '../services/connectivity_service.dart';
 import '../services/entitlement_service.dart';
 import 'go_screen/go_screen.dart';
@@ -175,36 +174,43 @@ class _AppShellState extends State<AppShell> {
                 const SettingsScreen(key: ValueKey('settings_screen')),
               ];
 
-        final navItems = online
+        final destinations = online
             ? const [
-                BottomNavigationBarItem(
+                NavigationDestination(
                   icon: Icon(Icons.directions_car_filled_outlined),
+                  selectedIcon: Icon(Icons.directions_car_filled),
                   label: 'Go',
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.alt_route),
+                NavigationDestination(
+                  icon: Icon(Icons.alt_route_outlined),
+                  selectedIcon: Icon(Icons.alt_route),
                   label: 'Routes',
                 ),
-                BottomNavigationBarItem(
+                NavigationDestination(
                   icon: Icon(Icons.moped_outlined),
+                  selectedIcon: Icon(Icons.moped),
                   label: 'Tricycles',
                 ),
-                BottomNavigationBarItem(
+                NavigationDestination(
                   icon: Icon(Icons.settings_outlined),
+                  selectedIcon: Icon(Icons.settings),
                   label: 'Settings',
                 ),
               ]
             : const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.alt_route),
+                NavigationDestination(
+                  icon: Icon(Icons.alt_route_outlined),
+                  selectedIcon: Icon(Icons.alt_route),
                   label: 'Routes',
                 ),
-                BottomNavigationBarItem(
+                NavigationDestination(
                   icon: Icon(Icons.moped_outlined),
+                  selectedIcon: Icon(Icons.moped),
                   label: 'Tricycles',
                 ),
-                BottomNavigationBarItem(
+                NavigationDestination(
                   icon: Icon(Icons.settings_outlined),
+                  selectedIcon: Icon(Icons.settings),
                   label: 'Settings',
                 ),
               ];
@@ -214,21 +220,10 @@ class _AppShellState extends State<AppShell> {
         return Scaffold(
           body: IndexedStack(index: clampedIndex, children: pages),
           bottomNavigationBar: _bottomNavVisible
-              ? BottomNavigationBar(
-                  currentIndex: clampedIndex,
-                  onTap: _onTabSelected,
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.white,
-                  elevation: 8,
-                  selectedItemColor: MapColors.primary,
-                  unselectedItemColor: MapColors.text.withValues(alpha: 0.45),
-                  selectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  items: navItems,
+              ? NavigationBar(
+                  selectedIndex: clampedIndex,
+                  onDestinationSelected: _onTabSelected,
+                  destinations: destinations,
                 )
               : null,
         );

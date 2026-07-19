@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/models/tricycle_region.dart';
 import 'package:jippy_mobile/utils/route_color_parser.dart';
 
@@ -30,15 +29,16 @@ class TricyclesRegionsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return ListView(
       controller: scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
-        const Text(
+        Text(
           'Tricycle Regions',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 34,
+          style: theme.textTheme.headlineLarge?.copyWith(
             fontWeight: FontWeight.w800,
             height: 1,
           ),
@@ -50,9 +50,7 @@ class TricyclesRegionsList extends StatelessWidget {
               Expanded(
                 child: Text(
                   isFocusedMode ? 'Currently viewing' : 'All Regions',
-                  style: const TextStyle(
-                    color: MapColors.text,
-                    fontSize: 18,
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -62,10 +60,12 @@ class TricyclesRegionsList extends StatelessWidget {
                   onPressed: () => onShowStationsChanged(!showStations),
                   style: TextButton.styleFrom(
                     foregroundColor: showStations
-                        ? MapColors.text.withValues(alpha: 0.55)
-                        : MapColors.primary,
+                        ? colorScheme.onSurfaceVariant
+                        : colorScheme.primary,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                    textStyle: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   child: Text(showStations ? 'Hide Stations' : 'Show Stations'),
                 ),
@@ -73,9 +73,11 @@ class TricyclesRegionsList extends StatelessWidget {
                 TextButton(
                   onPressed: onShowAllRegions,
                   style: TextButton.styleFrom(
-                    foregroundColor: MapColors.primary,
+                    foregroundColor: colorScheme.primary,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                    textStyle: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   child: const Text('Show All Regions'),
                 ),
@@ -95,21 +97,14 @@ class TricyclesRegionsList extends StatelessWidget {
             ),
           )
         else if (regions.isEmpty)
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: MapColors.primary.withValues(alpha: 0.18),
-              ),
-              color: MapColors.background,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-            child: const Text(
-              'No tricycle regions available right now.',
-              style: TextStyle(
-                color: MapColors.text,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+              child: Text(
+                'No tricycle regions available right now.',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           )
@@ -141,29 +136,31 @@ class _RegionListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final regionColor = parseRouteColor(region.regionColor);
     final stationCount = region.stations.length;
-    final stationLabel = stationCount == 1 ? '1 station' : '$stationCount stations';
+    final stationLabel =
+        stationCount == 1 ? '1 station' : '$stationCount stations';
 
     return Material(
       color: isSelected
           ? regionColor.withValues(alpha: 0.12)
-          : Colors.white,
-      borderRadius: BorderRadius.circular(14),
+          : colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isSelected
+              ? regionColor.withValues(alpha: 0.65)
+              : colorScheme.outlineVariant,
+          width: isSelected ? 1.5 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected
-                  ? regionColor.withValues(alpha: 0.65)
-                  : MapColors.text.withValues(alpha: 0.12),
-              width: isSelected ? 1.5 : 1,
-            ),
-          ),
           child: Row(
             children: [
               Container(
@@ -184,18 +181,15 @@ class _RegionListItem extends StatelessWidget {
                       region.regionName.trim().isEmpty
                           ? 'Unnamed Region'
                           : region.regionName.trim(),
-                      style: const TextStyle(
-                        color: MapColors.text,
-                        fontSize: 16,
+                      style: textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       stationLabel,
-                      style: TextStyle(
-                        color: MapColors.text.withValues(alpha: 0.62),
-                        fontSize: 13,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -204,7 +198,7 @@ class _RegionListItem extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_right,
-                color: MapColors.text.withValues(alpha: 0.35),
+                color: colorScheme.onSurfaceVariant,
               ),
             ],
           ),

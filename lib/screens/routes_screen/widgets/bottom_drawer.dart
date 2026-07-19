@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/widgets/sheet_drag_handle.dart';
 
 class MapBottomDrawer extends StatelessWidget {
@@ -35,6 +34,8 @@ class MapBottomDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return DraggableScrollableSheet(
       controller: controller,
       initialChildSize: initialChildSize,
@@ -43,11 +44,10 @@ class MapBottomDrawer extends StatelessWidget {
       snap: true,
       snapSizes: snapSizes,
       builder: (BuildContext context, ScrollController scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: MapColors.background,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
+        return Material(
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
               SheetDragHandle(

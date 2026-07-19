@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/widgets/cached_network_or_file_image.dart';
 import 'package:jippy_mobile/widgets/sticker_viewer.dart';
 
@@ -88,6 +87,8 @@ class _StickerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -98,10 +99,8 @@ class _StickerTile extends StatelessWidget {
           height: height,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: MapColors.primary.withValues(alpha: 0.14),
-            ),
-            color: MapColors.background,
+            border: Border.all(color: colorScheme.outlineVariant),
+            color: colorScheme.surfaceContainerHighest,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(11),

@@ -617,7 +617,7 @@ class _RoutesScreenState extends State<RoutesScreen>
                     circles: _overlapCircles,
                   )
                 else
-                  const ColoredBox(color: MapColors.background),
+                  const ColoredBox(color: MapColors.mapCanvasPlaceholder),
                 if (_loadingRoutes) const LoadingOverlay(),
               ],
             ),
@@ -956,34 +956,42 @@ class _RoutesScreenState extends State<RoutesScreen>
           alignment: Alignment.bottomCenter,
           child: GestureDetector(
             onTap: () => _openClosureDetails(closure),
-            child: Material(
-              elevation: 3,
-              shadowColor: Colors.black38,
-              borderRadius: BorderRadius.circular(6),
-              color: MapColors.background,
-              child: Container(
-                width: 76,
-                height: 20,
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
+            child: Builder(
+              builder: (context) {
+                final colorScheme = Theme.of(context).colorScheme;
+                return Material(
+                  elevation: 3,
+                  shadowColor: Colors.black38,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: _closureColor, width: 1),
-                ),
-                child: const Text(
-                  '❌ Road Closed',
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: MapColors.text,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
-                    letterSpacing: -0.2,
+                  color: colorScheme.surface,
+                  child: Container(
+                    width: 76,
+                    height: 20,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: _closureColor, width: 1),
+                    ),
+                    child: Text(
+                      '❌ Road Closed',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),

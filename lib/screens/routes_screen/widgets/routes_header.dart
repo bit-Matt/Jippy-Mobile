@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
-
 class RoutesHeader extends StatelessWidget {
   const RoutesHeader({
     super.key,
@@ -18,14 +16,14 @@ class RoutesHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Routes',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 34,
+          style: theme.textTheme.headlineLarge?.copyWith(
             fontWeight: FontWeight.w800,
             height: 1,
           ),
@@ -40,38 +38,12 @@ class RoutesHeader extends StatelessWidget {
               selected: isCompareMode,
               onSelected: onCompareModeChanged,
               showCheckmark: false,
-              selectedColor: MapColors.accentColor.withValues(alpha: 0.18),
-              checkmarkColor: MapColors.accentColor,
-              labelStyle: TextStyle(
-                color: isCompareMode
-                    ? MapColors.accentColor
-                    : MapColors.text.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w600,
-              ),
-              side: BorderSide(
-                color: isCompareMode
-                    ? MapColors.accentColor.withValues(alpha: 0.7)
-                    : MapColors.text.withValues(alpha: 0.18),
-              ),
             ),
             FilterChip(
               label: const Text('Tricycle Stations'),
               selected: showStations,
               onSelected: onShowStationsChanged,
               showCheckmark: false,
-              selectedColor: MapColors.accentColor.withValues(alpha: 0.18),
-              checkmarkColor: MapColors.accentColor,
-              labelStyle: TextStyle(
-                color: showStations
-                    ? MapColors.accentColor
-                    : MapColors.text.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w600,
-              ),
-              side: BorderSide(
-                color: showStations
-                    ? MapColors.accentColor.withValues(alpha: 0.7)
-                    : MapColors.text.withValues(alpha: 0.18),
-              ),
             ),
           ],
         ),

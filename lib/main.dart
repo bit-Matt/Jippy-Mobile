@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'core/theme/map_colors.dart';
+import 'core/theme/app_theme.dart';
 import 'screens/splash_gate.dart';
 import 'services/connectivity_service.dart';
 import 'services/entitlement_service.dart';
@@ -33,20 +33,7 @@ class JippyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Jippy',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.light(
-          primary: MapColors.primary,
-          secondary: MapColors.secondary,
-          tertiary: MapColors.accent,
-          surface: MapColors.background,
-          onPrimary: Colors.white,
-          onSecondary: MapColors.text,
-          onSurface: MapColors.text,
-        ),
-        scaffoldBackgroundColor: MapColors.background,
-        canvasColor: MapColors.background,
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
       home: const SplashGate(),
     );
   }

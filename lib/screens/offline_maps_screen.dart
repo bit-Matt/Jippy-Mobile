@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/config/billing_config.dart';
 import '../core/config/map_config.dart';
-import '../core/theme/map_colors.dart';
 import '../models/entitlement.dart';
 import '../models/offline_map_status.dart';
 import '../services/connectivity_service.dart';
@@ -144,15 +143,8 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: MapColors.background,
       appBar: AppBar(
-        backgroundColor: MapColors.background,
-        elevation: 0,
-        foregroundColor: MapColors.text,
-        title: const Text(
-          'Offline Map',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+        title: const Text('Offline Map'),
       ),
       body: ValueListenableBuilder<Entitlement>(
         valueListenable: EntitlementService.instance.listenable,
@@ -163,21 +155,22 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
               return ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
-                  _buildInfoCard(),
+                  _buildInfoCard(context),
                   const SizedBox(height: 16),
                   switch (status) {
-                    OfflineMapUnsupported() => _buildUnsupportedCard(),
+                    OfflineMapUnsupported() => _buildUnsupportedCard(context),
                     OfflineMapNotDownloaded() => _premiumUnlocked
                         ? _buildNotDownloadedCard()
-                        : _buildPremiumLockedCard(),
-                    OfflineMapDownloading() => _buildDownloadingCard(status),
-                    OfflineMapDownloaded() => _buildDownloadedCard(),
-                    OfflineMapError() => _buildErrorCard(status),
+                        : _buildPremiumLockedCard(context),
+                    OfflineMapDownloading() =>
+                      _buildDownloadingCard(context, status),
+                    OfflineMapDownloaded() => _buildDownloadedCard(context),
+                    OfflineMapError() => _buildErrorCard(context, status),
                   },
                   if (kPseudoBillingEnabled &&
                       (_premiumUnlocked || status is OfflineMapDownloaded)) ...[
                     const SizedBox(height: 24),
-                    _buildSimulateCancellationSection(),
+                    _buildSimulateCancellationSection(context),
                   ],
                 ],
               );
@@ -188,98 +181,91 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
     );
   }
 
-  Widget _buildInfoCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
-        color: MapColors.background,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Iloilo City vector map',
-            style: TextStyle(
-              color: MapColors.text,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Download map tiles, jeepney routes, tricycle regions, and route '
-            'images for offline use on the Routes and Tricycles screens. '
-            'Map zoom levels ${MapConfig.iloiloOfflineMinZoom.toInt()}–'
-            '${MapConfig.iloiloOfflineMaxZoom.toInt()}.',
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.72),
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildInfoCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-  Widget _buildUnsupportedCard() {
-    return _actionCard(
-      child: Text(
-        'Offline map downloads are not supported on this platform.',
-        style: TextStyle(
-          color: MapColors.text.withValues(alpha: 0.72),
-          fontSize: 14,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Iloilo City vector map',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Download map tiles, jeepney routes, tricycle regions, and route '
+              'images for offline use on the Routes and Tricycles screens. '
+              'Map zoom levels ${MapConfig.iloiloOfflineMinZoom.toInt()}–'
+              '${MapConfig.iloiloOfflineMaxZoom.toInt()}.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  Widget _buildUnsupportedCard(BuildContext context) {
+    return _ActionCard(
+      child: Text(
+        'Offline map downloads are not supported on this platform.',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+      ),
+    );
+  }
+
   Widget _buildNotDownloadedCard() {
-    return _actionCard(
+    return _ActionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             'No offline map downloaded yet.',
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.72),
-              fontSize: 14,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: _startDownload,
             icon: const Icon(Icons.download_outlined),
             label: const Text('Download map'),
-            style: FilledButton.styleFrom(
-              backgroundColor: MapColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPremiumLockedCard() {
-    return _actionCard(
+  Widget _buildPremiumLockedCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return _ActionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Icon(Icons.workspace_premium_outlined,
-                  color: MapColors.primary, size: 22),
+              Icon(
+                Icons.workspace_premium_outlined,
+                color: colorScheme.primary,
+                size: 22,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Offline map is a Premium feature',
-                  style: TextStyle(
-                    color: MapColors.text,
-                    fontSize: 15,
+                  style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -290,10 +276,8 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
           Text(
             'Subscribe to download map tiles, jeepney routes, tricycle regions, '
             'and route images for use without a connection.',
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.72),
-              fontSize: 14,
-              height: 1.4,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
@@ -301,22 +285,23 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
             onPressed: _openPaywall,
             icon: const Icon(Icons.lock_open_outlined),
             label: const Text('Unlock with Premium'),
-            style: FilledButton.styleFrom(
-              backgroundColor: MapColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDownloadingCard(OfflineMapDownloading status) {
+  Widget _buildDownloadingCard(
+    BuildContext context,
+    OfflineMapDownloading status,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final progress = status.progress;
 
     final phaseLabel = switch (status.phase) {
-      OfflineDownloadPhase.routesData => 'Downloading routes, regions & images…',
+      OfflineDownloadPhase.routesData =>
+        'Downloading routes, regions & images…',
       OfflineDownloadPhase.mapTiles => 'Downloading map tiles…',
     };
 
@@ -326,11 +311,11 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
           : 'Fetching route data from server…',
       OfflineDownloadPhase.mapTiles => status.totalTiles > 0
           ? '${status.loadedTiles} / ${status.totalTiles} tiles · '
-                '${_formatBytes(status.loadedBytes)}'
+              '${_formatBytes(status.loadedBytes)}'
           : '${_formatBytes(status.loadedBytes)} downloaded',
     };
 
-    return _actionCard(
+    return _ActionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -338,42 +323,35 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
             progress != null
                 ? '${(progress * 100).round()}% complete'
                 : 'Downloading…',
-            style: const TextStyle(
-              color: MapColors.text,
-              fontSize: 16,
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             phaseLabel,
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.65),
-              fontSize: 13,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 12),
           LinearProgressIndicator(
             value: progress,
-            backgroundColor: MapColors.primary.withValues(alpha: 0.15),
-            color: MapColors.primary,
             minHeight: 8,
             borderRadius: BorderRadius.circular(4),
           ),
           const SizedBox(height: 12),
           Text(
             detailText,
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.65),
-              fontSize: 13,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'You can leave this screen — download continues in the background.',
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.55),
-              fontSize: 12,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -381,33 +359,40 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
     );
   }
 
-  Widget _buildDownloadedCard() {
-    return _actionCard(
+  Widget _buildDownloadedCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return _ActionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: MapColors.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.check_circle, color: MapColors.primary, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Downloaded · routes, regions & map · zoom '
-                    '${MapConfig.iloiloOfflineMinZoom.toInt()}–'
-                    '${MapConfig.iloiloOfflineMaxZoom.toInt()}',
-                    style: const TextStyle(
-                      color: MapColors.text,
-                      fontWeight: FontWeight.w600,
+          Material(
+            color: colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: colorScheme.onSecondaryContainer,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Downloaded · routes, regions & map · zoom '
+                      '${MapConfig.iloiloOfflineMinZoom.toInt()}–'
+                      '${MapConfig.iloiloOfflineMaxZoom.toInt()}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSecondaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -415,18 +400,14 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
             onPressed: _confirmRedownload,
             icon: const Icon(Icons.refresh),
             label: const Text('Update map'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: MapColors.primary,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
           ),
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: _confirmDelete,
-            icon: Icon(Icons.delete_outline, color: MapColors.accent),
+            icon: Icon(Icons.delete_outline, color: colorScheme.error),
             label: Text(
               'Delete offline map',
-              style: TextStyle(color: MapColors.accent),
+              style: TextStyle(color: colorScheme.error),
             ),
           ),
         ],
@@ -434,66 +415,51 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
     );
   }
 
-  Widget _buildErrorCard(OfflineMapError status) {
-    return _actionCard(
+  Widget _buildErrorCard(BuildContext context, OfflineMapError status) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return _ActionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             status.message,
-            style: TextStyle(
-              color: MapColors.accent,
-              fontSize: 14,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.error,
+                ),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: _startDownload,
             icon: const Icon(Icons.refresh),
             label: const Text('Retry download'),
-            style: FilledButton.styleFrom(
-              backgroundColor: MapColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _actionCard({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MapColors.primary.withValues(alpha: 0.18)),
-        color: MapColors.background,
-      ),
-      child: child,
-    );
-  }
+  Widget _buildSimulateCancellationSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-  Widget _buildSimulateCancellationSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           'Internal testing only. Simulates cancelling a Premium subscription '
           'and removes all offline map data from this device.',
-          style: TextStyle(
-            color: MapColors.text.withValues(alpha: 0.55),
-            fontSize: 12,
-            height: 1.35,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 8),
         TextButton.icon(
           onPressed: _confirmSimulateCancellation,
-          icon: Icon(Icons.cancel_outlined, color: MapColors.accent),
+          icon: Icon(Icons.cancel_outlined, color: colorScheme.error),
           label: Text(
             'Simulate cancel subscription',
-            style: TextStyle(color: MapColors.accent),
+            style: TextStyle(color: colorScheme.error),
           ),
         ),
       ],
@@ -506,5 +472,21 @@ class _OfflineMapsScreenState extends State<OfflineMapsScreen> {
       return '${(bytes / 1024).toStringAsFixed(1)} KB';
     }
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
+class _ActionCard extends StatelessWidget {
+  const _ActionCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: child,
+      ),
+    );
   }
 }

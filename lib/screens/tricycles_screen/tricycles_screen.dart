@@ -502,7 +502,7 @@ class _TricyclesScreenState extends State<TricyclesScreen>
                       widgetMarkers: _stationMarkers,
                     )
                   else
-                    const ColoredBox(color: MapColors.background),
+                    const ColoredBox(color: MapColors.mapCanvasPlaceholder),
                   if (_loadingData) const LoadingOverlay(),
                 ],
               ),
@@ -524,13 +524,13 @@ class _TricyclesScreenState extends State<TricyclesScreen>
               snap: true,
               snapSizes: _drawerSnapSizes,
               builder: (context, scrollController) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: MapColors.background,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
+                final colorScheme = Theme.of(context).colorScheme;
+                return Material(
+                  color: colorScheme.surfaceContainerLow,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(28),
                   ),
+                  clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
                       SheetDragHandle(

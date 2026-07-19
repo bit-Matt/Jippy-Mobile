@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../data/feedback_client.dart';
-import '../../core/theme/map_colors.dart';
 
 class ReportIssueForm extends StatefulWidget {
   const ReportIssueForm({super.key});
@@ -123,9 +122,7 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
   void _showSnackBar(String message) {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _submit() async {
@@ -175,23 +172,7 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
 
   @override
   Widget build(BuildContext context) {
-    final inputDecoration = InputDecoration(
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: MapColors.text.withValues(alpha: 0.2)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: MapColors.text.withValues(alpha: 0.2)),
-      ),
-      focusedBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(12)),
-        borderSide: BorderSide(color: MapColors.primary, width: 1.4),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    );
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Form(
       key: _formKey,
@@ -207,7 +188,7 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
             autovalidateMode: _showEmailError
                 ? AutovalidateMode.always
                 : AutovalidateMode.disabled,
-            decoration: inputDecoration.copyWith(
+            decoration: const InputDecoration(
               labelText: 'Email address',
               hintText: 'name@example.com',
             ),
@@ -216,7 +197,6 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
               FocusScope.of(context).requestFocus(_descriptionFocusNode);
             },
           ),
-          const SizedBox(height: 12),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             initialValue: _selectedReportType,
@@ -231,7 +211,7 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
             autovalidateMode: _showReportTypeError
                 ? AutovalidateMode.always
                 : AutovalidateMode.disabled,
-            decoration: inputDecoration.copyWith(labelText: 'Report Type'),
+            decoration: const InputDecoration(labelText: 'Report Type'),
             items: _reportTypes
                 .map(
                   (type) =>
@@ -251,7 +231,7 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
             autovalidateMode: _showDescriptionError
                 ? AutovalidateMode.always
                 : AutovalidateMode.disabled,
-            decoration: inputDecoration.copyWith(
+            decoration: const InputDecoration(
               labelText: 'Describe the problem',
               hintText:
                   'Share as much detail as possible to help us investigate.',
@@ -265,25 +245,16 @@ class _ReportIssueFormState extends State<ReportIssueForm> {
             child: FilledButton.icon(
               onPressed: _isSubmitting ? null : _submit,
               icon: _isSubmitting
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: colorScheme.onPrimary,
                       ),
                     )
                   : const Icon(Icons.send_outlined),
               label: Text(_isSubmitting ? 'Submitting...' : 'Submit Report'),
-              style: FilledButton.styleFrom(
-                backgroundColor: MapColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                textStyle: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
             ),
           ),
         ],

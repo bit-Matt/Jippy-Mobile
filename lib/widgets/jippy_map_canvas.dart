@@ -334,11 +334,11 @@ class _JippyMapCanvasState extends State<JippyMapCanvas> {
   @override
   Widget build(BuildContext context) {
     if (!_isMapLibrePlatformReady) {
-      return const ColoredBox(color: MapColors.background);
+      return const ColoredBox(color: MapColors.mapCanvasPlaceholder);
     }
 
     return ColoredBox(
-      color: MapColors.background,
+      color: MapColors.mapCanvasPlaceholder,
       child: MapLibreMap(
         options: MapOptions(
           initStyle: widget.style,

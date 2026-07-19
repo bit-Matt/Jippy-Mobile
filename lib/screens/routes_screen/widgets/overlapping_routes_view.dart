@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/models/jeepney_route.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/details_back_button.dart';
 import 'package:jippy_mobile/screens/routes_screen/widgets/route_list_item.dart';
@@ -23,6 +22,8 @@ class OverlappingRoutesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return ListView(
       key: const ValueKey<String>('overlapping-routes-view'),
       controller: scrollController,
@@ -37,9 +38,7 @@ class OverlappingRoutesView extends StatelessWidget {
                   'Routes Nearby',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MapColors.text,
-                    fontSize: 26,
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     height: 1.1,
                   ),
@@ -52,21 +51,14 @@ class OverlappingRoutesView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         if (routes.isEmpty)
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: MapColors.primary.withValues(alpha: 0.18),
-              ),
-              color: MapColors.background,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-            child: const Text(
-              'No overlapping routes for this tap.',
-              style: TextStyle(
-                color: MapColors.text,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+              child: Text(
+                'No overlapping routes for this tap.',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           )

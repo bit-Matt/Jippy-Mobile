@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
-
 /// Floating hint shown at the bottom of a scrollable sheet when more content
 /// exists below the current viewport.
 class SheetScrollHint extends StatefulWidget {
@@ -86,8 +84,9 @@ class _SheetScrollHintState extends State<SheetScrollHint>
   Widget build(BuildContext context) {
     if (!_visible) return const SizedBox.shrink();
 
-    final textColor = MapColors.text.withValues(alpha: 0.45);
-    final arrowColor = MapColors.text.withValues(alpha: 0.55);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textColor = colorScheme.onSurfaceVariant;
+    final arrowColor = colorScheme.onSurfaceVariant;
 
     return IgnorePointer(
       child: Align(
@@ -101,12 +100,11 @@ class _SheetScrollHintState extends State<SheetScrollHint>
               children: [
                 Text(
                   'Scroll for details',
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
-                  ),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: textColor,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
                 ),
                 AnimatedBuilder(
                   animation: _bounceAnimation,

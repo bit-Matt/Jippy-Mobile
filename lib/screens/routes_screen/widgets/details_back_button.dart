@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/map_colors.dart';
-
 /// Padding so ink/hover fully covers icon + label on web/desktop.
 class DetailsBackButton extends StatelessWidget {
   const DetailsBackButton({super.key, required this.onPressed});
@@ -13,13 +11,18 @@ class DetailsBackButton extends StatelessWidget {
     return TextButton.icon(
       onPressed: onPressed,
       style: TextButton.styleFrom(
-        foregroundColor: MapColors.primary,
+        foregroundColor: Theme.of(context).colorScheme.primary,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.padded,
       ),
       icon: const Icon(Icons.arrow_back, size: 16),
-      label: const Text('Back', style: TextStyle(fontWeight: FontWeight.w700)),
+      label: Text(
+        'Back',
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

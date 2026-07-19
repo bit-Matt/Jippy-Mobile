@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -41,8 +40,6 @@ const double _initialZoom = 14.0;
 const double _navigation3dPitch = 55.0;
 const double _navigation3dZoom = 17.0;
 
-const Color _sheetSurfaceColor = Colors.white;
-const Color _timelineSubtleLineColor = Color(0xFFCFD4DB);
 const double _routeProgressSnapMaxMeters = 50.0;
 
 const double _sheetCollapsedSize = 0.25;
@@ -927,11 +924,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       valueListenable: _sheetExtent,
       builder: (context, _, child) {
         final screenHeight = MediaQuery.sizeOf(context).height;
+        final colorScheme = Theme.of(context).colorScheme;
+        final textTheme = Theme.of(context).textTheme;
         return Positioned(
           right: 16,
           bottom: _navigationViewToggleBottom(screenHeight),
           child: Material(
-            color: MapColors.background,
+            color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(14),
             elevation: 2,
             child: InkWell(
@@ -945,14 +944,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   children: [
                     Icon(
                       is3d ? Icons.map_outlined : Icons.view_in_ar_outlined,
-                      color: MapColors.primary,
+                      color: colorScheme.primary,
                       size: 22,
                     ),
                     Text(
                       is3d ? '2D' : '3D',
-                      style: TextStyle(
-                        color: MapColors.primary,
-                        fontSize: 11,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1784,19 +1782,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     messenger.clearSnackBars();
     messenger.showSnackBar(
       SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: MapColors.text,
         content: Text(
           title == null ? message : '$title\n$message',
           style: const TextStyle(
-            color: Colors.white,
             fontWeight: FontWeight.w600,
             height: 1.35,
           ),
         ),
         action: SnackBarAction(
           label: 'Dismiss',
-          textColor: MapColors.secondary,
           onPressed: () {},
         ),
       ),
@@ -1988,8 +1982,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
 
   String _routeBadgeText(int index) => 'Option ${index + 1}';
 
-  Color _badgeTextColor(Color background) {
-    return background.computeLuminance() > 0.55 ? MapColors.text : Colors.white;
+  Color _badgeTextColor(Color background, ColorScheme colorScheme) {
+    return background.computeLuminance() > 0.55
+        ? colorScheme.onSurface
+        : colorScheme.surface;
   }
 
   void _fitRouteOrStartEnd() {
@@ -2254,20 +2250,25 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     return _iconForManeuver(instruction.maneuverType);
   }
 
-  Color _colorForManeuver(NavigateManeuverType maneuver) {
+  Color _colorForManeuver(
+    NavigateManeuverType maneuver,
+    ColorScheme colorScheme,
+  ) {
     return switch (maneuver) {
-      NavigateManeuverType.board => MapColors.primary,
-      NavigateManeuverType.alight => MapColors.accent,
-      NavigateManeuverType.depart => MapColors.secondary,
-      NavigateManeuverType.turn => MapColors.text,
-      NavigateManeuverType.arrive => MapColors.accent,
-      NavigateManeuverType.unknown => MapColors.text.withValues(alpha: 0.7),
+      NavigateManeuverType.board => colorScheme.primary,
+      NavigateManeuverType.alight => colorScheme.tertiary,
+      NavigateManeuverType.depart => colorScheme.secondary,
+      NavigateManeuverType.turn => colorScheme.onSurface,
+      NavigateManeuverType.arrive => colorScheme.tertiary,
+      NavigateManeuverType.unknown => colorScheme.onSurfaceVariant,
     };
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_online) {
+      final colorScheme = Theme.of(context).colorScheme;
+      final textTheme = Theme.of(context).textTheme;
       return Scaffold(
         body: SafeArea(
           child: Padding(
@@ -2278,23 +2279,22 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                 Icon(
                   Icons.wifi_off_rounded,
                   size: 56,
-                  color: MapColors.text.withValues(alpha: 0.45),
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
                 const SizedBox(height: 20),
                 Text(
                   'Go is not available offline.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'Switch to the Routes tab to browse routes while you are offline.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: MapColors.text.withValues(alpha: 0.72),
-                    fontSize: 15,
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -2319,13 +2319,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           children: [
           Positioned.fill(
             child: mapStyle == null
-                ? ColoredBox(
-                    color: MapColors.background,
+                ? const ColoredBox(
+                    color: MapColors.mapCanvasPlaceholder,
                     child: Center(
-                      child: CircularProgressIndicator(
-                        color: MapColors.primary.withValues(alpha: 0.85),
-                        strokeWidth: 2.5,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
                     ),
                   )
                 : JippyMapCanvas(
@@ -2513,6 +2510,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final body = isOrigin
         ? 'Move the map so the crosshair points to your starting location.'
         : 'Move the map so the crosshair points to your destination.';
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return ListView(
       controller: scrollController,
@@ -2520,18 +2519,13 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            color: MapColors.text,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
         Text(
           body,
-          style: TextStyle(
-            color: MapColors.text.withValues(alpha: 0.78),
-            fontSize: 14,
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
             height: 1.35,
             fontWeight: FontWeight.w600,
           ),
@@ -2544,9 +2538,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                 onPressed: _cancelMapPinMode,
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(44),
-                  side: BorderSide(
-                    color: MapColors.text.withValues(alpha: 0.18),
-                  ),
                 ),
                 child: const Text('Cancel'),
               ),
@@ -2556,13 +2547,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               child: FilledButton(
                 onPressed: _confirmMapPinFromCenter,
                 style: FilledButton.styleFrom(
-                  backgroundColor: MapColors.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: colorScheme.onPrimary,
                   minimumSize: const Size.fromHeight(44),
                 ),
-                child: const Text(
+                child: Text(
                   'Confirm pin',
-                  style: TextStyle(fontWeight: FontWeight.w700),
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -2573,26 +2566,25 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildNavigatingSheetBody(ScrollController scrollController) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final tracker = _navigationTracker;
     if (tracker == null || tracker.stops.isEmpty) {
       return ListView(
         controller: scrollController,
         padding: const EdgeInsets.fromLTRB(18, 2, 18, 20),
         children: [
-          const Text(
+          Text(
             'Navigating',
-            style: TextStyle(
-              color: MapColors.text,
-              fontSize: 22,
+            style: textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 12),
           Text(
             'Starting trip…',
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.72),
-              fontSize: 14,
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -2622,20 +2614,15 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(18, 2, 18, 20),
       children: [
-        const Text(
+        Text(
           'Navigating',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
         Text(
           'Next stop: $nextLabel',
-          style: TextStyle(
-            color: MapColors.text.withValues(alpha: 0.86),
-            fontSize: 14,
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurface.withValues(alpha: 0.86),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -2644,9 +2631,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           distanceMeters == null
               ? 'Waiting for GPS...'
               : '${distanceMeters.round()}m away',
-          style: TextStyle(
-            color: MapColors.text.withValues(alpha: 0.7),
-            fontSize: 13,
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -2656,35 +2642,33 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         FilledButton.icon(
           onPressed: _navigationBusy ? null : _endNavigating,
           style: FilledButton.styleFrom(
-            backgroundColor: MapColors.primary,
-            foregroundColor: Colors.white,
+            foregroundColor: colorScheme.onPrimary,
             minimumSize: const Size.fromHeight(46),
           ),
           icon: _navigationBusy
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: colorScheme.onPrimary,
                   ),
                 )
               : const Icon(Icons.stop_circle_outlined),
           label: Text(
             _navigationBusy ? 'Ending…' : 'End trip',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: textTheme.labelLarge?.copyWith(
+              color: colorScheme.onPrimary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         const SizedBox(height: 10),
-        Divider(color: MapColors.text.withValues(alpha: 0.12)),
+        const Divider(),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Itinerary',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
         ..._buildLegBlocks(withCompletedState: true),
@@ -2701,66 +2685,60 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final label = completedStops >= totalStops
         ? 'Arrived'
         : 'Stop ${(completedStops + 1).clamp(1, totalStops)} of $totalStops';
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _sheetSurfaceColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: MapColors.text.withValues(alpha: 0.1)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor: MapColors.text.withValues(alpha: 0.1),
-                valueColor: const AlwaysStoppedAnimation<Color>(
-                  MapColors.primary,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: TextStyle(
-              color: MapColors.text.withValues(alpha: 0.78),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildDebugSimulatorToggleTile() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 4, 6, 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MapColors.text.withValues(alpha: 0.12)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.bug_report_outlined,
             size: 18,
-            color: MapColors.text,
+            color: colorScheme.onSurface,
           ),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
               'Enable Trip Simulator (debug)',
-              style: TextStyle(
-                color: MapColors.text,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           Switch(
@@ -2781,6 +2759,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     final title = _selectedExploreLabel.trim().isEmpty
         ? 'Selected location'
         : _selectedExploreLabel;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return ListView(
       controller: scrollController,
@@ -2793,9 +2773,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MapColors.text,
-                  fontSize: 20,
+                style: textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -2810,27 +2788,25 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         const SizedBox(height: 6),
         Text(
           '${selectedPoint.latitude.toStringAsFixed(5)}, ${selectedPoint.longitude.toStringAsFixed(5)}',
-          style: TextStyle(
-            color: MapColors.text.withValues(alpha: 0.6),
-            fontSize: 13,
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
           style: FilledButton.styleFrom(
-            backgroundColor: MapColors.primary,
-            foregroundColor: Colors.white,
+            foregroundColor: colorScheme.onPrimary,
             minimumSize: const Size.fromHeight(46),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
           ),
           onPressed: _onDirectionsFromLocationDetail,
           icon: const Icon(Icons.navigation_rounded),
-          label: const Text(
+          label: Text(
             'Directions',
-            style: TextStyle(fontWeight: FontWeight.w800),
+            style: textTheme.labelLarge?.copyWith(
+              color: colorScheme.onPrimary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ],
@@ -2840,7 +2816,9 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   Widget _buildRouteSelectionSheetBody(ScrollController scrollController) {
     final selected = _selectedSuggestion;
     final showRouteError = _searchError != null && !_routePreviewLoading;
-    const errorColor = Color(0xFFB00020);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final errorColor = colorScheme.error;
 
     return Stack(
       fit: StackFit.expand,
@@ -2849,173 +2827,161 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           controller: scrollController,
           padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
           children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Route Suggestions',
-                          style: TextStyle(
-                            color: MapColors.text,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _resetToExplore,
-                        style: TextButton.styleFrom(
-                          foregroundColor: MapColors.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                        ),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ],
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Route Suggestions',
+                    style: textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  if (showRouteError) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: errorColor.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: errorColor.withValues(alpha: 0.25),
+                ),
+                TextButton(
+                  onPressed: _resetToExplore,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (showRouteError) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: errorColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: errorColor.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.error_outline_rounded,
+                          size: 18,
+                          color: errorColor,
                         ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons.error_outline_rounded,
-                                size: 18,
-                                color: errorColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _searchError!,
-                                  style: const TextStyle(
-                                    color: errorColor,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          OutlinedButton.icon(
-                            onPressed: _requestNavigationIfComplete,
-                            icon: const Icon(Icons.refresh_rounded, size: 18),
-                            label: const Text('Retry'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: MapColors.primary,
-                              textStyle: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ] else if (_routeSuggestions.isEmpty &&
-                      !_routePreviewLoading) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      'No route suggestions available yet.',
-                      style: TextStyle(
-                        color: MapColors.text.withValues(alpha: 0.72),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ] else ...[
-                    SizedBox(height: 96, child: _buildSuggestedRoutesStrip()),
-                    if (_routeSuggestions.length > 1) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.swipe_left_rounded,
-                            size: 14,
-                            color: MapColors.text.withValues(alpha: 0.55),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Swipe to see more route options',
-                            style: TextStyle(
-                              color: MapColors.text.withValues(alpha: 0.6),
-                              fontSize: 11,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _searchError!,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: errorColor,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                  ],
-                  if (selected != null) ...[
-                    const SizedBox(height: 10),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: MapColors.primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(46),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
                         ),
-                      ),
-                      onPressed: _navigationBusy ? null : _startNavigating,
-                      icon: _navigationBusy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.play_arrow_rounded),
-                      label: Text(
-                        _navigationBusy ? 'Starting…' : 'Start',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
+                      ],
                     ),
-                    if (kTripSimulatorEnabled) ...[
-                      const SizedBox(height: 10),
-                      _buildDebugSimulatorToggleTile(),
-                    ],
-                    const SizedBox(height: 14),
-                    Text(
-                      'Preview instructions',
-                      style: TextStyle(
-                        color: MapColors.text.withValues(alpha: 0.82),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_previewInstructionCount(selected) == 0)
-                      Text(
-                        'No step previews available for this suggestion.',
-                        style: TextStyle(
-                          color: MapColors.text.withValues(alpha: 0.72),
-                          fontSize: 13,
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _requestNavigationIfComplete,
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Retry'),
+                      style: OutlinedButton.styleFrom(
+                        textStyle: textTheme.labelLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
-                      )
-                    else
-                      ..._buildPreviewInstructionRows(selected),
+                      ),
+                    ),
                   ],
+                ),
+              ),
+            ] else if (_routeSuggestions.isEmpty && !_routePreviewLoading) ...[
+              const SizedBox(height: 10),
+              Text(
+                'No route suggestions available yet.',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ] else ...[
+              SizedBox(height: 96, child: _buildSuggestedRoutesStrip()),
+              if (_routeSuggestions.length > 1) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.swipe_left_rounded,
+                      size: 14,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Swipe to see more route options',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+            if (selected != null) ...[
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  foregroundColor: colorScheme.onPrimary,
+                  minimumSize: const Size.fromHeight(46),
+                ),
+                onPressed: _navigationBusy ? null : _startNavigating,
+                icon: _navigationBusy
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.onPrimary,
+                        ),
+                      )
+                    : const Icon(Icons.play_arrow_rounded),
+                label: Text(
+                  _navigationBusy ? 'Starting…' : 'Start',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (kTripSimulatorEnabled) ...[
+                const SizedBox(height: 10),
+                _buildDebugSimulatorToggleTile(),
+              ],
+              const SizedBox(height: 14),
+              Text(
+                'Preview instructions',
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.82),
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (_previewInstructionCount(selected) == 0)
+                Text(
+                  'No step previews available for this suggestion.',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              else
+                ..._buildPreviewInstructionRows(selected),
+            ],
           ],
         ),
         if (selected != null)
@@ -3028,6 +2994,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     const cardWidth = 182.0;
     const cardSpacing = 6.0;
     const trailingPadding = 36.0;
+    final colorScheme = Theme.of(context).colorScheme;
+    final sheetSurface = colorScheme.surfaceContainerLow;
 
     return Stack(
       children: [
@@ -3062,8 +3030,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     colors: [
-                      _sheetSurfaceColor.withValues(alpha: 0),
-                      _sheetSurfaceColor.withValues(alpha: 0.95),
+                      sheetSurface.withValues(alpha: 0),
+                      sheetSurface.withValues(alpha: 0.95),
                     ],
                   ),
                 ),
@@ -3071,7 +3039,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                 child: Icon(
                   Icons.chevron_right_rounded,
                   size: 20,
-                  color: MapColors.text.withValues(alpha: 0.5),
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -3085,9 +3053,11 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     required int index,
     required bool isSelected,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final accentColor = _accentColorForSuggestion(suggestion, index);
-    final badgeColor = index == 0 ? MapColors.primary : accentColor;
-    final badgeTextColor = _badgeTextColor(badgeColor);
+    final badgeColor = index == 0 ? colorScheme.primary : accentColor;
+    final badgeTextColor = _badgeTextColor(badgeColor, colorScheme);
     final badgeText = _routeBadgeText(index);
     final transitRideSummary = suggestion.transitRideSummary;
     final distance = _formatDistance(suggestion.totalDistanceMeters);
@@ -3104,19 +3074,22 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
           padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
           decoration: BoxDecoration(
             color: isSelected
-                ? MapColors.primary.withValues(alpha: 0.06)
-                : _sheetSurfaceColor,
+                ? Color.alphaBlend(
+                    colorScheme.primary.withValues(alpha: 0.08),
+                    colorScheme.surface,
+                  )
+                : colorScheme.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isSelected
-                  ? MapColors.primary
-                  : MapColors.text.withValues(alpha: 0.12),
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant,
               width: isSelected ? 2.5 : 1,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: MapColors.primary.withValues(alpha: 0.22),
+                      color: colorScheme.primary.withValues(alpha: 0.16),
                       blurRadius: 12,
                       offset: const Offset(0, 3),
                     ),
@@ -3152,7 +3125,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                           ),
                           child: Text(
                             badgeText,
-                            style: TextStyle(
+                            style: textTheme.labelSmall?.copyWith(
                               color: badgeTextColor,
                               fontSize: 8,
                               fontWeight: FontWeight.w800,
@@ -3167,11 +3140,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                       transitRideSummary,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isSelected
-                            ? MapColors.text
-                            : MapColors.text.withValues(alpha: 0.85),
-                        fontSize: 14,
+                      style: textTheme.titleSmall?.copyWith(
+                        color: colorScheme.onSurface,
                         fontWeight: FontWeight.w800,
                         height: 1.05,
                       ),
@@ -3181,11 +3151,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                       '$distance - $modeSummary',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isSelected
-                            ? MapColors.text.withValues(alpha: 0.82)
-                            : MapColors.text.withValues(alpha: 0.66),
-                        fontSize: 10,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -3200,6 +3167,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
   }
 
   List<Widget> _buildPreviewInstructionRows(NavigateSuggestion suggestion) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final widgets = <Widget>[];
     var rendered = 0;
     for (final leg in suggestion.route.legs) {
@@ -3223,9 +3192,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
               Expanded(
                 child: Text(
                   previewText,
-                  style: TextStyle(
-                    color: MapColors.text.withValues(alpha: 0.83),
-                    fontSize: 13,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.83),
                     fontWeight: FontWeight.w600,
                     height: 1.35,
                   ),
@@ -3337,6 +3305,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
       return const SizedBox.shrink();
     }
 
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final legTimelineBlocks = _buildLegBlocks();
 
     return ListView(
@@ -3348,9 +3318,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             Expanded(
               child: Text(
                 'Route Details',
-                style: const TextStyle(
-                  color: MapColors.text,
-                  fontSize: 24,
+                style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -3365,9 +3333,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         const SizedBox(height: 2),
         Text(
           '${_formatMinutes(selected.totalDurationMinutes)} - ${_formatDistance(selected.totalDistanceMeters)}',
-          style: TextStyle(
-            color: MapColors.text.withValues(alpha: 0.72),
-            fontSize: 14,
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -3379,9 +3346,6 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
             label: const Text('Show all step-by-step'),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(42),
-              side: BorderSide(
-                color: MapColors.text.withValues(alpha: 0.2),
-              ),
             ),
           ),
         ],
@@ -3447,6 +3411,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
     bool isCompleted = false,
     required VoidCallback onTap,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     var boardCount = boardCountBeforeLeg;
     final baseLabel = leg.type == NavigateLegType.jeepney
         ? 'Jeep'
@@ -3455,17 +3421,17 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
         ? baseLabel
         : '$baseLabel $jeepStepNumber';
     final timelineColor = isCompleted
-        ? MapColors.text.withValues(alpha: 0.26)
-        : _timelineSubtleLineColor;
+        ? colorScheme.onSurface.withValues(alpha: 0.26)
+        : colorScheme.outlineVariant;
     final iconColor = isCompleted
-        ? MapColors.text.withValues(alpha: 0.44)
-        : MapColors.text;
+        ? colorScheme.onSurface.withValues(alpha: 0.44)
+        : colorScheme.onSurface;
     final titleColor = isCompleted
-        ? MapColors.text.withValues(alpha: 0.48)
-        : MapColors.text;
+        ? colorScheme.onSurface.withValues(alpha: 0.48)
+        : colorScheme.onSurface;
     final bodyColor = isCompleted
-        ? MapColors.text.withValues(alpha: 0.42)
-        : MapColors.text;
+        ? colorScheme.onSurface.withValues(alpha: 0.42)
+        : colorScheme.onSurface;
 
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
@@ -3482,7 +3448,7 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                     height: 30,
                     decoration: BoxDecoration(
                       color: isCompleted
-                          ? MapColors.text.withValues(alpha: 0.08)
+                          ? colorScheme.onSurface.withValues(alpha: 0.08)
                           : _colorForLeg(leg).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(99),
                     ),
@@ -3516,12 +3482,12 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                   child: Container(
                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                     decoration: BoxDecoration(
-                      color: _sheetSurfaceColor,
+                      color: colorScheme.surface,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: (isIsolated || isCurrent)
-                            ? MapColors.primary.withValues(alpha: 0.55)
-                            : MapColors.text.withValues(alpha: 0.1),
+                            ? colorScheme.primary.withValues(alpha: 0.55)
+                            : colorScheme.outlineVariant,
                         width: (isIsolated || isCurrent) ? 1.6 : 1,
                       ),
                     ),
@@ -3533,9 +3499,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             Expanded(
                               child: Text(
                                 stepLabel,
-                                style: TextStyle(
+                                style: textTheme.titleSmall?.copyWith(
                                   color: titleColor,
-                                  fontSize: 15,
                                   fontWeight: isCompleted
                                       ? FontWeight.w700
                                       : FontWeight.w800,
@@ -3544,9 +3509,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             ),
                             Text(
                               _formatMinutes(leg.durationMinutes),
-                              style: TextStyle(
+                              style: textTheme.labelMedium?.copyWith(
                                 color: bodyColor.withValues(alpha: 0.74),
-                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -3556,9 +3520,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                           const SizedBox(height: 2),
                           Text(
                             _legRouteDisplayName(leg),
-                            style: TextStyle(
+                            style: textTheme.bodySmall?.copyWith(
                               color: bodyColor.withValues(alpha: 0.84),
-                              fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -3572,9 +3535,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                         const SizedBox(height: 4),
                         Text(
                           _formatDistance(leg.distanceMeters),
-                          style: TextStyle(
+                          style: textTheme.labelMedium?.copyWith(
                             color: bodyColor.withValues(alpha: 0.65),
-                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -3582,9 +3544,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                           const SizedBox(height: 8),
                           Text(
                             'Completed',
-                            style: TextStyle(
-                              color: MapColors.text.withValues(alpha: 0.46),
-                              fontSize: 12,
+                            style: textTheme.labelMedium?.copyWith(
+                              color: colorScheme.onSurface.withValues(
+                                alpha: 0.46,
+                              ),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -3593,11 +3556,10 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                             const SizedBox(height: 8),
                             Text(
                               'Current step',
-                              style: TextStyle(
-                                color: MapColors.primary.withValues(
+                              style: textTheme.labelMedium?.copyWith(
+                                color: colorScheme.primary.withValues(
                                   alpha: 0.82,
                                 ),
-                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -3606,9 +3568,8 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                           if (leg.instructions.isEmpty)
                             Text(
                               'No detailed instructions for this leg.',
-                              style: TextStyle(
-                                color: MapColors.text.withValues(alpha: 0.68),
-                                fontSize: 12,
+                              style: textTheme.labelMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
                                 fontWeight: FontWeight.w600,
                               ),
                             )
@@ -3646,17 +3607,18 @@ class _GoScreenState extends State<GoScreen> with WidgetsBindingObserver {
                                           size: 15,
                                           color: _colorForManeuver(
                                             instruction.maneuverType,
+                                            colorScheme,
                                           ),
                                         ),
                                         const SizedBox(width: 7),
                                         Expanded(
                                           child: Text(
                                             instruction.text,
-                                            style: TextStyle(
+                                            style: textTheme.bodySmall
+                                                ?.copyWith(
                                               color: bodyColor.withValues(
                                                 alpha: 0.8,
                                               ),
-                                              fontSize: 13,
                                               fontWeight: FontWeight.w600,
                                               height: 1.33,
                                             ),
@@ -3719,19 +3681,14 @@ class _SheetSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: MapColors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(color: MapColors.text.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: MapColors.text.withValues(alpha: 0.13),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: colorScheme.surfaceContainerLow,
+      elevation: 1,
+      shadowColor: colorScheme.shadow,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           SheetDragHandle(
@@ -3742,7 +3699,7 @@ class _SheetSurface extends StatelessWidget {
             snapSizes: _sheetSnapSizes,
             barWidth: 44,
             barHeight: 5,
-            barColor: MapColors.text.withValues(alpha: 0.22),
+            barColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
             barBorderRadius: 999,
           ),
           Expanded(child: child),

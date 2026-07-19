@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
-
 /// Drag handle for [DraggableScrollableSheet] content that resizes the sheet
 /// independently of any nested scroll view. Useful when the user has scrolled
 /// deep inside the sheet and still wants to collapse it from the handle.
@@ -70,9 +68,10 @@ class SheetDragHandle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final resolvedBarColor =
-        barColor ?? MapColors.text.withValues(alpha: 0.3);
+        barColor ?? colorScheme.onSurfaceVariant.withValues(alpha: 0.4);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
