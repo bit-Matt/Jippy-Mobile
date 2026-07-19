@@ -5,7 +5,6 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/billing_config.dart';
-import '../../core/theme/map_colors.dart';
 import '../../services/entitlement_service.dart';
 import '../../services/subscription_service.dart';
 
@@ -17,10 +16,7 @@ Future<void> showPaywallSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: MapColors.background,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
+    showDragHandle: true,
     builder: (_) => const _PaywallSheet(),
   );
 }
@@ -59,9 +55,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openUrl(String url) async {
@@ -72,6 +66,8 @@ class _PaywallSheetState extends State<_PaywallSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Padding(
@@ -83,24 +79,48 @@ class _PaywallSheetState extends State<_PaywallSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSheetHandle(),
-              const SizedBox(height: 18),
-              _buildHeader(),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.workspace_premium_outlined,
+                    color: colorScheme.primary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Jippy Premium',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
-              _buildSubtitle(),
+              Text(
+                'Save routes and their details for offline access — '
+                'navigate even without a connection.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 18),
-              _buildFeature('Offline access to routes & stops'),
-              _buildFeature('Route details available without a connection'),
+              _buildFeature(context, 'Offline access to routes & stops'),
               _buildFeature(
+                context,
+                'Route details available without a connection',
+              ),
+              _buildFeature(
+                context,
                 kPseudoBillingEnabled
                     ? 'Sandbox mode — no real charge'
                     : 'Cancel anytime from Google Play',
               ),
               const SizedBox(height: 20),
               if (kPseudoBillingEnabled) ...[
-                _buildSandboxBanner(),
+                _buildSandboxBanner(context),
                 const SizedBox(height: 12),
-                _buildSandboxPriceCard(),
+                _buildSandboxPriceCard(context),
                 const SizedBox(height: 16),
                 _buildSandboxSubscribeButton(),
                 const SizedBox(height: 8),
@@ -114,13 +134,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                             ? null
                             : () => SubscriptionService.instance
                                 .resetSandboxPremium(),
-                        child: Text(
-                          'Reset sandbox subscription',
-                          style: TextStyle(
-                            color: MapColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: const Text('Reset sandbox subscription'),
                       );
                     },
                   ),
@@ -130,14 +144,12 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                   'Internal testing only. This simulates a Google Play '
                   'subscription checkout without charging your account. '
                   'Use Reset to test the locked state again.',
-                  style: TextStyle(
-                    color: MapColors.text.withValues(alpha: 0.55),
-                    fontSize: 11,
-                    height: 1.35,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ] else ...[
-                _buildPriceCard(),
+                _buildPriceCard(context),
                 const SizedBox(height: 16),
                 _buildSubscribeButton(),
                 const SizedBox(height: 8),
@@ -150,13 +162,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                         onPressed: pending
                             ? null
                             : () => SubscriptionService.instance.restore(),
-                        child: Text(
-                          'Restore purchases',
-                          style: TextStyle(
-                            color: MapColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: const Text('Restore purchases'),
                       );
                     },
                   ),
@@ -167,14 +173,12 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                   'your Google Play account and renews automatically until '
                   'canceled at least 24 hours before the end of the current '
                   'period. Manage or cancel anytime in Google Play.',
-                  style: TextStyle(
-                    color: MapColors.text.withValues(alpha: 0.55),
-                    fontSize: 11,
-                    height: 1.35,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
-              _buildLegalLinks(),
+              _buildLegalLinks(context),
             ],
           ),
         ),
@@ -182,123 +186,80 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     );
   }
 
-  Widget _buildSheetHandle() {
-    return Center(
-      child: Container(
-        width: 40,
-        height: 4,
-        decoration: BoxDecoration(
-          color: MapColors.text.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
+  Widget _buildSandboxBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        Icon(Icons.workspace_premium_outlined,
-            color: MapColors.primary, size: 28),
-        const SizedBox(width: 10),
-        const Text(
-          'Jippy Premium',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSubtitle() {
-    return Text(
-      'Save routes and their details for offline access — '
-      'navigate even without a connection.',
-      style: TextStyle(
-        color: MapColors.text.withValues(alpha: 0.7),
-        fontSize: 14,
-        height: 1.35,
-      ),
-    );
-  }
-
-  Widget _buildSandboxBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: MapColors.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: MapColors.accent.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.science_outlined, color: MapColors.accent, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Sandbox checkout — mimics Google Play for internal testing. '
-              'No payment is collected.',
-              style: TextStyle(
-                color: MapColors.text.withValues(alpha: 0.85),
-                fontSize: 12,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
+    return Material(
+      color: colorScheme.tertiaryContainer,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.science_outlined,
+              color: colorScheme.onTertiaryContainer,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Sandbox checkout — mimics Google Play for internal testing. '
+                'No payment is collected.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onTertiaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSandboxPriceCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MapColors.primary.withValues(alpha: 0.3)),
-        color: MapColors.primary.withValues(alpha: 0.05),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Premium (Offline Routes)',
-                  style: TextStyle(
-                    color: MapColors.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+  Widget _buildSandboxPriceCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      color: colorScheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Premium (Offline Routes)',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Billed $premiumOfflineBasePlanId · sandbox',
-                  style: TextStyle(
-                    color: MapColors.text.withValues(alpha: 0.6),
-                    fontSize: 12,
+                  const SizedBox(height: 2),
+                  Text(
+                    'Billed $premiumOfflineBasePlanId · sandbox',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Text(
-            sandboxPremiumPriceLabel,
-            style: TextStyle(
-              color: MapColors.primary,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
+            Text(
+              sandboxPremiumPriceLabel,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -307,6 +268,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     return ValueListenableBuilder<bool>(
       valueListenable: SubscriptionService.instance.purchasePending,
       builder: (context, pending, _) {
+        final colorScheme = Theme.of(context).colorScheme;
         return SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
@@ -314,26 +276,17 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                 ? null
                 : () => SubscriptionService.instance.grantSandboxPremium(),
             icon: pending
-                ? const SizedBox(
+                ? SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: colorScheme.onPrimary,
                     ),
                   )
                 : const Icon(Icons.lock_open_outlined),
             label: Text(
               pending ? 'Processing…' : 'Confirm sandbox subscription',
-            ),
-            style: FilledButton.styleFrom(
-              backgroundColor: MapColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              textStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
             ),
           ),
         );
@@ -341,20 +294,21 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     );
   }
 
-  Widget _buildFeature(String text) {
+  Widget _buildFeature(BuildContext context, String text) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.check_circle, color: MapColors.primary, size: 20),
+          Icon(Icons.check_circle, color: colorScheme.primary, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                color: MapColors.text,
-                fontSize: 14,
+              style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -364,7 +318,10 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     );
   }
 
-  Widget _buildPriceCard() {
+  Widget _buildPriceCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return ValueListenableBuilder<List<ProductDetails>>(
       valueListenable: SubscriptionService.instance.products,
       builder: (context, _, _) {
@@ -373,48 +330,42 @@ class _PaywallSheetState extends State<_PaywallSheet> {
         final title = product?.title.isNotEmpty == true
             ? product!.title
             : 'Premium (Offline Routes)';
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: MapColors.primary.withValues(alpha: 0.3)),
-            color: MapColors.primary.withValues(alpha: 0.05),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _stripAppName(title),
-                      style: const TextStyle(
-                        color: MapColors.text,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+        return Card(
+          color: colorScheme.primaryContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _stripAppName(title),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Billed $premiumOfflineBasePlanId',
-                      style: TextStyle(
-                        color: MapColors.text.withValues(alpha: 0.6),
-                        fontSize: 12,
+                      const SizedBox(height: 2),
+                      Text(
+                        'Billed $premiumOfflineBasePlanId',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Text(
-                priceText,
-                style: TextStyle(
-                  color: MapColors.primary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+                Text(
+                  priceText,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -428,6 +379,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
         return ValueListenableBuilder<List<ProductDetails>>(
           valueListenable: SubscriptionService.instance.products,
           builder: (context, _, _) {
+            final colorScheme = Theme.of(context).colorScheme;
             final hasProduct =
                 SubscriptionService.instance.premiumProduct != null;
             final disabled = pending || !hasProduct;
@@ -438,25 +390,16 @@ class _PaywallSheetState extends State<_PaywallSheet> {
                     ? null
                     : () => SubscriptionService.instance.buyPremium(),
                 icon: pending
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: colorScheme.onPrimary,
                         ),
                       )
                     : const Icon(Icons.lock_open_outlined),
                 label: Text(pending ? 'Processing…' : 'Subscribe'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: MapColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
               ),
             );
           },
@@ -465,13 +408,13 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     );
   }
 
-  Widget _buildLegalLinks() {
+  Widget _buildLegalLinks(BuildContext context) {
     final links = <Widget>[];
     if (premiumTermsUrl != null) {
-      links.add(_linkButton('Terms', premiumTermsUrl!));
+      links.add(_linkButton(context, 'Terms', premiumTermsUrl!));
     }
     if (premiumPrivacyUrl != null) {
-      links.add(_linkButton('Privacy Policy', premiumPrivacyUrl!));
+      links.add(_linkButton(context, 'Privacy Policy', premiumPrivacyUrl!));
     }
     if (links.isEmpty) return const SizedBox.shrink();
 
@@ -481,7 +424,7 @@ class _PaywallSheetState extends State<_PaywallSheet> {
     );
   }
 
-  Widget _linkButton(String label, String url) {
+  Widget _linkButton(BuildContext context, String label, String url) {
     return TextButton(
       onPressed: () => _openUrl(url),
       style: TextButton.styleFrom(
@@ -491,11 +434,10 @@ class _PaywallSheetState extends State<_PaywallSheet> {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: MapColors.text.withValues(alpha: 0.6),
-          fontSize: 12,
-          decoration: TextDecoration.underline,
-        ),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              decoration: TextDecoration.underline,
+            ),
       ),
     );
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
 import 'package:jippy_mobile/screens/go_screen/go_state.dart';
 import 'package:jippy_mobile/services/geocoding_service.dart';
 
@@ -81,18 +80,21 @@ class _CollapsedBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Material(
       elevation: 2,
-      shadowColor: Colors.black26,
+      shadowColor: colorScheme.shadow.withValues(alpha: 0.3),
       borderRadius: BorderRadius.circular(24),
-      color: MapColors.background,
+      color: colorScheme.surfaceContainerHighest,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: Row(
           children: [
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Icon(Icons.search, color: MapColors.primary, size: 24),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Icon(Icons.search, color: colorScheme.primary, size: 24),
             ),
             Expanded(
               child: GestureDetector(
@@ -102,10 +104,8 @@ class _CollapsedBar extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(0, 14, 12, 14),
                   child: Text(
                     'Where do you want to go?',
-                    style: TextStyle(
-                      color: MapColors.text.withValues(alpha: 0.6),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -157,13 +157,14 @@ class _RoutingHeaderPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mutedText = MapColors.text.withValues(alpha: 0.6);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Material(
       elevation: 3,
-      shadowColor: Colors.black26,
+      shadowColor: colorScheme.shadow.withValues(alpha: 0.3),
       borderRadius: BorderRadius.circular(20),
-      color: MapColors.background,
+      color: colorScheme.surfaceContainerLow,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
         child: Column(
@@ -172,7 +173,7 @@ class _RoutingHeaderPanel extends StatelessWidget {
           children: [
             _RoutingInputRow(
               icon: Icons.place_rounded,
-              iconColor: MapColors.primary,
+              iconColor: colorScheme.primary,
               controller: startController,
               focusNode: startFocusNode,
               hintText: 'Choose starting point',
@@ -184,7 +185,7 @@ class _RoutingHeaderPanel extends StatelessWidget {
             const SizedBox(height: 6),
             _RoutingInputRow(
               icon: Icons.place_rounded,
-              iconColor: MapColors.secondary,
+              iconColor: colorScheme.secondary,
               controller: endController,
               focusNode: endFocusNode,
               hintText: 'Search destination',
@@ -204,14 +205,12 @@ class _RoutingHeaderPanel extends StatelessWidget {
                   icon: const Icon(Icons.my_location, size: 18),
                   label: const Text('Use my current location'),
                   style: TextButton.styleFrom(
-                    foregroundColor: MapColors.primary,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 6,
                       vertical: 4,
                     ),
-                    textStyle: const TextStyle(
+                    textStyle: textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w600,
-                      fontSize: 13,
                     ),
                   ),
                 ),
@@ -221,16 +220,17 @@ class _RoutingHeaderPanel extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 searchError!,
-                style: const TextStyle(color: Color(0xFFB00020), fontSize: 13),
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.error,
+                ),
               ),
             ],
             if (showOutOfAreaDisclaimer) ...[
               const SizedBox(height: 6),
               Text(
                 'This destination is outside the covered area - results may be limited.',
-                style: TextStyle(
-                  color: MapColors.text.withValues(alpha: 0.72),
-                  fontSize: 12,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -238,9 +238,8 @@ class _RoutingHeaderPanel extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 'Results for ${activeRoutingField == GoRoutingField.start ? 'Start' : 'End'}',
-                style: TextStyle(
-                  color: mutedText,
-                  fontSize: 12,
+                style: textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -261,7 +260,7 @@ class _RoutingHeaderPanel extends StatelessWidget {
                         hit.displayName,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14),
+                        style: textTheme.bodyMedium,
                       ),
                       onTap: () => onSuggestionTap(hit),
                     );
@@ -305,6 +304,8 @@ class _RoutingInputRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     void handleTextFieldTap() {
       onTap();
       final text = controller.text;
@@ -325,10 +326,10 @@ class _RoutingInputRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isActive
-                  ? MapColors.primary.withValues(alpha: 0.65)
-                  : MapColors.text.withValues(alpha: 0.14),
+                  ? colorScheme.primary.withValues(alpha: 0.65)
+                  : colorScheme.outlineVariant,
             ),
-            color: MapColors.background,
+            color: colorScheme.surfaceContainerHighest,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
@@ -345,7 +346,10 @@ class _RoutingInputRow extends StatelessWidget {
                   textInputAction: textInputAction,
                   decoration: InputDecoration(
                     isDense: true,
+                    filled: false,
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
                     hintText: hintText,
                   ),
                 ),
@@ -374,24 +378,23 @@ class GoManualPinLocationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 2,
-      shadowColor: Colors.black26,
-      color: MapColors.primary,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          child: Text(
-            'Manually pin location',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return FilledButton(
+      onPressed: onTap,
+      style: FilledButton.styleFrom(
+        foregroundColor: colorScheme.onPrimary,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: const StadiumBorder(),
+      ),
+      child: Text(
+        'Manually pin location',
+        style: textTheme.labelLarge?.copyWith(
+          color: colorScheme.onPrimary,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

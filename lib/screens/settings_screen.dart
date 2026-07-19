@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../core/theme/map_colors.dart';
 import '../models/entitlement.dart';
 import '../services/entitlement_service.dart';
 import 'offline_maps_screen.dart';
@@ -12,35 +11,48 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final topPadding = MediaQuery.paddingOf(context).top + 16;
 
     return ListView(
       padding: EdgeInsets.fromLTRB(16, topPadding, 16, 8),
       children: [
-        const Text(
+        Text(
           'Settings',
-          style: TextStyle(
-            color: MapColors.text,
-            fontSize: 34,
-            fontWeight: FontWeight.w800,
-            height: 1,
+          style: theme.textTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 16),
-        _buildSettingsSection(
+        _SettingsSection(
           title: 'Maps',
           children: [
             ValueListenableBuilder<Entitlement>(
               valueListenable: EntitlementService.instance.listenable,
               builder: (context, entitlement, child) {
                 final locked = !EntitlementService.instance.premiumUnlocked;
-                return _SettingsTile(
-                  icon: Icons.map_outlined,
-                  title: 'Offline Map',
-                  subtitle: locked
-                      ? 'Premium · download Iloilo map, routes & regions'
-                      : 'Download Iloilo map, routes & regions',
-                  trailing: locked ? const _ProBadge() : null,
+                return ListTile(
+                  leading: Icon(Icons.map_outlined, color: colorScheme.primary),
+                  title: const Text('Offline Map'),
+                  subtitle: Text(
+                    locked
+                        ? 'Premium · download Iloilo map, routes & regions'
+                        : 'Download Iloilo map, routes & regions',
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (locked) ...[
+                        const _ProBadge(),
+                        const SizedBox(width: 4),
+                      ],
+                      Icon(
+                        Icons.chevron_right,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
@@ -55,13 +67,22 @@ class SettingsScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        _buildSettingsSection(
+        _SettingsSection(
           title: 'Support',
           children: [
-            _SettingsTile(
-              icon: Icons.bug_report_outlined,
-              title: 'Report an Issue',
-              subtitle: 'Help us improve Jippy with your feedback',
+            ListTile(
+              leading: Icon(
+                Icons.bug_report_outlined,
+                color: colorScheme.primary,
+              ),
+              title: const Text('Report an Issue'),
+              subtitle: const Text(
+                'Help us improve Jippy with your feedback',
+              ),
+              trailing: Icon(
+                Icons.chevron_right,
+                color: colorScheme.onSurfaceVariant,
+              ),
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -78,124 +99,43 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-Widget _buildSettingsSection({
-  required String title,
-  required List<Widget> children,
-}) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.only(left: 12, bottom: 8),
-        child: Text(
-          title,
-          style: const TextStyle(
-            color: MapColors.text,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ),
-      Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: MapColors.primary.withValues(alpha: 0.18),
-          ),
-          color: MapColors.background,
-        ),
-        child: Column(
-          children: [
-            for (int i = 0; i < children.length; i++) ...[
-              children[i],
-              if (i < children.length - 1)
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: MapColors.text.withValues(alpha: 0.08),
-                  indent: 0,
-                  endIndent: 0,
-                ),
-            ],
-          ],
-        ),
-      ),
-    ],
-  );
-}
-
-/// Individual settings menu item with icon, title, and subtitle.
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.icon,
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({
     required this.title,
-    this.subtitle,
-    this.trailing,
-    this.onTap,
+    required this.children,
   });
 
-  final IconData icon;
   final String title;
-  final String? subtitle;
-  final Widget? trailing;
-  final VoidCallback? onTap;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Card(
+          child: Column(
             children: [
-              Icon(
-                icon,
-                color: MapColors.primary,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: MapColors.text,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle!,
-                        style: TextStyle(
-                          color: MapColors.text.withValues(alpha: 0.65),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (trailing != null) ...[
-                trailing!,
-                const SizedBox(width: 4),
+              for (int i = 0; i < children.length; i++) ...[
+                children[i],
+                if (i < children.length - 1) const Divider(height: 1),
               ],
-              Icon(
-                Icons.chevron_right,
-                color: MapColors.text.withValues(alpha: 0.4),
-                size: 20,
-              ),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -205,25 +145,30 @@ class _ProBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: MapColors.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.lock_outline, size: 12, color: MapColors.primary),
+          Icon(
+            Icons.lock_outline,
+            size: 12,
+            color: colorScheme.onSecondaryContainer,
+          ),
           const SizedBox(width: 4),
           Text(
             'PRO',
-            style: TextStyle(
-              color: MapColors.primary,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
           ),
         ],
       ),

@@ -72,6 +72,8 @@ class NavigateSuggestion {
 
   double get totalDurationMinutes => route.totalDurationMinutes;
 
+  double get totalFare => route.resolvedTotalFare;
+
   int get boardCount {
     var count = 0;
     for (final leg in route.legs) {
@@ -154,13 +156,21 @@ int compareNavigateSuggestions(NavigateSuggestion a, NavigateSuggestion b) {
 }
 
 class NavigateRoute {
-  const NavigateRoute({required this.legs});
+  const NavigateRoute({
+    required this.legs,
+    this.totalFare,
+  });
 
   final List<NavigateLeg> legs;
 
+  /// Server-provided total when present; otherwise derived from leg fares.
+  final double? totalFare;
+
   static NavigateRoute fromJson(Map<String, dynamic> json) {
     final rawLegs = json['legs'];
-    if (rawLegs is! List) return const NavigateRoute(legs: []);
+    if (rawLegs is! List) {
+      return const NavigateRoute(legs: []);
+    }
 
     final legs = <NavigateLeg>[];
     for (final item in rawLegs) {
@@ -169,7 +179,10 @@ class NavigateRoute {
       if (parsed != null) legs.add(parsed);
     }
 
-    return NavigateRoute(legs: legs);
+    return NavigateRoute(
+      legs: legs,
+      totalFare: _toDouble(json['total_fare'] ?? json['totalFare']),
+    );
   }
 
   double get totalDistanceMeters {
@@ -187,6 +200,17 @@ class NavigateRoute {
     }
     return total;
   }
+
+  /// Prefer API [totalFare]; fall back to summing leg fares.
+  double get resolvedTotalFare {
+    final provided = totalFare;
+    if (provided != null) return provided;
+    var total = 0.0;
+    for (final leg in legs) {
+      total += leg.fare;
+    }
+    return total;
+  }
 }
 
 class NavigateLeg {
@@ -199,6 +223,7 @@ class NavigateLeg {
     required this.colorHex,
     required this.distanceMeters,
     required this.durationMinutes,
+    required this.fare,
     required this.instructions,
     required this.bbox,
   });
@@ -211,6 +236,7 @@ class NavigateLeg {
   final String? colorHex;
   final double distanceMeters;
   final double durationMinutes;
+  final double fare;
   final List<NavigateInstruction> instructions;
   final List<NavigatePoint> bbox;
 
@@ -245,6 +271,7 @@ class NavigateLeg {
       colorHex: _normalizeNullableString(json['color']),
       distanceMeters: _toDouble(json['distance']) ?? 0,
       durationMinutes: durationSeconds / 60,
+      fare: _toDouble(json['fare']) ?? 0,
       instructions: instructions,
       bbox: bbox,
     );

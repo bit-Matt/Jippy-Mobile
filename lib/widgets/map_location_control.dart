@@ -5,8 +5,6 @@ import 'dart:ui' show lerpDouble;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'package:jippy_mobile/core/theme/map_colors.dart';
-
 /// Floating map control that tracks the bottom drawer's top edge and indicates
 /// whether user location is on or off.
 ///
@@ -166,19 +164,22 @@ class _LocationOnButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Material(
-      color: MapColors.background,
-      borderRadius: BorderRadius.circular(14),
+      color: colorScheme.surfaceContainerHigh,
       elevation: 2,
+      shadowColor: colorScheme.shadow,
+      shape: const CircleBorder(),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        customBorder: const CircleBorder(),
         child: SizedBox(
           width: size,
           height: size,
           child: Icon(
             isFollowing ? Icons.gps_fixed : Icons.gps_not_fixed,
-            color: MapColors.primary,
+            color: colorScheme.primary,
             size: 24,
           ),
         ),
@@ -202,6 +203,8 @@ class _LocationOffBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     final screenWidth = MediaQuery.sizeOf(context).width;
     const horizontalMargin = 16.0;
     final expandedWidth = math.min(
@@ -217,9 +220,10 @@ class _LocationOffBanner extends StatelessWidget {
         final textOpacity = progress.clamp(0.0, 1.0);
 
         return Material(
-          color: MapColors.background,
-          borderRadius: BorderRadius.circular(14),
+          color: colorScheme.surfaceContainerHigh,
           elevation: 2,
+          shadowColor: colorScheme.shadow,
+          borderRadius: BorderRadius.circular(24),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
@@ -239,9 +243,8 @@ class _LocationOffBanner extends StatelessWidget {
                             message,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: MapColors.text.withValues(alpha: 0.85),
-                              fontSize: 13,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: colorScheme.onSurface,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -253,7 +256,7 @@ class _LocationOffBanner extends StatelessWidget {
                     height: buttonSize,
                     child: Icon(
                       Icons.location_off,
-                      color: MapColors.text.withValues(alpha: 0.7),
+                      color: colorScheme.onSurfaceVariant,
                       size: 24,
                     ),
                   ),

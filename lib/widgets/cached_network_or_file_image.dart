@@ -2,8 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../core/theme/map_colors.dart';
-
 /// Loads a remote URL or a local file path (offline cache).
 class CachedNetworkOrFileImage extends StatelessWidget {
   const CachedNetworkOrFileImage({
@@ -12,7 +10,7 @@ class CachedNetworkOrFileImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.loadingSize = 22,
     this.errorIconSize = 32,
-    this.loadingColor = Colors.white,
+    this.loadingColor,
     this.errorIconColor,
   });
 
@@ -20,7 +18,7 @@ class CachedNetworkOrFileImage extends StatelessWidget {
   final BoxFit fit;
   final double loadingSize;
   final double errorIconSize;
-  final Color loadingColor;
+  final Color? loadingColor;
   final Color? errorIconColor;
 
   bool get _isLocalFile {
@@ -41,8 +39,11 @@ class CachedNetworkOrFileImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final resolvedErrorColor =
-        errorIconColor ?? MapColors.text.withValues(alpha: 0.35);
+        errorIconColor ?? colorScheme.onSurfaceVariant.withValues(alpha: 0.5);
+    final resolvedLoadingColor =
+        loadingColor ?? colorScheme.primary.withValues(alpha: 0.6);
 
     if (_isLocalFile) {
       return Image.file(
@@ -67,9 +68,7 @@ class CachedNetworkOrFileImage extends StatelessWidget {
             height: loadingSize,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: loadingColor == Colors.white
-                  ? loadingColor
-                  : MapColors.primary.withValues(alpha: 0.6),
+              color: resolvedLoadingColor,
               value: loadingProgress.expectedTotalBytes != null
                   ? loadingProgress.cumulativeBytesLoaded /
                         loadingProgress.expectedTotalBytes!

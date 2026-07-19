@@ -1,18 +1,29 @@
 import 'package:flutter/material.dart';
 
-/// Design system colors and stroke widths for map route rendering.
-/// Used for polylines (jeepney routes, walking paths, A* result segments).
+/// Domain colors and stroke widths for map route rendering.
+///
+/// UI chrome should use [ThemeData.colorScheme] instead. These tokens remain
+/// for polylines, markers, and other map-domain styling.
 class MapColors {
   MapColors._();
 
-  // --- Design system (from design_system.md) ---
-  static const Color background = Color(0xFFfefaf5); // Off-white
-  static const Color text = Color(0xFF0d0902); // Dark ink
-  static const Color primary = Color(0xFFe68c1e); // Jippy Orange - jeepney routes
-  static const Color secondary = Color(0xFF87dcf1); // Transit Blue - walking paths
-  static const Color accent = Color(0xFF6f57ec); // Jeepney Purple - selected / tricycle
+  /// Brand seed / jeepney route orange.
+  static const Color primary = Color(0xFFe68c1e);
+
+  /// Transit blue — walking paths.
+  static const Color secondary = Color(0xFF87dcf1);
+
+  /// Jeepney purple — selected / tricycle.
+  static const Color accent = Color(0xFF6f57ec);
+
+  /// Dark ink used for route outlines on the map.
+  static const Color text = Color(0xFF0d0902);
+
+  /// Placeholder behind the map canvas while tiles load.
+  static const Color mapCanvasPlaceholder = Color(0xFFfefaf5);
 
   // --- Polyline styling ---
+
   /// Stroke width (logical pixels) for jeepney route lines.
   static const double jeepneyRouteStrokeWidth = 4.5;
 
@@ -40,6 +51,6 @@ class MapColors {
   /// Extra stroke width (pixels) added to the fill width for route outlines.
   static const int routeOutlineExtraWidth = 2;
 
-  /// Uniform border for unselected route list cards.
+  /// Uniform border for unselected route list cards on the map sheet.
   static const Color routeListBorderColor = Color(0xFFBDBDBD);
 }

@@ -13,7 +13,7 @@ const String publicImagesPathPrefix = '/api/public/images/';
 const String feedbackApiUrl = '$apiBaseUrl/api/public/feedback';
 
 /// Public API URL for step-by-step navigation suggestions.
-const String navigateApiUrl = '$apiBaseUrl/api/public/navigate/v2';
+const String navigateApiUrl = '$apiBaseUrl/api/public/navigate/v3';
 
 /// Valhalla proxy status endpoint.
 const String valhallaStatusApiUrl =

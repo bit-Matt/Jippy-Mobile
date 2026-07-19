@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../core/theme/map_colors.dart';
 import 'app_shell.dart';
 
 /// Branded loading overlay shown while the map and core services initialize.
@@ -54,6 +53,7 @@ class _SplashGateState extends State<SplashGate> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final logoWidth = MediaQuery.sizeOf(context).width * 0.4;
 
     return Stack(
@@ -67,7 +67,7 @@ class _SplashGateState extends State<SplashGate> {
               opacity: _fadeOut ? 0 : 1,
               duration: SplashGate._fadeDuration,
               child: ColoredBox(
-                color: MapColors.background,
+                color: colorScheme.surface,
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -77,11 +77,11 @@ class _SplashGateState extends State<SplashGate> {
                         width: logoWidth,
                       ),
                       const SizedBox(height: 24),
-                      const SizedBox(
+                      SizedBox(
                         width: 28,
                         height: 28,
                         child: CircularProgressIndicator(
-                          color: MapColors.primary,
+                          color: colorScheme.primary,
                           strokeWidth: 2,
                         ),
                       ),
